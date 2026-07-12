@@ -1,0 +1,148 @@
+{
+  "games": [
+    {
+      "milestone": 800,
+      "players": [
+        {
+          "awardGame": {
+            "gameTitle": "TPS - Lukko : 2026-10-24",
+            "gameId": 2701414,
+            "season": 2027
+          },
+          "celebrationGame": {
+            "gameTitle": "TPS - Lukko : 2026-10-24",
+            "gameId": 2701414,
+            "season": 2027
+          },
+          "games": 782,
+          "assists": 213,
+          "goals": 145,
+          "playerId": 27752328,
+          "points": 358,
+          "firstName": "Otto",
+          "lastName": "Paajanen",
+          "teamExternalId": "651304385:tps",
+          "teamId": 651304385,
+          "teamName": "TPS",
+          "pictureUrl": null,
+          "role": "H",
+          "jersey": 13
+        }
+      ]
+    }
+  ],
+  "goals": [
+    {
+      "milestone": 100,
+      "players": [
+        {
+          "awardGame": null,
+          "celebrationGame": null,
+          "games": 418,
+          "assists": 157,
+          "goals": 97,
+          "playerId": 21499603,
+          "points": 254,
+          "firstName": "Anrei",
+          "lastName": "Hakulinen",
+          "teamExternalId": "55786244:hpk",
+          "teamId": 55786244,
+          "teamName": "HPK",
+          "pictureUrl": "https://liiga-backend-prod.s3.eu-north-1.amazonaws.com/2027/55786244%3Ahpk/21499603.png",
+          "role": "H",
+          "jersey": 94
+        },
+        {
+          "awardGame": null,
+          "celebrationGame": null,
+          "games": 453,
+          "assists": 140,
+          "goals": 97,
+          "playerId": 27471447,
+          "points": 237,
+          "firstName": "Aleksi",
+          "lastName": "Klemetti",
+          "teamExternalId": "859884935:kalpa",
+          "teamId": 859884935,
+          "teamName": "KalPa",
+          "pictureUrl": "https://liiga-backend-prod.s3.eu-north-1.amazonaws.com/2027/859884935%3Akalpa/27471447.png",
+          "role": "H",
+          "jersey": 20
+        }
+      ]
+    }
+  ],
+  "assists": [
+    {
+      "milestone": 300,
+      "players": [
+        {
+          "awardGame": {
+            "gameTitle": "HIFK - Jukurit : 2026-09-16",
+            "gameId": 2701305,
+            "season": 2027
+          },
+          "celebrationGame": {
+            "gameTitle": "HIFK - Jukurit : 2026-09-16",
+            "gameId": 2701305,
+            "season": 2027
+          },
+          "games": 396,
+          "assists": 297,
+          "goals": 73,
+          "playerId": 22333124,
+          "points": 370,
+          "firstName": "Jori",
+          "lastName": "Lehterä",
+          "teamExternalId": "168761288:hifk",
+          "teamId": 168761288,
+          "teamName": "HIFK",
+          "pictureUrl": "https://liiga-backend-prod.s3.eu-north-1.amazonaws.com/2027/168761288%3Ahifk/22333124.png",
+          "role": "H",
+          "jersey": 21
+        },
+        {
+          "awardGame": null,
+          "celebrationGame": null,
+          "games": 618,
+          "assists": 283,
+          "goals": 87,
+          "playerId": 21848539,
+          "points": 370,
+          "firstName": "Jan-Mikael",
+          "lastName": "Järvinen",
+          "teamExternalId": "951626834:ilves",
+          "teamId": 951626834,
+          "teamName": "Ilves",
+          "pictureUrl": null,
+          "role": "H",
+          "jersey": 44
+        }
+      ]
+    }
+  ],
+  "points": [
+    {
+      "milestone": 400,
+      "players": [
+        {
+          "awardGame": null,
+          "celebrationGame": null,
+          "games": 626,
+          "assists": 189,
+          "goals": 201,
+          "playerId": 22953708,
+          "points": 390,
+          "firstName": "Juuso",
+          "lastName": "Puustinen",
+          "teamExternalId": "219244634:jyp",
+          "teamId": 219244634,
+          "teamName": "JYP",
+          "pictureUrl": "https://liiga-backend-prod.s3.eu-north-1.amazonaws.com/2027/219244634%3Ajyp/22953708.png",
+          "role": "H",
+          "jersey": 71
+        }
+      ]
+    }
+  ]
+}

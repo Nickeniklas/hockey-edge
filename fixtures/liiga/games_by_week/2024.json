@@ -1,0 +1,185 @@
+[
+  {
+    "id": 2701274,
+    "season": 2027,
+    "start": "2026-09-01T15:30:00Z",
+    "homeTeam": {
+      "teamId": "292293444:jukurit",
+      "teamPlaceholder": null,
+      "teamName": "Jukurit",
+      "goals": 0,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-09-01T18:30:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F5fa94d44327f46b7b4e30ae58a3be7ca",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F5fa94d44327f46b7b4e30ae58a3be7ca",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "awayTeam": {
+      "teamId": "55786244:hpk",
+      "teamPlaceholder": null,
+      "teamName": "HPK",
+      "goals": 0,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-09-01T18:30:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F6020edd6d9bc45b68a50bd191b826deb",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F6020edd6d9bc45b68a50bd191b826deb",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "finishedType": "ACTIVE_OR_NOT_STARTED",
+    "started": false,
+    "ended": false,
+    "buyTicketsUrl": "https://www.lippu.fi/artist/jukurit/",
+    "iceRink": {
+      "id": 111,
+      "name": "Mikkelin jäähalli",
+      "latitude": 61.6926,
+      "longitude": 27.2546,
+      "streetAddress": "Raviradantie 1",
+      "zip": "50100",
+      "city": "MIKKELI"
+    },
+    "currentPeriod": 0,
+    "provider": "stats-67c867bbd6-bzh9q",
+    "stale": false,
+    "serie": "RUNKOSARJA",
+    "gameWeek": 1
+  },
+  {
+    "id": 2701275,
+    "season": 2027,
+    "start": "2026-09-01T15:30:00Z",
+    "homeTeam": {
+      "teamId": "1368624751:k-espoo",
+      "teamPlaceholder": null,
+      "teamName": "K-Espoo",
+      "goals": 0,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-09-01T18:30:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fbf4ab47ce42640ebad139fd11a6a7861",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fbf4ab47ce42640ebad139fd11a6a7861",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "awayTeam": {
+      "teamId": "859884935:kalpa",
+      "teamPlaceholder": null,
+      "teamName": "KalPa",
+      "goals": 0,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-09-01T18:30:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F1183427f2aed401184bc2f96bb1a3303",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F1183427f2aed401184bc2f96bb1a3303",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "finishedType": "ACTIVE_OR_NOT_STARTED",
+    "started": false,
+    "ended": false,
+    "buyTicketsUrl": "https://kiekkoespoo.tmtickets.fi",
+    "iceRink": {
+      "id": 190,
+      "name": "Tapiolan monitoimiareena",
+      "latitude": 60.1782,
+      "longitude": 24.7857,
+      "streetAddress": "Urheilupuistontie 3",
+      "zip": "02200",
+      "city": "ESPOO"
+    },
+    "currentPeriod": 0,
+    "provider": "stats-67c867bbd6-bzh9q",
+    "stale": false,
+    "serie": "RUNKOSARJA",
+    "gameWeek": 1
+  },
+  {
+    "id": 2701276,
+    "season": 2027,
+    "start": "2026-09-01T15:30:00Z",
+    "homeTeam": {
+      "teamId": "495643563:kärpät",
+      "teamPlaceholder": null,
+      "teamName": "Kärpät",
+      "goals": 0,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-09-01T18:30:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F57b5b1a6c04f43368910ee73822513d8",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F57b5b1a6c04f43368910ee73822513d8",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "awayTeam": {
+      "teamId": "679171680:ässät",
+      "teamPlaceholder": null,
+      "teamName": "Ässät",
+      "goals": 0,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-09-01T18:30:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe4c7031958a043cdb8ca80c3c353f0c6",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe4c7031958a043cdb8ca80c3c353f0c6",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "finishedType": "ACTIVE_OR_NOT_STARTED",
+    "started": false,
+    "ended": false,
+    "buyTicketsUrl": "https://www.ticketmaster.fi/artist/karpat-lippuja/96763",
+    "iceRink": {
+      "id": 131,
+      "name": "Oulun jäähalli",
+      "latitude": 65.0084,
+      "longitude": 25.494,
+      "streetAddress": "Teuvo Pakkalankatu 11",
+      "zip": "90100",
+      "city": "OULU"
+    },
+    "currentPeriod": 0,
+    "provider": "stats-67c867bbd6-bzh9q",
+    "stale": false,
+    "serie": "RUNKOSARJA",
+    "gameWeek": 1
+  }
+]

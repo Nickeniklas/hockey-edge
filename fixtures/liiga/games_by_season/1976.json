@@ -1,0 +1,202 @@
+[
+  {
+    "id": 25276,
+    "season": 1976,
+    "start": "1975-09-18T17:00:00Z",
+    "homeTeam": {
+      "teamId": "238306801:jokerit",
+      "teamPlaceholder": null,
+      "teamName": "Jokerit",
+      "goals": 7,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "1975-09-18T19:00:00+02:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Faaa8acd74adb43f4bfd3de3e9af484b0",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Faaa8acd74adb43f4bfd3de3e9af484b0",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "awayTeam": {
+      "teamId": "624554857:lukko",
+      "teamPlaceholder": null,
+      "teamName": "Lukko",
+      "goals": 3,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "1975-09-18T19:00:00+02:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F55329dda85a94cfaa626465a80329cc9",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F48695ce02ec549dab74ad90e65d1e532",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "finishedType": "ENDED_DURING_REGULAR_GAME_TIME",
+    "started": true,
+    "ended": true,
+    "gameTime": 3600,
+    "spectators": 2220,
+    "playOffPair": 0,
+    "playOffPhase": 0,
+    "playOffReqWins": 0,
+    "buyTicketsUrl": "https://www.ticketmaster.fi/artist/jokerit-lippuja/973335",
+    "iceRink": {
+      "id": 1,
+      "name": "Ainovaaran jäähalli",
+      "latitude": 66.3158,
+      "longitude": 23.6892,
+      "streetAddress": "Hiihtäjäntie",
+      "zip": "95600",
+      "city": "YLITORNIO"
+    },
+    "currentPeriod": 0,
+    "cacheUpdateDate": "2026-07-03T21:33:46.980470410Z",
+    "provider": "stats-8447d89b86-r26qd",
+    "stale": false,
+    "serie": "RUNKOSARJA",
+    "gameWeek": 1
+  },
+  {
+    "id": 25277,
+    "season": 1976,
+    "start": "1975-09-18T17:00:00Z",
+    "homeTeam": {
+      "teamId": "362185137:tappara",
+      "teamPlaceholder": null,
+      "teamName": "Tappara",
+      "goals": 0,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "1975-09-18T19:00:00+02:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F8bb664ba2392481ebc1091a33ee75513",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F8bb664ba2392481ebc1091a33ee75513",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "awayTeam": {
+      "teamId": "951626834:ilves",
+      "teamPlaceholder": null,
+      "teamName": "Ilves",
+      "goals": 2,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "1975-09-18T19:00:00+02:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F079e0e0bde4f43b8b8afa667d3285ebc",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F079e0e0bde4f43b8b8afa667d3285ebc",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "finishedType": "ENDED_DURING_REGULAR_GAME_TIME",
+    "started": true,
+    "ended": true,
+    "gameTime": 3600,
+    "spectators": 6937,
+    "playOffPair": 0,
+    "playOffPhase": 0,
+    "playOffReqWins": 0,
+    "iceRink": {
+      "id": 2,
+      "name": "Alavuden jäähalli",
+      "latitude": 62.5931,
+      "longitude": 23.6226,
+      "streetAddress": "Lakiantie 5",
+      "zip": "63300",
+      "city": "ALAVUS"
+    },
+    "currentPeriod": 0,
+    "cacheUpdateDate": "2026-07-03T21:33:46.980474726Z",
+    "provider": "stats-8447d89b86-r26qd",
+    "stale": false,
+    "serie": "RUNKOSARJA",
+    "gameWeek": 1
+  },
+  {
+    "id": 25278,
+    "season": 1976,
+    "start": "1975-09-18T17:00:00Z",
+    "homeTeam": {
+      "teamId": "679171680:ässät",
+      "teamPlaceholder": null,
+      "teamName": "Ässät",
+      "goals": 4,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "1975-09-18T19:00:00+02:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe4c7031958a043cdb8ca80c3c353f0c6",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe4c7031958a043cdb8ca80c3c353f0c6",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "awayTeam": {
+      "teamId": "651304385:tps",
+      "teamPlaceholder": null,
+      "teamName": "TPS",
+      "goals": 2,
+      "timeOut": null,
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "1975-09-18T19:00:00+02:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe07109c96edf4561b8b5021e7fc44526",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe07109c96edf4561b8b5021e7fc44526",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "finishedType": "ENDED_DURING_REGULAR_GAME_TIME",
+    "started": true,
+    "ended": true,
+    "gameTime": 3600,
+    "spectators": 2980,
+    "playOffPair": 0,
+    "playOffPhase": 0,
+    "playOffReqWins": 0,
+    "buyTicketsUrl": "https://www.ticketmaster.fi/assat",
+    "iceRink": {
+      "id": 4,
+      "name": "Patajunnuareena",
+      "latitude": 61.4747,
+      "longitude": 21.7661,
+      "streetAddress": "Jäähallinpolku",
+      "zip": "28500",
+      "city": "PORI"
+    },
+    "currentPeriod": 0,
+    "cacheUpdateDate": "2026-07-03T21:33:46.980479608Z",
+    "provider": "stats-8447d89b86-r26qd",
+    "stale": false,
+    "serie": "RUNKOSARJA",
+    "gameWeek": 1
+  }
+]
