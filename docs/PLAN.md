@@ -109,12 +109,11 @@ odds (OddsPapi /    │
 
 - **Liiga API is undocumented** — endpoints can change; scraping maintenance is the
   ongoing cost. Accepted: it's also the moat.
-- **OddsPapi billing semantics unverified** — per-fixture vs per-sport-board request
-  billing decides the capture budget. A real free-tier key is now in the untracked
-  `.env` (added 2026-07-12) — verify this against any in-season sport **before**
-  writing any snapshot-job code; it's the next concrete task. Liiga book depth / how
-  early lines post can only be verified in-season. Veikkaus scrape fallback stays in
-  reserve either way.
+- **OddsPapi billing confirmed (2026-07-12)**: per HTTP request, verified against
+  the dashboard usage counter (9/250 used across all manual tests + the probe
+  script) — see `docs/DATA_PIPELINE.md` for detail, including Liiga's
+  tournamentId (134). Liiga book depth / how early lines post still can only be
+  verified in-season. Veikkaus scrape fallback stays in reserve either way.
 - **Snapshot job needs an always-on machine** — where it runs (desktop, Mac, small
   VPS) not yet decided.
 - **Small Liiga samples** — 15 teams × 60 games; wider uncertainty bands, regress

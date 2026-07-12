@@ -15,10 +15,11 @@ grep + direct curl, not devtools — see `endpoints.py`) · NHL official
 API · MoneyPuck/NatStatTrick for NHL xG bootstrap · lineups from liiga.fi
 `/kokoonpanot` + veikkaus.fi mirror (liiga.fi has no odds — lineups/goalies only) ·
 odds: NHL via The Odds API free tier (1 credit = all NHL games per market+region),
-Liiga via OddsPapi free tier (listed on all plans, checked 2026-07; verify
-per-fixture vs per-board billing with a test key before building the snapshot job;
-guaranteed fallback = scrape Veikkaus, which is also the book actually bettable in
-Finland) · odds capture behind a swappable provider interface · Elo baseline +
+Liiga via OddsPapi free tier (listed on all plans, checked 2026-07; billing
+confirmed per-HTTP-request 2026-07-12 against the dashboard counter; Liiga
+tournamentId=134; guaranteed fallback = scrape Veikkaus, which is also the book
+actually bettable in Finland) · odds capture behind a swappable provider
+interface (scaffolded in `src/hockey_edge/snapshot/odds/`) · Elo baseline +
 LightGBM blend · local compute only.
 
 Tooling (decided session 1): plain venv + requirements.txt (no uv/poetry) ·
@@ -75,13 +76,27 @@ or shapes · one real sample response per verified endpoint/season checked into
   fetch before wiring the snapshot job, per the no-leakage rule.
 - `docs/SCHEMA_DRAFT.md` not started; next step is drafting the SQLite schema
   against these real fixture shapes.
-- **A real OddsPapi free-tier key is now in the untracked `.env`** (added end of this
-  session). **Next session's first task**: verify OddsPapi billing semantics
-  (per-fixture vs per-sport-board request billing) with that key against an in-season
-  sport before writing any snapshot-job code — this was flagged as a blocking open
-  item in `docs/PLAN.md` since planning, and is now unblocked. The odds provider
-  interface (swappable NHL/Liiga sources) hasn't been scaffolded yet — this is the
-  first real code against it.
+- **OddsPapi billing verified (2026-07-12, confirmed against the dashboard
+  counter)**: per HTTP request — one call to `/v4/odds-by-tournaments` bills as a
+  single request regardless of how many fixtures/bookmakers it returns (total
+  usage across all manual tests + `scripts/oddspapi_probe.py`: 9/250 for the
+  month). Liiga's tournamentId is **134** — not `34596` (Auroraliiga, the
+  women's league) or `48851` (Hokiliiga, Estonia), both false positives on a
+  naive name match. Full writeup in `docs/DATA_PIPELINE.md`'s OddsPapi section,
+  including the HTTP 404/`FIXTURE_NOT_FOUND` gotcha for an empty tournament board.
+- **Step 2 (snapshot capture job): skeleton built, not deployed.**
+  `src/hockey_edge/snapshot/` has the odds provider interface (`odds/base.py`), a
+  working `OddsPapiProvider`, a stubbed `VeikkausProvider` fallback, append-only
+  SQLite storage (`storage.py` → `data/snapshots.db`), and an orchestrator
+  (`job.py`, run manually via `python -m hockey_edge.snapshot.job`) that logs to
+  `logs/snapshot_job.log` and alerts at CRITICAL on failure without crashing or
+  writing partial data. Lineup capture (`lineups.py`) is stubbed, blocked on the
+  same pre-puck-drop `game_detail` question noted above. Odds parsing into
+  structured home/draw/away columns is also stubbed (every row currently has
+  `parsed=False`) — every call this session hit the empty-board 404 case, so the
+  real market/outcome JSON shape is still unconfirmed; implement parsing once a
+  live fixture payload can be inspected. Scheduling/deployment placement is still
+  open (see Gotchas).
 
 ## Gotchas
 - Liiga playoff format changed 2024-25; flag season phase per game; formats vary by season.
@@ -89,6 +104,10 @@ or shapes · one real sample response per verified endpoint/season checked into
 - Player-name normalization across sources (liiga.fi vs Veikkaus vs community) is a known pain.
 - Liiga small samples: regress early-season features hard to league mean.
 - Snapshot job needs an always-on machine — placement not yet decided (open item).
+- OddsPapi returns HTTP 404 with `code: "FIXTURE_NOT_FOUND"` for a tournament
+  with no fixtures currently posted, not `HTTP 200` with `[]` — the snapshot job
+  handles this explicitly as "no odds yet," not a failure; don't reintroduce a
+  bare `raise_for_status()` that would misclassify it.
 
 ## Secrets
 Odds API keys via environment / untracked `.env`. Never commit keys. If the repo goes
