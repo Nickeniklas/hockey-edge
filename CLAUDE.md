@@ -10,9 +10,17 @@ Full plan: `docs/PLAN.md`. Data contract: `docs/DATA_PIPELINE.md`. Model contrac
 ## Decided stack — do not re-litigate without being asked
 Python · SQLite · liiga.fi JSON API (endpoints via devtools discovery) · NHL official
 API · MoneyPuck/NatStatTrick for NHL xG bootstrap · lineups from liiga.fi
-`/kokoonpanot` + veikkaus.fi mirror · odds via OddsPapi free tier (Liiga coverage
-unverified → maybe scrape Veikkaus/Pinnacle) · Elo baseline + LightGBM blend ·
-local compute only.
+`/kokoonpanot` + veikkaus.fi mirror (liiga.fi has no odds — lineups/goalies only) ·
+odds: NHL via The Odds API free tier (1 credit = all NHL games per market+region),
+Liiga via OddsPapi free tier (listed on all plans, checked 2026-07; verify
+per-fixture vs per-board billing with a test key before building the snapshot job;
+guaranteed fallback = scrape Veikkaus, which is also the book actually bettable in
+Finland) · odds capture behind a swappable provider interface · Elo baseline +
+LightGBM blend · local compute only.
+
+Tooling (decided session 1): plain venv + requirements.txt (no uv/poetry) ·
+src/hockey_edge/ package layout · raw JSON cached as files under data/raw/
+(gitignored), SQLite stores metadata only.
 
 ## Hard rules
 1. **No leakage.** Features use only information timestamped before puck drop.

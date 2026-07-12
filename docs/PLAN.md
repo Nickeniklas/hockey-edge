@@ -59,7 +59,9 @@ for the build to be worth it — worst case is a great personal tool.
 | Lineups/goalies | Official pre-game lineups on liiga.fi (`/fi/peli/{season}/{gameId}/kokoonpanot`), mirrored by veikkaus.fi/kokoonpanot; liigakokoonpanot.com as fallback | No journalist-article NLP needed for MVP — structured official data exists, just capture it timestamped before puck drop |
 | NHL data | Official NHL API | Free, documented, Niklas has used it (nhl-stats-app) |
 | NHL advanced stats bootstrap | MoneyPuck / Natural Stat Trick downloads | Skip computing own xG at first; replace later if needed |
-| Odds | OddsPapi free tier first (250 req/mo, incl. Pinnacle + free historical, checked 2026-07) over The Odds API (credit-multiplier system, ~40 soft books, no Pinnacle) | Pinnacle closing line is the validation benchmark. Liiga coverage UNVERIFIED → open item; fallback is scraping Veikkaus/Pinnacle for Liiga |
+| Odds — NHL | The Odds API free tier (500 credits/mo; one call = all NHL games for a market+region = 1 credit, checked 2026-07) | 16 pulls/day covers closing captures with room to spare; NHL odds solved for free, zero risk |
+| Odds — Liiga | OddsPapi free tier (250 req/mo; Liiga confirmed listed on all plans, checked 2026-07 off-season). **Guaranteed fallback: scrape Veikkaus**, which posts odds on every Liiga game | Splitting leagues across two free tiers frees the whole OddsPapi budget for Liiga (~70–90 games/mo → closing + 1–2 earlier captures per game even under worst-case per-fixture billing). Veikkaus odds are also the odds actually bettable in Finland, so a Veikkaus edge is the actionable one |
+| Odds benchmark | Pinnacle closing (via OddsPapi) preferred; **Veikkaus closing as the practical benchmark** if Pinnacle unavailable | Pinnacle = sharp/academic benchmark; Veikkaus closing measures the edge at the book Niklas can actually use |
 | Models | Elo/ridge baseline + LightGBM, blended | GBM alone is overconfident and drifts early-season; Elo is calibrated and works on small data (Liiga: 15 teams, 60-game seasons) |
 | Metrics | Log loss + calibration, NOT accuracy | Product is probabilities vs odds; miscalibration produces fake edges |
 | Validation | Strict walk-forward by season, pre-puck-drop info only | The place these projects usually lie to themselves |
@@ -107,7 +109,11 @@ odds (OddsPapi /    │
 
 - **Liiga API is undocumented** — endpoints can change; scraping maintenance is the
   ongoing cost. Accepted: it's also the moat.
-- **Liiga odds source unverified** — check OddsPapi coverage; else scrape Veikkaus/Pinnacle.
+- **OddsPapi billing semantics unverified** — per-fixture vs per-sport-board request
+  billing decides the capture budget. Verifiable NOW with a free test key against any
+  in-season sport; do this before building the snapshot job. Liiga book depth / how
+  early lines post can only be verified in-season. Veikkaus scrape fallback stays in
+  reserve either way.
 - **Snapshot job needs an always-on machine** — where it runs (desktop, Mac, small
   VPS) not yet decided.
 - **Small Liiga samples** — 15 teams × 60 games; wider uncertainty bands, regress

@@ -31,8 +31,10 @@ The pipeline has two distinct jobs with different failure modes. Keep them separ
   (game_id, endpoint, fetched_at, http_status, content_hash). Re-running sync is
   always safe and only fetches what's missing/stale. This was the painful retrofit
   in eduskunta-analysis — here it's day-one design.
-- Raw JSON responses stored verbatim (raw table or files) so parsing can be redone
-  without refetching.
+- Raw JSON responses cached **as files on disk** under `data/raw/<league>/<endpoint>/<hash>.json`
+  (gitignored), with SQLite holding metadata only (`raw_responses`: url, fetched_at,
+  content_hash, file_path) — decided 2026-07 in the first Claude Code session. Parsing
+  can always be redone without refetching.
 
 ## Layer 2 — Snapshot capture (game-day job)
 
@@ -45,10 +47,19 @@ Captures, per upcoming game, polled at increasing frequency as puck drop approac
 1. **Confirmed lineups + starting goalies** — liiga.fi game `/kokoonpanot`;
    veikkaus.fi/kokoonpanot mirrors Liiga lineups early; liigakokoonpanot.com as
    manual-check fallback. NHL: official API starting goalies + lineups.
-2. **Odds** — moneyline (and later totals) from 1–2 books. OddsPapi free tier
-   (Pinnacle incl.) for NHL; Liiga coverage unverified → possibly scrape
-   Veikkaus/Pinnacle. Multiple captures per game give open→close line movement,
-   and the **last capture before puck drop ≈ closing line** = validation benchmark.
+2. **Odds** — moneyline (and later totals), captured behind a small provider
+   interface so the source is swappable without touching the rest of the pipeline:
+   - **NHL: The Odds API free tier** — one call returns all NHL games for a
+     market+region at 1 credit; 500 credits/mo = 16 pulls/day. Solved, no risk.
+   - **Liiga: OddsPapi free tier** (Liiga listed on all plans, checked 2026-07).
+     Full 250 req/mo budget goes to Liiga (~70–90 games/mo). **Verify billing
+     semantics (per-fixture vs per-sport-board) with a test key BEFORE building
+     this job.** Guaranteed fallback: scrape Veikkaus, which posts odds on every
+     Liiga game — also the odds actually bettable in Finland.
+   - Multiple captures per game give open→close movement; if budget forces
+     rationing, the **last capture before puck drop (≈ closing line) is the one
+     non-negotiable poll** — it's the validation benchmark (Pinnacle preferred,
+     Veikkaus closing as the practical benchmark otherwise).
 
 Missed capture = data gone forever. Job must alert on failure (even just a log/email),
 and start running as early in the build as possible.
@@ -66,7 +77,8 @@ Guideline shapes — final DDL decided in implementation, but keep these separat
   — Liiga/European books price regulation 1X2 three-way; NHL moneyline is two-way
   incl. OT. Store market type explicitly.
 - `sync_state` (see above)
-- `raw_responses` (url, fetched_at, body or file ref)
+- `raw_responses` (url, fetched_at, content_hash, file_path) — metadata only; body
+  lives under `data/raw/`
 
 ## Feature store (Layer 3) — contract with the model
 

@@ -21,9 +21,15 @@ Python, SQLite, local compute. Liiga data from liiga.fi's undocumented JSON API
 `liiga.fi/fi/peli/{season}/{gameId}/...` incl. `/kokoonpanot` lineups). Official
 Liiga lineups/goalies also mirrored at veikkaus.fi/kokoonpanot;
 liigakokoonpanot.com as fallback. NHL from the official free NHL API; NHL xG
-bootstrapped from MoneyPuck/Natural Stat Trick. Odds: OddsPapi free tier first
-(250 req/mo, incl. Pinnacle + historical, as of 2026-07); Liiga odds coverage
-unverified — fallback is scraping Veikkaus/Pinnacle. Models: Elo-style baseline +
+bootstrapped from MoneyPuck/Natural Stat Trick. Odds are split across two free
+tiers: NHL via The Odds API (1 credit = all NHL games per market+region, 500/mo —
+solved, no risk) and Liiga via OddsPapi (250 req/mo, all budget for Liiga's ~70–90
+games/mo; billing semantics per-fixture vs per-board must be verified with a test
+key before the snapshot job is built). Guaranteed Liiga fallback: scrape Veikkaus,
+which posts odds on every Liiga game and is the book actually bettable in Finland —
+so "beat Veikkaus closing" is the practical benchmark if Pinnacle (via OddsPapi)
+is unavailable. Odds capture sits behind a swappable provider interface. liiga.fi
+itself has no odds — lineups/goalies only. Models: Elo-style baseline +
 LightGBM, blended (GBM alone = overconfident early-season). Targets: NHL binary
 moneyline; Liiga three-way regulation 1X2. Metrics: log loss + calibration, never
 accuracy; benchmark is odds-implied probabilities (vig removed) from the last
@@ -48,7 +54,15 @@ schedule fatigue (B2B, density; travel NHL-only); home advantage (bigger in Liig
 roster availability (share of ice time missing); late-season motivation proxy.
 Excluded as noise: streaks, head-to-head, point streaks.
 
+## Tooling (decided in first Claude Code session)
+Plain venv + requirements.txt; src/hockey_edge/ package layout; raw JSON cached as
+files under data/raw/ (gitignored) with SQLite holding metadata only; endpoint
+catalog isolated in src/hockey_edge/ingest/liiga/endpoints.py.
+
 ## Open items
-Where the always-on snapshot job runs; OddsPapi Liiga coverage;
-liiga.fi ToS review before anything public; Liiga shot-coordinate availability
+Where the always-on snapshot job runs; OddsPapi billing semantics (per-fixture vs
+per-sport-board — verifiable now with a free test key, do before building the
+snapshot job); Liiga book depth / how early lines post (in-season check only);
+liiga.fi ToS review before anything public; Liiga
+shot-coordinate availability
 (affects whether own Liiga xG model is possible later).
