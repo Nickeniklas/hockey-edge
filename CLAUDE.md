@@ -20,7 +20,10 @@ LightGBM blend · local compute only.
 
 Tooling (decided session 1): plain venv + requirements.txt (no uv/poetry) ·
 src/hockey_edge/ package layout · raw JSON cached as files under data/raw/
-(gitignored), SQLite stores metadata only.
+(gitignored), SQLite stores metadata only · each `Endpoint` in the catalog module
+tracks `verified_seasons`, since historical seasons may use different endpoints
+or shapes · one real sample response per verified endpoint/season checked into
+`fixtures/liiga/<name>/<season>.json` (git-tracked, unlike `data/raw/`).
 
 ## Hard rules
 1. **No leakage.** Features use only information timestamped before puck drop.
@@ -44,6 +47,20 @@ src/hockey_edge/ package layout · raw JSON cached as files under data/raw/
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-07-12)
+- **Step 1 (Liiga ingest) in progress, endpoint discovery not yet done.** Scaffolding
+  is built: `src/hockey_edge/` package, `requirements.txt`, `.gitignore`, and the
+  endpoint catalog module `src/hockey_edge/ingest/liiga/endpoints.py`. Its 3 entries
+  (`game_kokoonpanot`, `stats_en`, `pelaajat_fi`) are **UNCONFIRMED placeholders**
+  copied from `docs/DATA_PIPELINE.md` — none verified against real devtools traffic
+  yet, `verified_seasons` is empty on all of them.
+- `fixtures/liiga/` convention is set up (see `fixtures/liiga/README.md`) but has no
+  files in it yet — no real sample responses captured.
+- `docs/SCHEMA_DRAFT.md` not started; blocked on seeing real payload shapes first.
+- **Next step**: paste liiga.fi devtools network captures (schedule page first, per
+  plan) so placeholders can be replaced with confirmed URLs + a fixture sample each;
+  then draft the SQLite schema.
 
 ## Gotchas
 - Liiga playoff format changed 2024-25; flag season phase per game; formats vary by season.
