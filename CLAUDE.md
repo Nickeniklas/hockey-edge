@@ -7,6 +7,8 @@ immutable prediction log. Liiga is the differentiator (nobody models it; softer 
 Full plan: `docs/PLAN.md`. Data contract: `docs/DATA_PIPELINE.md`. Model contract:
 `docs/MODEL.md`. Read them before structural work.
 
+/docs/PROJECT_CONTEXT: Owned by the design chat. Emitted whole and replaced wholesale at session close. Not edited by Human or by Claude Code sessions.
+
 ## Decided stack — do not re-litigate without being asked
 Python · SQLite · liiga.fi JSON API (endpoints via devtools discovery) · NHL official
 API · MoneyPuck/NatStatTrick for NHL xG bootstrap · lineups from liiga.fi
@@ -49,18 +51,29 @@ or shapes · one real sample response per verified endpoint/season checked into
 7. Prediction log + local dashboard
 
 ## Status (as of 2026-07-12)
-- **Step 1 (Liiga ingest) in progress, endpoint discovery not yet done.** Scaffolding
-  is built: `src/hockey_edge/` package, `requirements.txt`, `.gitignore`, and the
-  endpoint catalog module `src/hockey_edge/ingest/liiga/endpoints.py`. Its 3 entries
-  (`game_kokoonpanot`, `stats_en`, `pelaajat_fi`) are **UNCONFIRMED placeholders**
-  copied from `docs/DATA_PIPELINE.md` — none verified against real devtools traffic
-  yet, `verified_seasons` is empty on all of them.
-- `fixtures/liiga/` convention is set up (see `fixtures/liiga/README.md`) but has no
-  files in it yet — no real sample responses captured.
-- `docs/SCHEMA_DRAFT.md` not started; blocked on seeing real payload shapes first.
-- **Next step**: paste liiga.fi devtools network captures (schedule page first, per
-  plan) so placeholders can be replaced with confirmed URLs + a fixture sample each;
-  then draft the SQLite schema.
+- **Step 1 (Liiga ingest): endpoint discovery done without devtools.** Fetched
+  liiga.fi's HTML + Vite JS bundle directly, grepped it for API call sites, then
+  curled candidates (normal UA, rate-limited, no auth) to confirm. All data lives
+  under `https://liiga.fi/api/v2`. `src/hockey_edge/ingest/liiga/endpoints.py` now
+  has 17 catalog entries, 16 confirmed with real responses + `verified_seasons`,
+  covering games (verified back to season=1976, the league's first season, through
+  2024), schedule, standings, per-game lineups/rosters, per-game/per-period corsi
+  stats, shot coordinates, player bios/rosters/game logs, and team season history.
+  One entry (`teams_stats`) is a confirmed *path* from the bundle but every param
+  combination tried 500/502'd — flagged in its `notes` field as needing a real
+  devtools capture (open the team-stats tab on liiga.fi/en/stats, change a filter,
+  grab the request).
+- `fixtures/liiga/` now has one real (trimmed) sample response per verified
+  endpoint/season — see the directory for the full list.
+- **Known gotchas found this pass** (see `notes` on each `Endpoint` for detail):
+  `games_by_date` and `team_info` silently ignore the `season` query param;
+  `game_stats`/`shotmap` 500 for old seasons (recent-seasons-only data, not a
+  broken endpoint — skip and move on during backfill); whether `game_detail`/
+  `game_preview` expose lineups *before* puck drop is untested (no games were
+  scheduled during the 2026-07 off-season check) — verify against a live pre-game
+  fetch before wiring the snapshot job, per the no-leakage rule.
+- `docs/SCHEMA_DRAFT.md` not started; next step is drafting the SQLite schema
+  against these real fixture shapes.
 
 ## Gotchas
 - Liiga playoff format changed 2024-25; flag season phase per game; formats vary by season.

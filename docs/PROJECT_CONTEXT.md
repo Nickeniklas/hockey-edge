@@ -2,6 +2,8 @@
 
 Paste-ready summary for Claude project memory. Crystallized 2026-07-06.
 
+Owned by the design chat. Emitted whole and replaced wholesale at session close. Not edited by Human or by Claude Code sessions.
+
 ## Project
 Niklas (IT student, Finland; Python/data/ML skills; Windows RTX 3060 Ti desktop + M1
 Mac) is building a **personal-use-first hockey prediction tool for Liiga and NHL**.
