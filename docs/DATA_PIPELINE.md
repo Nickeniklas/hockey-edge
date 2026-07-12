@@ -57,14 +57,60 @@ Captures, per upcoming game, polled at increasing frequency as puck drop approac
      market+region at 1 credit; 500 credits/mo = 16 pulls/day. Solved, no risk.
    - **Liiga: OddsPapi free tier** (Liiga listed on all plans, checked 2026-07).
      Full 250 req/mo budget goes to Liiga (~70–90 games/mo). A real free-tier key is
-     now in the untracked `.env` (added 2026-07-12). **Verify billing semantics
-     (per-fixture vs per-sport-board) with it BEFORE building this job** — next
-     concrete task. Guaranteed fallback: scrape Veikkaus, which posts odds on every
-     Liiga game — also the odds actually bettable in Finland.
+     now in the untracked `.env` (added 2026-07-12). Guaranteed fallback: scrape
+     Veikkaus, which posts odds on every Liiga game — also the odds actually
+     bettable in Finland.
+
+     **OddsPapi verified 2026-07-12** (`scripts/oddspapi_probe.py`, 2 HTTP requests
+     total, off-season so no live fixtures — see script docstring for how to re-run):
+     - Base URL `https://api.oddspapi.io/v4`; auth is `apiKey=<key>` as a query
+       param on every request (not a header).
+     - **Liiga tournamentId = 134** (`GET /v4/tournaments?sportId=15`, ice hockey
+       → 361 tournaments returned; `tournamentId=134` has `tournamentName='Liiga'`,
+       `categoryName='Finland'`, `tournamentSlug='liiga'`). Two other candidates
+       matched the naive "liiga" name/slug filter and must not be confused with
+       this one: `34596` = Auroraliiga (Finland's *women's* league) and `48851` =
+       Hokiliiga (Estonia, different country). Use `134` for all Liiga odds calls.
+     - Billing semantics: **per HTTP request — CONFIRMED** against the OddsPapi
+       dashboard counter (2026-07-12): total usage after all manual tests + probe
+       runs was 9/250. The first manual call alone returned the full ice-hockey
+       tournament list (361 tournaments, a large payload); per-fixture or
+       per-item billing would have consumed far more than 9 for that alone. One
+       call to `/v4/odds-by-tournaments?tournamentIds=134&bookmaker=<book>`
+       returns the *entire* tournament's fixture board (all upcoming Liiga games
+       with odds) in one response, billed as a single request regardless of
+       payload size.
+     - **GOTCHA**: when a tournament has zero fixtures with odds posted (our
+       off-season case), `/odds-by-tournaments` returns **HTTP 404** with
+       `{"error": {"code": "FIXTURE_NOT_FOUND", ...}}` — not `HTTP 200` with `[]`
+       as originally assumed. The snapshot job must treat this specific 404/code
+       combination as "no odds yet" (normal, not an alert-worthy failure), while
+       still alerting on other 4xx/5xx or a missing/different error code.
+     - Because one call returns the whole tournament board, polling budget is
+       bounded by **poll events (calendar slots), not game count** — a single
+       request during a multi-game Liiga night captures odds for every game that
+       night at once. This makes 250 req/mo far less tight than the per-game
+       framing suggests; see the request-pattern note below.
+     - **Open tripwire**: odds snapshots are written with `parsed=False` until
+       the first real Liiga fixtures with odds appear — at that point, confirm
+       the market/outcome shape against a live payload and implement parsing in
+       `OddsPapiProvider` (currently a TODO in `snapshot/odds/oddspapi.py`).
    - Multiple captures per game give open→close movement; if budget forces
      rationing, the **last capture before puck drop (≈ closing line) is the one
      non-negotiable poll** — it's the validation benchmark (Pinnacle preferred,
      Veikkaus closing as the practical benchmark otherwise).
+   - **Liiga request pattern**: one `/odds-by-tournaments` pull (`tournamentIds=134`)
+     per poll, covering every fixture currently on the board — the job polls the
+     *tournament*, not individual games. Liiga plays ~70–90 games/mo but typically
+     in batches on shared game nights (2–7 games/night), so the number of poll
+     events/mo is much smaller than the game count. Budget check: even a generous
+     schedule of one poll per game night plus one extra closing-line poll per
+     night (~2 polls × ~15–20 game nights/mo ≈ 30–40 req/mo) leaves most of the
+     250 req/mo budget unused — room for several intra-day captures (open, mid,
+     close) per night rather than the tight per-game rationing originally assumed.
+     Still guarantee the last-poll-before-puck-drop per game even on multi-game
+     nights (poll close enough to the *earliest* puck drop that night, or poll
+     per-game near each game's own drop time if spacing allows).
 
 Missed capture = data gone forever. Job must alert on failure (even just a log/email),
 and start running as early in the build as possible.
