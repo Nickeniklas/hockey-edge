@@ -55,7 +55,7 @@ for the build to be worth it — worst case is a great personal tool.
 |---|---|---|
 | Language | Python | Niklas's main language; whole ML ecosystem |
 | Storage | SQLite | Proven pattern from eduskunta-analysis; single-file, easy resumable sync |
-| Liiga data | liiga.fi underlying JSON API (SPA) | Site is a JS SPA → JSON API behind it; endpoints discovered via devtools. Building a clean Liiga dataset IS the moat |
+| Liiga data | liiga.fi underlying JSON API (SPA) | Site is a JS SPA → JSON API behind it; endpoints discovered 2026-07-12 via JS-bundle grep + direct curl (see `endpoints.py`). Building a clean Liiga dataset IS the moat |
 | Lineups/goalies | Official pre-game lineups on liiga.fi (`/fi/peli/{season}/{gameId}/kokoonpanot`), mirrored by veikkaus.fi/kokoonpanot; liigakokoonpanot.com as fallback | No journalist-article NLP needed for MVP — structured official data exists, just capture it timestamped before puck drop |
 | NHL data | Official NHL API | Free, documented, Niklas has used it (nhl-stats-app) |
 | NHL advanced stats bootstrap | MoneyPuck / Natural Stat Trick downloads | Skip computing own xG at first; replace later if needed |
@@ -110,8 +110,9 @@ odds (OddsPapi /    │
 - **Liiga API is undocumented** — endpoints can change; scraping maintenance is the
   ongoing cost. Accepted: it's also the moat.
 - **OddsPapi billing semantics unverified** — per-fixture vs per-sport-board request
-  billing decides the capture budget. Verifiable NOW with a free test key against any
-  in-season sport; do this before building the snapshot job. Liiga book depth / how
+  billing decides the capture budget. A real free-tier key is now in the untracked
+  `.env` (added 2026-07-12) — verify this against any in-season sport **before**
+  writing any snapshot-job code; it's the next concrete task. Liiga book depth / how
   early lines post can only be verified in-season. Veikkaus scrape fallback stays in
   reserve either way.
 - **Snapshot job needs an always-on machine** — where it runs (desktop, Mac, small

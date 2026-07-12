@@ -10,7 +10,8 @@ Full plan: `docs/PLAN.md`. Data contract: `docs/DATA_PIPELINE.md`. Model contrac
 /docs/PROJECT_CONTEXT: Owned by the design chat. Emitted whole and replaced wholesale at session close. Not edited by Human or by Claude Code sessions.
 
 ## Decided stack — do not re-litigate without being asked
-Python · SQLite · liiga.fi JSON API (endpoints via devtools discovery) · NHL official
+Python · SQLite · liiga.fi JSON API (endpoints discovered 2026-07-12 via JS-bundle
+grep + direct curl, not devtools — see `endpoints.py`) · NHL official
 API · MoneyPuck/NatStatTrick for NHL xG bootstrap · lineups from liiga.fi
 `/kokoonpanot` + veikkaus.fi mirror (liiga.fi has no odds — lineups/goalies only) ·
 odds: NHL via The Odds API free tier (1 credit = all NHL games per market+region),
@@ -74,6 +75,13 @@ or shapes · one real sample response per verified endpoint/season checked into
   fetch before wiring the snapshot job, per the no-leakage rule.
 - `docs/SCHEMA_DRAFT.md` not started; next step is drafting the SQLite schema
   against these real fixture shapes.
+- **A real OddsPapi free-tier key is now in the untracked `.env`** (added end of this
+  session). **Next session's first task**: verify OddsPapi billing semantics
+  (per-fixture vs per-sport-board request billing) with that key against an in-season
+  sport before writing any snapshot-job code — this was flagged as a blocking open
+  item in `docs/PLAN.md` since planning, and is now unblocked. The odds provider
+  interface (swappable NHL/Liiga sources) hasn't been scaffolded yet — this is the
+  first real code against it.
 
 ## Gotchas
 - Liiga playoff format changed 2024-25; flag season phase per game; formats vary by season.

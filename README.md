@@ -12,9 +12,12 @@ Full plan: [docs/PLAN.md](docs/PLAN.md). Data contract:
 
 ## Status
 
-Early scaffolding only — no runnable pipeline yet. Currently on build-order step 1
-(Liiga endpoint discovery); see the Status section in `CLAUDE.md` for exactly what's
-done vs. pending.
+Early scaffolding only — no runnable pipeline yet. Liiga endpoint discovery (build-order
+step 1) is done: 16 confirmed endpoints with real fixtures in `fixtures/liiga/`, catalog
+in `src/hockey_edge/ingest/liiga/endpoints.py`. A real OddsPapi free-tier key is now in
+the untracked `.env`; next up is verifying its billing semantics before writing any
+snapshot-job code. See the Status section in `CLAUDE.md` for exactly what's done vs.
+pending.
 
 ## Setup
 

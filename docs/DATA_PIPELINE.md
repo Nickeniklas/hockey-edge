@@ -7,13 +7,17 @@ The pipeline has two distinct jobs with different failure modes. Keep them separ
 ## Layer 1 — Historical ingest
 
 ### Liiga (the moat, and the ugly part)
-- liiga.fi is a JS SPA; all data comes from an underlying JSON API. **First task is
-  endpoint discovery via browser devtools** (network tab while browsing games,
-  schedules, stats pages). Known URL shapes to start from:
-  - game pages: `liiga.fi/fi/peli/{season}/{gameId}/...` (incl. `/kokoonpanot`)
-  - stats: `liiga.fi/en/stats` (skater/goalie/team), `liiga.fi/fi/pelaajat`
-  - community prior art exists (e.g. github.com/hmm/liigadata parses liiga.fi game
-    data to JSON) — read for endpoint hints, don't depend on it
+- liiga.fi is a JS SPA; all data comes from an underlying JSON API at
+  `https://liiga.fi/api/v2`. **Endpoint discovery is done** (2026-07-12) — instead of
+  browser devtools, endpoints were found by grepping the site's Vite JS bundle for
+  axios call sites, then confirming each candidate with a direct rate-limited curl.
+  16 endpoints are confirmed with real fixtures; one (`teams_stats`) is a real path
+  that 500/502'd on every param combination tried and still needs a devtools capture.
+  The full catalog, per-endpoint gotchas, and `verified_seasons` live in
+  `src/hockey_edge/ingest/liiga/endpoints.py` — that module is the source of truth,
+  not this doc. Games are confirmed back to season=1976 (the league's first season).
+  Community prior art (e.g. github.com/hmm/liigadata) was not needed in the end but
+  remains a fallback reference if the API shape ever changes.
 - Backfill target: ~10 seasons of games, per-game events (goals, penalties, shots if
   available), rosters, goalie stats, team stats. Take whatever granularity the API
   gives; shot coordinates may or may not exist — record what's there.
@@ -52,9 +56,10 @@ Captures, per upcoming game, polled at increasing frequency as puck drop approac
    - **NHL: The Odds API free tier** — one call returns all NHL games for a
      market+region at 1 credit; 500 credits/mo = 16 pulls/day. Solved, no risk.
    - **Liiga: OddsPapi free tier** (Liiga listed on all plans, checked 2026-07).
-     Full 250 req/mo budget goes to Liiga (~70–90 games/mo). **Verify billing
-     semantics (per-fixture vs per-sport-board) with a test key BEFORE building
-     this job.** Guaranteed fallback: scrape Veikkaus, which posts odds on every
+     Full 250 req/mo budget goes to Liiga (~70–90 games/mo). A real free-tier key is
+     now in the untracked `.env` (added 2026-07-12). **Verify billing semantics
+     (per-fixture vs per-sport-board) with it BEFORE building this job** — next
+     concrete task. Guaranteed fallback: scrape Veikkaus, which posts odds on every
      Liiga game — also the odds actually bettable in Finland.
    - Multiple captures per game give open→close movement; if budget forces
      rationing, the **last capture before puck drop (≈ closing line) is the one
