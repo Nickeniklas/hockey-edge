@@ -52,7 +52,42 @@ or shapes · one real sample response per verified endpoint/season checked into
 6. LightGBM + blend
 7. Prediction log + local dashboard
 
-## Status (as of 2026-07-12)
+## Status (as of 2026-07-13)
+- **Step 1 (Liiga ingest): schema drafted and ingest machinery built, smoke-tested
+  on season 2024.** `docs/SCHEMA_DRAFT.md` documents 14 curated tables (games,
+  goal/penalty/goalkeeper events, rosters, players, team/player/goalie period
+  stats, puck control, shot events, standings) plus `sync_state`/`raw_responses`,
+  derived from the real fixtures — not from assumptions — with rationale for every
+  deviation from `docs/DATA_PIPELINE.md`'s guideline shapes. DDL lives in
+  `src/hockey_edge/ingest/db.py` (`data/hockey.db`, separate from
+  `data/snapshots.db`). `src/hockey_edge/ingest/raw_cache.py` does rate-limited
+  (1.5s, normal Chrome UA), resumable fetch-and-cache: raw JSON to
+  `data/raw/liiga/<endpoint>/` (gitignored), metadata to `raw_responses`,
+  status to `sync_state` — a `status='success'` row skips the network entirely on
+  re-run. `src/hockey_edge/ingest/liiga/parsers.py` parses cached JSON into
+  curated rows; `backfill.py` orchestrates one season end to end (`python -m
+  hockey_edge.ingest.liiga.backfill --season 2024`). Curated tables are
+  deleted-and-reinserted per entity on reparse **except `games`**, which is
+  upserted in place — see `docs/SCHEMA_DRAFT.md`'s "Rebuild caveat" for why a
+  blanket delete broke on the FK from every other per-game table.
+- **Smoke test (season=2024, 2026-07-13)**: `games_by_season` (all 5 tournament
+  phases) + `standings` fetched in full — 561 games (450 regular + 45 playoffs +
+  66 preseason `serie="PRACTICE"`; `playout`/`qualifications` had none this
+  season). Per-game endpoints (`game_detail`/`game_stats`/`shotmap`) sampled to
+  the season's first 20 games via a new `--max-games` flag, not all 561 — a full
+  per-game pass is ~561 × 3 × the 1.5s delay (40+ min), too much real traffic to
+  spend before schema review. Verified idempotent (re-run: 0 HTTP requests, ~1.5s)
+  and `--force` refetch. Full row counts and two real bugs found+fixed while
+  smoke-testing (an FK violation on season reparse; a Windows/NTFS bug where a
+  colon in a cache filename silently wrote to a hidden alternate-data-stream
+  instead of erroring) are written up in `docs/SCHEMA_DRAFT.md`'s "Smoke test
+  results" section — the second bug in particular is worth reading before
+  trusting `data/raw/` file listings blindly on Windows.
+- **Not yet done**: the real ~10-season backfill (blocked on your schema review,
+  per your instruction) and full per-game endpoints for season 2024 beyond the
+  20-game sample. `player_info`/`player_list`/`team_info`/`teams_stats`/
+  `milestones` are cataloged but have no parser/table yet — deferred, see
+  `docs/SCHEMA_DRAFT.md`'s "Deferred" section for why each was skipped.
 - **Step 1 (Liiga ingest): endpoint discovery done without devtools.** Fetched
   liiga.fi's HTML + Vite JS bundle directly, grepped it for API call sites, then
   curled candidates (normal UA, rate-limited, no auth) to confirm. All data lives
@@ -74,8 +109,6 @@ or shapes · one real sample response per verified endpoint/season checked into
   `game_preview` expose lineups *before* puck drop is untested (no games were
   scheduled during the 2026-07 off-season check) — verify against a live pre-game
   fetch before wiring the snapshot job, per the no-leakage rule.
-- `docs/SCHEMA_DRAFT.md` not started; next step is drafting the SQLite schema
-  against these real fixture shapes.
 - **OddsPapi billing verified (2026-07-12, confirmed against the dashboard
   counter)**: per HTTP request — one call to `/v4/odds-by-tournaments` bills as a
   single request regardless of how many fixtures/bookmakers it returns (total
@@ -100,6 +133,16 @@ or shapes · one real sample response per verified endpoint/season checked into
 
 ## Gotchas
 - Liiga playoff format changed 2024-25; flag season phase per game; formats vary by season.
+- `games_by_season`'s `serie` field for preseason games reads `"PRACTICE"`, not
+  `"VALMISTAVAT_OTTELUT"` (confirmed season=2024) — `standings` uses lowercase
+  `valmistavat_ottelut` as its dict key for the same phase. The two endpoints
+  don't share vocabulary; don't assume they do elsewhere either.
+- On Windows, a raw `:` in a `data/raw/` cache filename is NTFS's alternate-
+  data-stream separator — it does not error, it silently writes to a hidden
+  stream invisible to `ls`/Explorer/git while reads keep working. Any code
+  building cache filenames from API-derived strings (season+tournament,
+  player names, etc.) must sanitize `:` same as `/`. Fixed once in
+  `raw_cache.py`; if a new raw-cache path gets added elsewhere, check it too.
 - Liiga odds are three-way (regulation 1X2); NHL moneyline is two-way incl. OT. Store market type.
 - Player-name normalization across sources (liiga.fi vs Veikkaus vs community) is a known pain.
 - Liiga small samples: regress early-season features hard to league mean.
