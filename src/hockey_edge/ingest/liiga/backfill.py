@@ -88,30 +88,37 @@ def backfill_games_and_standings(conn, season: int, *, force: bool = False) -> l
 def backfill_game_detail(conn, season: int, game_id: int, *, force: bool = False) -> str:
     endpoint = ENDPOINTS["game_detail"]
     url = endpoint.url_template.format(season=season, game_id=game_id)
-    result = raw_cache.fetch(conn, endpoint, str(game_id), url, season=season, force=force)
+    # entity_id must be season-scoped: game_id alone is not globally unique
+    # across seasons (liiga.fi reuses small RUNKOSARJA/PRACTICE ids per
+    # season) — see docs/BACKFILL_RESULTS.md for the corruption this caused
+    # before this fix.
+    entity_id = f"{season}:{game_id}"
+    result = raw_cache.fetch(conn, endpoint, entity_id, url, season=season, force=force)
     if result.status == "success" and result.data:
-        parsed = parsers.parse_game_detail(result.data, game_id)
-        parsers.upsert_game_detail(conn, game_id, parsed)
+        parsed = parsers.parse_game_detail(result.data, game_id, season)
+        parsers.upsert_game_detail(conn, game_id, season, parsed)
     return result.status
 
 
 def backfill_game_stats(conn, season: int, game_id: int, *, force: bool = False) -> str:
     endpoint = ENDPOINTS["game_stats"]
     url = endpoint.url_template.format(season=season, game_id=game_id)
-    result = raw_cache.fetch(conn, endpoint, str(game_id), url, season=season, force=force)
+    entity_id = f"{season}:{game_id}"  # see backfill_game_detail's comment
+    result = raw_cache.fetch(conn, endpoint, entity_id, url, season=season, force=force)
     if result.status == "success" and result.data:
-        parsed = parsers.parse_game_stats(result.data, game_id)
-        parsers.upsert_game_stats(conn, game_id, parsed)
+        parsed = parsers.parse_game_stats(result.data, game_id, season)
+        parsers.upsert_game_stats(conn, game_id, season, parsed)
     return result.status
 
 
 def backfill_shotmap(conn, season: int, game_id: int, *, force: bool = False) -> str:
     endpoint = ENDPOINTS["shotmap"]
     url = endpoint.url_template.format(season=season, game_id=game_id)
-    result = raw_cache.fetch(conn, endpoint, str(game_id), url, season=season, force=force)
+    entity_id = f"{season}:{game_id}"  # see backfill_game_detail's comment
+    result = raw_cache.fetch(conn, endpoint, entity_id, url, season=season, force=force)
     if result.status == "success" and result.data:
-        rows = parsers.parse_shotmap(result.data, game_id)
-        parsers.upsert_shot_events(conn, game_id, rows)
+        rows = parsers.parse_shotmap(result.data, game_id, season)
+        parsers.upsert_shot_events(conn, game_id, season, rows)
     return result.status
 
 

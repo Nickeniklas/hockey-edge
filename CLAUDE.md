@@ -52,7 +52,52 @@ or shapes · one real sample response per verified endpoint/season checked into
 6. LightGBM + blend
 7. Prediction log + local dashboard
 
-## Status (as of 2026-07-13)
+## Status (as of 2026-07-21)
+- **Step 1 (Liiga ingest): full 10-season backfill (2015–2024) complete and
+  verified.** `python -m hockey_edge.ingest.liiga.backfill --season <N>` run
+  for every season 2024 down to 2015 — 5,517 games total, all per-game
+  endpoints (`game_detail`/`game_stats`/`shotmap`), no `--max-games`
+  sampling. Full per-season row counts, sanity checks, goal-event cross-
+  checks, and NTFS spot-checks are in `docs/BACKFILL_RESULTS.md` — read it
+  before trusting `data/hockey.db` for feature-store work, especially the
+  top summary's notes on the two distinct `game_stats` gap mechanisms
+  (foreign-opponent friendlies vs. an unresolved Blues-specific gap in
+  2015/2016) and the confirmed xG-availability cutoff (absent through 2019,
+  partial by 2021, ~100% by 2023).
+- **Schema changed mid-backfill: `games`' primary key is now composite
+  `(game_id, season)`, not bare `game_id`.** Discovered during the season
+  2023 backfill that liiga.fi's `game_id` is **not globally unique across
+  seasons** — `RUNKOSARJA`/`PRACTICE` game_ids are small per-season counters
+  that get reused (449/450 season-2023 `RUNKOSARJA` game_ids collided with
+  season 2024's), silently overwriting `games` rows and causing the
+  per-game raw-cache (`sync_state`/`raw_responses`, keyed on bare
+  `entity_id=str(game_id)`) to serve one season's cached response under
+  another season's game_id. Fixed: `games` PK and every dependent table's
+  FK/UNIQUE constraint (`game_rosters`, `game_goal_events`,
+  `game_penalty_events`, `game_goalkeeper_events`,
+  `game_team_period_stats`, `game_player_period_stats`,
+  `game_goalie_period_stats`, `game_puck_control`, `shot_events`) now
+  include `season`; `raw_cache` entity_id for `game_detail`/`game_stats`/
+  `shotmap` is `f"{season}:{game_id}"`. `PLAYOFFS` game_ids did not collide
+  in any season checked (large, apparently-global range) — only
+  `RUNKOSARJA`/`PRACTICE` did. Full root-cause writeup, remediation steps,
+  and the regression check are in `docs/BACKFILL_RESULTS.md`'s "Fix
+  implemented and verified" section — **any future schema/parser work on
+  the per-game tables must preserve the composite key**, not silently
+  revert to bare `game_id`.
+- **Correction to an earlier assumption**: `game_stats`/`shotmap` are
+  **not** "recent-seasons-only" as previously believed from a season=2010
+  fixture 500ing — both endpoints work fine all the way back to season
+  2015 (the oldest season backfilled so far). The real `failed_permanent`
+  gaps found (160/5,517 games, 2.9%) are unrelated to season age — see
+  `docs/BACKFILL_RESULTS.md`'s top summary.
+- **Not yet done**: seasons older than 2015 (untested — `game_stats`/
+  `shotmap` behavior further back is unknown), `PLAYOUT`/`QUALIFICATIONS`
+  phase confirmation (zero games in either across all 10 seasons checked),
+  and the Blues `game_stats` gap root cause (would need a liiga.fi devtools
+  capture).
+
+## Status (historical — as of 2026-07-13)
 - **Step 1 (Liiga ingest): schema drafted and ingest machinery built, smoke-tested
   on season 2024.** `docs/SCHEMA_DRAFT.md` documents 14 curated tables (games,
   goal/penalty/goalkeeper events, rosters, players, team/player/goalie period
@@ -104,8 +149,11 @@ or shapes · one real sample response per verified endpoint/season checked into
   endpoint/season — see the directory for the full list.
 - **Known gotchas found this pass** (see `notes` on each `Endpoint` for detail):
   `games_by_date` and `team_info` silently ignore the `season` query param;
-  `game_stats`/`shotmap` 500 for old seasons (recent-seasons-only data, not a
-  broken endpoint — skip and move on during backfill); whether `game_detail`/
+  `game_stats`/`shotmap` occasionally 500 per-game (thought at the time to be a
+  recent-seasons-only cutoff — **corrected by the 2026-07-21 10-season
+  backfill: both endpoints work fine back through season 2015; the real
+  failures are per-game, not season-wide — see CLAUDE.md's current Status
+  section and `docs/BACKFILL_RESULTS.md`**); whether `game_detail`/
   `game_preview` expose lineups *before* puck drop is untested (no games were
   scheduled during the 2026-07 off-season check) — verify against a live pre-game
   fetch before wiring the snapshot job, per the no-leakage rule.
@@ -132,6 +180,14 @@ or shapes · one real sample response per verified endpoint/season checked into
   open (see Gotchas).
 
 ## Gotchas
+- **`game_id` is not globally unique across seasons** — liiga.fi reuses
+  small `RUNKOSARJA`/`PRACTICE` game_ids per season (confirmed: 449/450
+  season-2023 regular-season game_ids collided with season 2024's). Any
+  code touching `games` or a per-game table must key on `(game_id, season)`
+  together, never `game_id` alone — see the 2026-07-21 Status entry and
+  `docs/BACKFILL_RESULTS.md` for the corruption this caused before the fix.
+  `PLAYOFFS` game_ids did not collide in testing (large, apparently-global
+  range) but treat the composite key as the rule, not the exception.
 - Liiga playoff format changed 2024-25; flag season phase per game; formats vary by season.
 - `games_by_season`'s `serie` field for preseason games reads `"PRACTICE"`, not
   `"VALMISTAVAT_OTTELUT"` (confirmed season=2024) — `standings` uses lowercase

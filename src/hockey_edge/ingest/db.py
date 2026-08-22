@@ -49,8 +49,13 @@ CREATE TABLE IF NOT EXISTS raw_responses (
 );
 CREATE INDEX IF NOT EXISTS idx_raw_responses_lookup ON raw_responses (league, endpoint, entity_id);
 
+-- game_id alone is NOT globally unique: liiga.fi resets RUNKOSARJA/PRACTICE
+-- game_ids as small per-season counters (confirmed: 466 ids shared between
+-- season=2023 and season=2024, each pair referring to two different real
+-- games). PLAYOFFS ids are large and did not collide in testing, but the key
+-- is composite everywhere for safety. See docs/BACKFILL_RESULTS.md.
 CREATE TABLE IF NOT EXISTS games (
-    game_id INTEGER PRIMARY KEY,
+    game_id INTEGER NOT NULL,
     season INTEGER NOT NULL,
     phase TEXT NOT NULL,
     start_utc TEXT NOT NULL,
@@ -74,14 +79,16 @@ CREATE TABLE IF NOT EXISTS games (
     play_off_req_wins INTEGER,
     rink_name TEXT,
     rink_city TEXT,
-    source_raw_response_id INTEGER REFERENCES raw_responses(id)
+    source_raw_response_id INTEGER REFERENCES raw_responses(id),
+    PRIMARY KEY (game_id, season)
 );
 CREATE INDEX IF NOT EXISTS idx_games_season_phase ON games (season, phase);
 CREATE INDEX IF NOT EXISTS idx_games_teams ON games (home_team_id, away_team_id);
 
 CREATE TABLE IF NOT EXISTS game_goal_events (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     event_id INTEGER NOT NULL,
     scorer_player_id INTEGER,
@@ -95,13 +102,15 @@ CREATE TABLE IF NOT EXISTS game_goal_events (
     home_score_after INTEGER,
     away_score_after INTEGER,
     winning_goal INTEGER,
-    UNIQUE (game_id, team_id, event_id)
+    UNIQUE (game_id, season, team_id, event_id),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX IF NOT EXISTS idx_goal_events_game ON game_goal_events (game_id);
+CREATE INDEX IF NOT EXISTS idx_goal_events_game ON game_goal_events (game_id, season);
 
 CREATE TABLE IF NOT EXISTS game_penalty_events (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     event_id INTEGER NOT NULL,
     player_id INTEGER,
@@ -113,13 +122,15 @@ CREATE TABLE IF NOT EXISTS game_penalty_events (
     fault_name TEXT,
     fault_type TEXT,
     penalty_minutes INTEGER,
-    UNIQUE (game_id, team_id, event_id)
+    UNIQUE (game_id, season, team_id, event_id),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX IF NOT EXISTS idx_penalty_events_game ON game_penalty_events (game_id);
+CREATE INDEX IF NOT EXISTS idx_penalty_events_game ON game_penalty_events (game_id, season);
 
 CREATE TABLE IF NOT EXISTS game_goalkeeper_events (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     event_id INTEGER NOT NULL,
     player_id INTEGER NOT NULL,
@@ -128,13 +139,15 @@ CREATE TABLE IF NOT EXISTS game_goalkeeper_events (
     begin_time INTEGER,
     end_time INTEGER,
     empty_net INTEGER,
-    UNIQUE (game_id, team_id, event_id)
+    UNIQUE (game_id, season, team_id, event_id),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX IF NOT EXISTS idx_goalkeeper_events_game ON game_goalkeeper_events (game_id);
+CREATE INDEX IF NOT EXISTS idx_goalkeeper_events_game ON game_goalkeeper_events (game_id, season);
 
 CREATE TABLE IF NOT EXISTS game_rosters (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     player_id INTEGER NOT NULL,
     role TEXT,
@@ -146,9 +159,10 @@ CREATE TABLE IF NOT EXISTS game_rosters (
     injured INTEGER,
     suspended INTEGER,
     removed INTEGER,
-    UNIQUE (game_id, team_id, player_id)
+    UNIQUE (game_id, season, team_id, player_id),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX IF NOT EXISTS idx_game_rosters_game ON game_rosters (game_id);
+CREATE INDEX IF NOT EXISTS idx_game_rosters_game ON game_rosters (game_id, season);
 CREATE INDEX IF NOT EXISTS idx_game_rosters_player ON game_rosters (player_id);
 
 CREATE TABLE IF NOT EXISTS players (
@@ -167,7 +181,8 @@ CREATE TABLE IF NOT EXISTS players (
 
 CREATE TABLE IF NOT EXISTS game_team_period_stats (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     period INTEGER NOT NULL,
     goals INTEGER,
@@ -179,13 +194,15 @@ CREATE TABLE IF NOT EXISTS game_team_period_stats (
     penalty_minutes INTEGER,
     face_off_wins INTEGER,
     total_distance_travelled REAL,
-    UNIQUE (game_id, team_id, period)
+    UNIQUE (game_id, season, team_id, period),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX IF NOT EXISTS idx_team_period_stats_game ON game_team_period_stats (game_id);
+CREATE INDEX IF NOT EXISTS idx_team_period_stats_game ON game_team_period_stats (game_id, season);
 
 CREATE TABLE IF NOT EXISTS game_player_period_stats (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     player_id INTEGER NOT NULL,
     jersey_id INTEGER,
@@ -207,13 +224,15 @@ CREATE TABLE IF NOT EXISTS game_player_period_stats (
     distance REAL,
     expected_goals_player REAL,
     expected_goals_against REAL,
-    UNIQUE (game_id, team_id, player_id, period)
+    UNIQUE (game_id, season, team_id, player_id, period),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX IF NOT EXISTS idx_player_period_stats_game ON game_player_period_stats (game_id);
+CREATE INDEX IF NOT EXISTS idx_player_period_stats_game ON game_player_period_stats (game_id, season);
 
 CREATE TABLE IF NOT EXISTS game_goalie_period_stats (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     player_id INTEGER NOT NULL,
     jersey_id INTEGER,
@@ -223,23 +242,27 @@ CREATE TABLE IF NOT EXISTS game_goalie_period_stats (
     goals_allowed INTEGER,
     save_percentage TEXT,
     time_on_ice_seconds INTEGER,
-    UNIQUE (game_id, team_id, player_id, period)
+    UNIQUE (game_id, season, team_id, player_id, period),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX IF NOT EXISTS idx_goalie_period_stats_game ON game_goalie_period_stats (game_id);
+CREATE INDEX IF NOT EXISTS idx_goalie_period_stats_game ON game_goalie_period_stats (game_id, season);
 
 CREATE TABLE IF NOT EXISTS game_puck_control (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     period INTEGER NOT NULL,
     home_control_seconds REAL,
     away_control_seconds REAL,
     contested_control_seconds REAL,
-    UNIQUE (game_id, period)
+    UNIQUE (game_id, season, period),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
 
 CREATE TABLE IF NOT EXISTS shot_events (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     period INTEGER,
     game_time_seconds INTEGER,
     shooting_team_id TEXT,
@@ -250,9 +273,10 @@ CREATE TABLE IF NOT EXISTS shot_events (
     event_type TEXT,
     strength_type TEXT,
     own_team_players_on_ice INTEGER,
-    other_team_players_on_ice INTEGER
+    other_team_players_on_ice INTEGER,
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX IF NOT EXISTS idx_shot_events_game ON shot_events (game_id);
+CREATE INDEX IF NOT EXISTS idx_shot_events_game ON shot_events (game_id, season);
 
 CREATE TABLE IF NOT EXISTS standings (
     id INTEGER PRIMARY KEY,

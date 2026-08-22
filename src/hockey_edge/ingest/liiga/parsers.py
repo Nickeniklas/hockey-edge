@@ -95,6 +95,7 @@ def parse_games_by_season(
                 goal_rows.append(
                     (
                         game_id,
+                        season,
                         side_team,
                         ev.get("eventId"),
                         ev.get("scorerPlayerId"),
@@ -116,12 +117,14 @@ def parse_games_by_season(
 def upsert_games_for_season(
     conn: sqlite3.Connection, season: int, game_rows: list[tuple], goal_rows: list[tuple]
 ) -> None:
-    """Upserts `games` by game_id (never deletes) — a blanket delete-by-season
-    would violate the FK from every other per-game table (game_rosters,
-    game_*_stats, shot_events, ...) that other endpoints have already written
-    against these game_ids. `game_goal_events` IS solely owned by this parse
-    (games_by_season is its only source), so it's fine to delete-and-reinsert
-    scoped to just the game_ids in this batch."""
+    """Upserts `games` by (game_id, season) (never deletes) — a blanket
+    delete-by-season would violate the FK from every other per-game table
+    (game_rosters, game_*_stats, shot_events, ...) that other endpoints have
+    already written against these (game_id, season) pairs. `game_goal_events`
+    IS solely owned by this parse (games_by_season is its only source), so
+    it's fine to delete-and-reinsert scoped to just this season's game_ids —
+    scoped by season too, since game_id alone is not unique across seasons
+    (see the comment on the `games` table in db.py)."""
     conn.executemany(
         "INSERT INTO games (game_id, season, phase, start_utc, end_utc, home_team_id, "
         "home_team_name, home_goals, away_team_id, away_team_name, away_goals, "
@@ -129,8 +132,8 @@ def upsert_games_for_season(
         "finished_type, spectators, game_week, play_off_pair, play_off_phase, "
         "play_off_req_wins, rink_name, rink_city, source_raw_response_id) "
         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
-        "ON CONFLICT (game_id) DO UPDATE SET "
-        "season=excluded.season, phase=excluded.phase, start_utc=excluded.start_utc, "
+        "ON CONFLICT (game_id, season) DO UPDATE SET "
+        "phase=excluded.phase, start_utc=excluded.start_utc, "
         "end_utc=excluded.end_utc, home_team_id=excluded.home_team_id, "
         "home_team_name=excluded.home_team_name, home_goals=excluded.home_goals, "
         "away_team_id=excluded.away_team_id, away_team_name=excluded.away_team_name, "
@@ -147,14 +150,17 @@ def upsert_games_for_season(
     game_ids = [row[0] for row in game_rows]
     if game_ids:
         placeholders = ",".join("?" * len(game_ids))
-        conn.execute(f"DELETE FROM game_goal_events WHERE game_id IN ({placeholders})", game_ids)
+        conn.execute(
+            f"DELETE FROM game_goal_events WHERE season = ? AND game_id IN ({placeholders})",
+            [season] + game_ids,
+        )
     if goal_rows:
         conn.executemany(
-            "INSERT OR IGNORE INTO game_goal_events (game_id, team_id, event_id, "
+            "INSERT OR IGNORE INTO game_goal_events (game_id, season, team_id, event_id, "
             "scorer_player_id, scorer_first_name, scorer_last_name, period, "
             "game_time_seconds, log_time_utc, goal_types, assistant_player_ids, "
             "home_score_after, away_score_after, winning_goal) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             goal_rows,
         )
     conn.commit()
@@ -166,7 +172,7 @@ def upsert_games_for_season(
 # ---------------------------------------------------------------------------
 
 
-def parse_game_detail(data: dict, game_id: int) -> dict[str, list[tuple]]:
+def parse_game_detail(data: dict, game_id: int, season: int) -> dict[str, list[tuple]]:
     game = data.get("game") or {}
     home = game.get("homeTeam") or {}
     away = game.get("awayTeam") or {}
@@ -180,6 +186,7 @@ def parse_game_detail(data: dict, game_id: int) -> dict[str, list[tuple]]:
             roster_rows.append(
                 (
                     game_id,
+                    season,
                     team_id,
                     player_id,
                     p.get("role"),
@@ -216,6 +223,7 @@ def parse_game_detail(data: dict, game_id: int) -> dict[str, list[tuple]]:
             penalty_rows.append(
                 (
                     game_id,
+                    season,
                     team_id,
                     ev.get("eventId"),
                     ev.get("playerId"),
@@ -233,6 +241,7 @@ def parse_game_detail(data: dict, game_id: int) -> dict[str, list[tuple]]:
             goalkeeper_rows.append(
                 (
                     game_id,
+                    season,
                     team_id,
                     ev.get("eventId"),
                     ev.get("playerId"),
@@ -252,16 +261,18 @@ def parse_game_detail(data: dict, game_id: int) -> dict[str, list[tuple]]:
     }
 
 
-def upsert_game_detail(conn: sqlite3.Connection, game_id: int, parsed: dict[str, list[tuple]]) -> None:
-    conn.execute("DELETE FROM game_rosters WHERE game_id = ?", (game_id,))
-    conn.execute("DELETE FROM game_penalty_events WHERE game_id = ?", (game_id,))
-    conn.execute("DELETE FROM game_goalkeeper_events WHERE game_id = ?", (game_id,))
+def upsert_game_detail(
+    conn: sqlite3.Connection, game_id: int, season: int, parsed: dict[str, list[tuple]]
+) -> None:
+    conn.execute("DELETE FROM game_rosters WHERE game_id = ? AND season = ?", (game_id, season))
+    conn.execute("DELETE FROM game_penalty_events WHERE game_id = ? AND season = ?", (game_id, season))
+    conn.execute("DELETE FROM game_goalkeeper_events WHERE game_id = ? AND season = ?", (game_id, season))
 
     if parsed["rosters"]:
         conn.executemany(
-            "INSERT INTO game_rosters (game_id, team_id, player_id, role, role_code, "
+            "INSERT INTO game_rosters (game_id, season, team_id, player_id, role, role_code, "
             "jersey, captain, alternate_captain, rookie, injured, suspended, removed) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             parsed["rosters"],
         )
     if parsed["players"]:
@@ -279,17 +290,17 @@ def upsert_game_detail(conn: sqlite3.Connection, game_id: int, parsed: dict[str,
         )
     if parsed["penalties"]:
         conn.executemany(
-            "INSERT OR IGNORE INTO game_penalty_events (game_id, team_id, event_id, "
+            "INSERT OR IGNORE INTO game_penalty_events (game_id, season, team_id, event_id, "
             "player_id, sufferer_player_id, period, game_time_seconds, penalty_begin_time, "
             "penalty_end_time, fault_name, fault_type, penalty_minutes) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             parsed["penalties"],
         )
     if parsed["goalkeeper_events"]:
         conn.executemany(
-            "INSERT OR IGNORE INTO game_goalkeeper_events (game_id, team_id, event_id, "
+            "INSERT OR IGNORE INTO game_goalkeeper_events (game_id, season, team_id, event_id, "
             "player_id, period, game_time_seconds, begin_time, end_time, empty_net) "
-            "VALUES (?,?,?,?,?,?,?,?,?)",
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
             parsed["goalkeeper_events"],
         )
     conn.commit()
@@ -301,7 +312,7 @@ def upsert_game_detail(conn: sqlite3.Connection, game_id: int, parsed: dict[str,
 # ---------------------------------------------------------------------------
 
 
-def parse_game_stats(data: dict, game_id: int) -> dict[str, list[tuple]]:
+def parse_game_stats(data: dict, game_id: int, season: int) -> dict[str, list[tuple]]:
     team_rows = []
     player_rows = []
     goalie_rows = []
@@ -313,6 +324,7 @@ def parse_game_stats(data: dict, game_id: int) -> dict[str, list[tuple]]:
             team_rows.append(
                 (
                     game_id,
+                    season,
                     team_id,
                     period,
                     team_period.get("goals"),
@@ -331,6 +343,7 @@ def parse_game_stats(data: dict, game_id: int) -> dict[str, list[tuple]]:
                 player_rows.append(
                     (
                         game_id,
+                        season,
                         team_id,
                         ps.get("playerId"),
                         ps.get("jerseyId"),
@@ -359,6 +372,7 @@ def parse_game_stats(data: dict, game_id: int) -> dict[str, list[tuple]]:
                 goalie_rows.append(
                     (
                         game_id,
+                        season,
                         team_id,
                         gs.get("playerId"),
                         gs.get("jerseyId"),
@@ -374,6 +388,7 @@ def parse_game_stats(data: dict, game_id: int) -> dict[str, list[tuple]]:
     puck_rows = [
         (
             game_id,
+            season,
             ps.get("periodNumber"),
             ps.get("homeTeamControlDuration"),
             ps.get("awayTeamControlDuration"),
@@ -385,40 +400,42 @@ def parse_game_stats(data: dict, game_id: int) -> dict[str, list[tuple]]:
     return {"team": team_rows, "player": player_rows, "goalie": goalie_rows, "puck": puck_rows}
 
 
-def upsert_game_stats(conn: sqlite3.Connection, game_id: int, parsed: dict[str, list[tuple]]) -> None:
-    conn.execute("DELETE FROM game_team_period_stats WHERE game_id = ?", (game_id,))
-    conn.execute("DELETE FROM game_player_period_stats WHERE game_id = ?", (game_id,))
-    conn.execute("DELETE FROM game_goalie_period_stats WHERE game_id = ?", (game_id,))
-    conn.execute("DELETE FROM game_puck_control WHERE game_id = ?", (game_id,))
+def upsert_game_stats(
+    conn: sqlite3.Connection, game_id: int, season: int, parsed: dict[str, list[tuple]]
+) -> None:
+    conn.execute("DELETE FROM game_team_period_stats WHERE game_id = ? AND season = ?", (game_id, season))
+    conn.execute("DELETE FROM game_player_period_stats WHERE game_id = ? AND season = ?", (game_id, season))
+    conn.execute("DELETE FROM game_goalie_period_stats WHERE game_id = ? AND season = ?", (game_id, season))
+    conn.execute("DELETE FROM game_puck_control WHERE game_id = ? AND season = ?", (game_id, season))
 
     if parsed["team"]:
         conn.executemany(
-            "INSERT OR IGNORE INTO game_team_period_stats (game_id, team_id, period, goals, "
+            "INSERT OR IGNORE INTO game_team_period_stats (game_id, season, team_id, period, goals, "
             "shots, powerplay_instances, powerplay_goals, shorthanded_instances, "
             "shorthanded_goals_against, penalty_minutes, face_off_wins, total_distance_travelled) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             parsed["team"],
         )
     if parsed["player"]:
         conn.executemany(
-            "INSERT OR IGNORE INTO game_player_period_stats (game_id, team_id, player_id, "
+            "INSERT OR IGNORE INTO game_player_period_stats (game_id, season, team_id, player_id, "
             "jersey_id, period, goals, assists, points, plusminus, shots, penalty_minutes, "
             "powerplay_goals, shorthanded_goals, blocked_shots, faceoffs_total, faceoffs_won, "
             "corsi_for, corsi_against, time_on_ice_seconds, distance, expected_goals_player, "
-            "expected_goals_against) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "expected_goals_against) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             parsed["player"],
         )
     if parsed["goalie"]:
         conn.executemany(
-            "INSERT OR IGNORE INTO game_goalie_period_stats (game_id, team_id, player_id, "
+            "INSERT OR IGNORE INTO game_goalie_period_stats (game_id, season, team_id, player_id, "
             "jersey_id, period, shots_on_goal, saves, goals_allowed, save_percentage, "
-            "time_on_ice_seconds) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "time_on_ice_seconds) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             parsed["goalie"],
         )
     if parsed["puck"]:
         conn.executemany(
-            "INSERT OR IGNORE INTO game_puck_control (game_id, period, home_control_seconds, "
-            "away_control_seconds, contested_control_seconds) VALUES (?,?,?,?,?)",
+            "INSERT OR IGNORE INTO game_puck_control (game_id, season, period, home_control_seconds, "
+            "away_control_seconds, contested_control_seconds) VALUES (?,?,?,?,?,?)",
             parsed["puck"],
         )
     conn.commit()
@@ -429,10 +446,11 @@ def upsert_game_stats(conn: sqlite3.Connection, game_id: int, parsed: dict[str, 
 # ---------------------------------------------------------------------------
 
 
-def parse_shotmap(data: list[dict], game_id: int) -> list[tuple]:
+def parse_shotmap(data: list[dict], game_id: int, season: int) -> list[tuple]:
     return [
         (
             game_id,
+            season,
             ev.get("period"),
             ev.get("gameTime"),
             ev.get("shootingTeamId"),
@@ -449,13 +467,13 @@ def parse_shotmap(data: list[dict], game_id: int) -> list[tuple]:
     ]
 
 
-def upsert_shot_events(conn: sqlite3.Connection, game_id: int, rows: list[tuple]) -> None:
-    conn.execute("DELETE FROM shot_events WHERE game_id = ?", (game_id,))
+def upsert_shot_events(conn: sqlite3.Connection, game_id: int, season: int, rows: list[tuple]) -> None:
+    conn.execute("DELETE FROM shot_events WHERE game_id = ? AND season = ?", (game_id, season))
     if rows:
         conn.executemany(
-            "INSERT INTO shot_events (game_id, period, game_time_seconds, shooting_team_id, "
+            "INSERT INTO shot_events (game_id, season, period, game_time_seconds, shooting_team_id, "
             "shooter_player_id, blocker_player_id, shot_x, shot_y, event_type, strength_type, "
-            "own_team_players_on_ice, other_team_players_on_ice) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "own_team_players_on_ice, other_team_players_on_ice) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             rows,
         )
     conn.commit()
