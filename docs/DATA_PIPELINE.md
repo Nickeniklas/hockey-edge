@@ -119,6 +119,14 @@ and start running as early in the build as possible.
 
 Guideline shapes — final DDL decided in implementation, but keep these separations:
 
+> **`game_id` alone does not identify a Liiga game.** liiga.fi reuses small
+> per-season `game_id` counters for regular-season and preseason games, so
+> every shape written `(game_id, ...)` below is keyed `(game_id, season)` in
+> the shipped Liiga schema — `games`, `game_events`, and the per-game stats
+> tables alike. Confirmed the hard way during the 2015–2024 backfill; see
+> `docs/BACKFILL_RESULTS.md`. Check the NHL API's id semantics before
+> assuming the same or the opposite there.
+
 - `games` (game_id, league, season, date_utc, home, away, result fields, status)
 - `game_events` (game_id, event_type, period, time, players…, raw payload ref)
 - `players` / `rosters` (league-scoped IDs; **name normalization across sources is a
@@ -134,8 +142,8 @@ Guideline shapes — final DDL decided in implementation, but keep these separat
 ## Feature store (Layer 3) — contract with the model
 
 Derived tables, rebuilt from raw at any time. Every feature row is keyed
-(game_id, computed strictly from data with timestamps **before that game's puck
-drop**). Feature families (from planning discussion, in signal order):
+(game_id, season) for Liiga — see the note under Storage shapes — computed
+strictly from data with timestamps **before that game's puck drop**. Feature families (from planning discussion, in signal order):
 
 1. Goalie: rolling save% (vs expected where xG exists) for the **confirmed starter**
 2. Team shot quality: rolling xG/Corsi for & against per 60 at EV, windows 10/25/40

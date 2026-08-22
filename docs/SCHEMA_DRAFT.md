@@ -9,6 +9,16 @@ Lives in `data/hockey.db` — separate from `data/snapshots.db` (snapshot job
 owns that file; this schema is backfill/sync only, per the build-order split
 between Layer 1 and Layer 2).
 
+> **No longer a draft — reconciled against the shipped schema 2026-08-22.**
+> The DDL below matches `src/hockey_edge/ingest/db.py` as it stands after the
+> full 10-season backfill (2015–2024). Two assumptions written into the
+> original draft turned out to be **wrong** and were corrected here: the
+> `games` primary key (design principle 5) and the `game_stats`/`shotmap`
+> "recent-seasons-only" claim (design principle 4). The corrections are marked
+> inline; the reasoning and evidence live in `docs/BACKFILL_RESULTS.md`. The
+> smoke-test section at the bottom is preserved as-written history — it
+> records the state of things on 2026-07-13, not the schema as it is now.
+
 ## Design principles
 
 1. **Raw layer is strictly append-only.** `raw_responses` rows and the JSON
@@ -31,22 +41,47 @@ between Layer 1 and Layer 2).
    `serie="PRACTICE"`). `standings`, confusingly, keys its preseason phase
    dict as lowercase `valmistavat_ottelut` — the two endpoints use different
    vocabulary for the same phase. `tournament=playout` and
-   `tournament=qualifications` returned zero games for season=2024, so their
-   `serie` values are still unconfirmed; don't assume they'll say `PLAYOUT`/
-   `QUALIFICATIONS` until a season that actually has games in those phases
-   is backfilled. Liiga's playoff format changed in 2024-25 and has varied
+   `tournament=qualifications` returned zero games for **every one of the ten
+   seasons 2015–2024**, not just season=2024, so their `serie` values are
+   still unconfirmed; don't assume they'll say `PLAYOUT`/`QUALIFICATIONS`
+   until a season that actually has games in those phases is backfilled —
+   which means going further back than 2015. Liiga's playoff format changed in 2024-25 and has varied
    across seasons before that — never assume a fixed bracket shape, just
    carry what the API says per game.
-4. **Recent-seasons-only endpoints degrade gracefully.** `game_stats` and
-   `shotmap` 500 ("Remote server error") for old game_ids — confirmed on
-   season=2010, working on season=2024. `sync_state` records the failure
-   per `(endpoint, game_id)` as a terminal "unavailable" status, not a
-   retryable error, so backfill doesn't loop on it forever. The
-   corresponding curated tables (`game_team_period_stats`,
-   `game_player_period_stats`, `game_goalie_period_stats`,
-   `game_puck_control`, `shot_events`) simply have no rows for those
-   game_ids — no sentinel/placeholder rows.
-5. **IDs are carried as the API gives them.** `teamId` is the API's
+4. **Per-game endpoints degrade gracefully when they fail.**
+   ~~Recent-seasons-only:~~ **corrected 2026-07-21.** The original draft
+   read a season=2010 fixture 500ing as evidence that `game_stats` and
+   `shotmap` are recent-seasons-only. The full 10-season backfill disproves
+   it: **both endpoints work all the way back to season 2015**, and the
+   failures that do occur are per-game, not season-wide — 160 of 5,517
+   games (2.9%), all `game_stats`, `shotmap` had zero. Two unrelated
+   mechanisms, neither of them season age: foreign-opponent friendlies
+   (Liiga's stats system doesn't track non-Liiga clubs) and an unresolved
+   HC Blues-specific gap in seasons 2015/2016. See
+   `docs/BACKFILL_RESULTS.md` before building features off either. The
+   graceful-degradation mechanism itself is unchanged and works as
+   designed: `sync_state` records the failure per `(endpoint, entity_id)`
+   as terminal `failed_permanent`, not a retryable error, so backfill
+   doesn't loop on it forever, and the corresponding curated tables
+   (`game_team_period_stats`, `game_player_period_stats`,
+   `game_goalie_period_stats`, `game_puck_control`, `shot_events`) simply
+   have no rows for those games — no sentinel/placeholder rows.
+5. **`game_id` is not a standalone key — every per-game table is keyed
+   `(game_id, season)`.** ~~The original draft made `game_id` the `games`
+   table's sole `PRIMARY KEY`.~~ **Corrected 2026-07-20, mid-backfill.**
+   liiga.fi resets `RUNKOSARJA`/`PRACTICE` `game_id`s as small per-season
+   counters, so they collide across seasons: 466 ids appear in both
+   season=2023 and season=2024 (449 of 450 regular-season games plus 17
+   preseason), each pair referring to two genuinely different games —
+   game_id=1 is both Tappara–TPS (2022-09-13) and Lukko–HPK (2023-09-12).
+   Under the old key this silently overwrote `games` rows and served one
+   season's cached response under another season's id. `PLAYOFFS` ids are
+   large and did not collide in any season checked, but the composite key
+   is applied everywhere rather than per-phase. **Any future work on these
+   tables must preserve the composite key** — a bare `game_id` reintroduces
+   the corruption. Full root cause, blast radius, and the remediation +
+   regression check are in `docs/BACKFILL_RESULTS.md`.
+6. **Other IDs are carried as the API gives them.** `teamId` is the API's
    composite string (e.g. `"624554857:lukko"`) — used verbatim as the team
    key throughout rather than split into numeric id + slug, since some
    payloads (goal events, shot events, standings) mix numeric-only team ids
@@ -58,9 +93,12 @@ between Layer 1 and Layer 2).
 ## sync_state
 
 Tracks fetch status per `(league, endpoint, entity_id)` so re-running
-backfill only fetches what's missing or stale. `entity_id` is season-scoped
-for season-level endpoints (`games_by_season`, `standings`) and game-scoped
-for per-game endpoints (`game_detail`, `game_stats`, `shotmap`).
+backfill only fetches what's missing or stale. **`entity_id` is season-scoped
+for every endpoint**, including the per-game ones: `games_by_season` and
+`standings` use `"<season>"` / `"<season>:<tournament>"`, and `game_detail`,
+`game_stats`, and `shotmap` use `f"{season}:{game_id}"` — *not* a bare
+`game_id`, which would make one season's cached response satisfy another
+season's fetch for a colliding id (design principle 5).
 
 ```sql
 CREATE TABLE sync_state (
@@ -79,22 +117,27 @@ CREATE TABLE sync_state (
 CREATE INDEX idx_sync_state_season ON sync_state (league, endpoint, season);
 ```
 
-`failed_permanent` is used for the recent-seasons-only 500s (point 4 above)
-so a resumable re-run doesn't keep retrying game_stats/shotmap on old games.
-`failed_retryable` is for transient errors (timeouts, rate-limit 429s) —
-those get retried on the next sync run.
+`failed_permanent` is used for the per-game `game_stats` 404/500s (point 4
+above) so a resumable re-run doesn't keep retrying games the API will never
+serve. `failed_retryable` is for transient errors (timeouts, rate-limit
+429s) — those get retried on the next sync run. The full backfill ended with
+zero `failed_retryable` rows left in the table.
 
 ## raw_responses
 
 Metadata only; response bodies live on disk. Deviates slightly from
 `docs/DATA_PIPELINE.md`'s literal `<hash>.json` naming: filenames are
-`<entity_id>__<hash8>.json` (season or game_id, plus an 8-char content-hash
-suffix) rather than hash-only, because entity-scoped filenames make
+`<entity_id>__<hash8>.json` (the season-scoped entity_id, plus an 8-char
+content-hash suffix) rather than hash-only, because entity-scoped filenames make
 `data/raw/liiga/<endpoint>/` debuggable by hand during development, while the
 hash suffix still gives append-only behavior — if a re-fetch's content
 differs from what's cached, it's written as a new file rather than
 overwriting, and `content_hash` in this table is what `sync_state` compares
-against to decide whether reparse is needed.
+against to decide whether reparse is needed. `entity_id` is sanitized on the
+way into the filename — `/` becomes `_` and `:` becomes `-`, so a per-game
+entity_id `2024:1536` writes as `2024-1536__<hash8>.json`. The colon
+substitution is not cosmetic: see the NTFS alternate-data-stream bug in the
+smoke-test section below.
 
 ```sql
 CREATE TABLE raw_responses (
@@ -125,7 +168,7 @@ assumes a field is universally present.
 
 ```sql
 CREATE TABLE games (
-    game_id INTEGER PRIMARY KEY, -- API's top-level "id"
+    game_id INTEGER NOT NULL, -- API's top-level "id"; NOT unique across seasons
     season INTEGER NOT NULL,
     phase TEXT NOT NULL, -- from "serie": confirmed RUNKOSARJA/PLAYOFFS/PRACTICE so far; PLAYOUT/QUALIFICATIONS unconfirmed (see design principle 3)
     start_utc TEXT NOT NULL,
@@ -136,7 +179,7 @@ CREATE TABLE games (
     away_team_id TEXT NOT NULL,
     away_team_name TEXT NOT NULL,
     away_goals INTEGER,
-    home_expected_goals REAL, -- absent pre-~2015 seasons; NULL, don't backfill-fail
+    home_expected_goals REAL, -- 0% present 2018-2019, ~85% by 2021, ~100% by 2023 (see BACKFILL_RESULTS.md); NULL, don't backfill-fail
     away_expected_goals REAL,
     game_time_seconds INTEGER,
     started INTEGER NOT NULL, -- 0/1
@@ -149,7 +192,8 @@ CREATE TABLE games (
     play_off_req_wins INTEGER,
     rink_name TEXT,
     rink_city TEXT,
-    source_raw_response_id INTEGER REFERENCES raw_responses(id)
+    source_raw_response_id INTEGER REFERENCES raw_responses(id),
+    PRIMARY KEY (game_id, season)
 );
 CREATE INDEX idx_games_season_phase ON games (season, phase);
 CREATE INDEX idx_games_teams ON games (home_team_id, away_team_id);
@@ -158,17 +202,25 @@ CREATE INDEX idx_games_teams ON games (home_team_id, away_team_id);
 **Rebuild caveat found during the smoke test:** design principle 2 above says
 curated tables are "deleted-and-reinserted per entity" — for every table
 *except* `games` itself, that's exactly what the parser does. `games` is the
-one exception: it's upserted in place (`INSERT ... ON CONFLICT (game_id) DO
-UPDATE`), never deleted, because seven other tables (`game_rosters`,
+one exception: it's upserted in place (`INSERT ... ON CONFLICT (game_id,
+season) DO UPDATE`), never deleted, because nine other tables (`game_rosters`,
 `game_team_period_stats`, `game_player_period_stats`,
 `game_goalie_period_stats`, `game_puck_control`, `shot_events`, plus the
-penalty/goalkeeper event tables) hold a `REFERENCES games(game_id)` written
+goal/penalty/goalkeeper event tables) hold a composite
+`FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)` written
 by *other* endpoints' parsers. A blanket `DELETE FROM games WHERE season = ?`
 before reinserting (the first version of this parser) throws a foreign-key
 constraint error the moment any of those other tables already has rows for
 that season — confirmed by re-running the season=2024 smoke test a second
-time. `game_goal_events` is still safely delete-and-reinsert-scoped-to-its-
-game_ids, since `games_by_season` is its only source.
+time.
+
+**The conflict target is load-bearing.** `ON CONFLICT (game_id)` — what this
+said before the composite-key fix — is what let season 2023's backfill
+silently overwrite 466 of season 2024's `games` rows. Every per-entity delete
+in `parsers.py` is likewise scoped by both columns (`WHERE game_id = ? AND
+season = ?`), including `game_goal_events`, whose delete-and-reinsert is
+scoped to `season = ? AND game_id IN (...)` since `games_by_season` is its
+only source.
 
 ## game_goal_events
 
@@ -182,7 +234,8 @@ a normalized assists table would be pure overhead for this access pattern.
 ```sql
 CREATE TABLE game_goal_events (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL, -- home or away team_id for this goal
     event_id INTEGER NOT NULL, -- API's per-game eventId
     scorer_player_id INTEGER,
@@ -196,9 +249,10 @@ CREATE TABLE game_goal_events (
     home_score_after INTEGER,
     away_score_after INTEGER,
     winning_goal INTEGER, -- 0/1
-    UNIQUE (game_id, team_id, event_id)
+    UNIQUE (game_id, season, team_id, event_id),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX idx_goal_events_game ON game_goal_events (game_id);
+CREATE INDEX idx_goal_events_game ON game_goal_events (game_id, season);
 ```
 
 ## game_penalty_events / game_goalkeeper_events
@@ -209,7 +263,8 @@ These require the per-game call, unlike goals.
 ```sql
 CREATE TABLE game_penalty_events (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     event_id INTEGER NOT NULL,
     player_id INTEGER, -- 0 for bench/team penalties (seen in fixture)
@@ -221,12 +276,15 @@ CREATE TABLE game_penalty_events (
     fault_name TEXT, -- Finnish, e.g. "Kampitus"
     fault_type TEXT, -- short code, e.g. "KAM"
     penalty_minutes INTEGER,
-    UNIQUE (game_id, team_id, event_id)
+    UNIQUE (game_id, season, team_id, event_id),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
+CREATE INDEX idx_penalty_events_game ON game_penalty_events (game_id, season);
 
 CREATE TABLE game_goalkeeper_events (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     event_id INTEGER NOT NULL,
     player_id INTEGER NOT NULL,
@@ -235,8 +293,10 @@ CREATE TABLE game_goalkeeper_events (
     begin_time INTEGER, -- goalie's own-shift begin/end (net in/out), not the penalty clock
     end_time INTEGER,
     empty_net INTEGER, -- 0/1
-    UNIQUE (game_id, team_id, event_id)
+    UNIQUE (game_id, season, team_id, event_id),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
+CREATE INDEX idx_goalkeeper_events_game ON game_goalkeeper_events (game_id, season);
 ```
 
 ## game_rosters (lineups) + players
@@ -258,7 +318,8 @@ explicitly out of scope here) — do not reuse `game_rosters` rows produced by
 ```sql
 CREATE TABLE game_rosters (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     player_id INTEGER NOT NULL,
     role TEXT, -- e.g. "CENTER", "LEFT_DEFENSEMAN"
@@ -270,9 +331,10 @@ CREATE TABLE game_rosters (
     injured INTEGER,
     suspended INTEGER,
     removed INTEGER, -- left team mid-season; still a valid historical roster row
-    UNIQUE (game_id, team_id, player_id)
+    UNIQUE (game_id, season, team_id, player_id),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX idx_game_rosters_game ON game_rosters (game_id);
+CREATE INDEX idx_game_rosters_game ON game_rosters (game_id, season);
 CREATE INDEX idx_game_rosters_player ON game_rosters (player_id);
 
 CREATE TABLE players (
@@ -301,9 +363,13 @@ below.
 
 ## game_team_period_stats / game_player_period_stats / game_goalie_period_stats / game_puck_control
 
-Source: `game_stats` — **recent-seasons-only** (confirmed working for
-season=2024, returns `{"stats": "Remote server error"}` for season=2010).
-Richest source for the team shot-quality feature family. Goalies get a
+Source: `game_stats` — ~~recent-seasons-only~~ **works back through at least
+season 2015** (see design principle 4; a season=2010 fixture does return
+`{"stats": "Remote server error"}`, but the cutoff, if any, is older than the
+backfilled range). 160 of 5,517 backfilled games have no rows here at all,
+for reasons unrelated to season age — foreign-opponent friendlies and the
+Blues 2015/2016 gap. Richest source for the team shot-quality feature
+family. Goalies get a
 separate `goaliePeriodStats` array in the same payload with a different stat
 set (saves, goals allowed) than skaters — kept as a separate table rather
 than jamming both shapes into one, since forcing a shared schema would mean
@@ -312,7 +378,8 @@ every skater row carries NULL goalie columns and vice versa.
 ```sql
 CREATE TABLE game_team_period_stats (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     period INTEGER NOT NULL,
     goals INTEGER,
@@ -324,12 +391,15 @@ CREATE TABLE game_team_period_stats (
     penalty_minutes INTEGER,
     face_off_wins INTEGER,
     total_distance_travelled REAL,
-    UNIQUE (game_id, team_id, period)
+    UNIQUE (game_id, season, team_id, period),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
+CREATE INDEX idx_team_period_stats_game ON game_team_period_stats (game_id, season);
 
 CREATE TABLE game_player_period_stats (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     player_id INTEGER NOT NULL,
     jersey_id INTEGER,
@@ -351,12 +421,15 @@ CREATE TABLE game_player_period_stats (
     distance REAL,
     expected_goals_player REAL, -- NULL in every 2024 sample seen; API field exists but unpopulated so far
     expected_goals_against REAL,
-    UNIQUE (game_id, team_id, player_id, period)
+    UNIQUE (game_id, season, team_id, player_id, period),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
+CREATE INDEX idx_player_period_stats_game ON game_player_period_stats (game_id, season);
 
 CREATE TABLE game_goalie_period_stats (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     team_id TEXT NOT NULL,
     player_id INTEGER NOT NULL,
     jersey_id INTEGER,
@@ -366,24 +439,29 @@ CREATE TABLE game_goalie_period_stats (
     goals_allowed INTEGER,
     save_percentage TEXT, -- API sends as string, e.g. "" when 0 shots; store as-is, cast at query time
     time_on_ice_seconds INTEGER,
-    UNIQUE (game_id, team_id, player_id, period)
+    UNIQUE (game_id, season, team_id, player_id, period),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
+CREATE INDEX idx_goalie_period_stats_game ON game_goalie_period_stats (game_id, season);
 
 CREATE TABLE game_puck_control (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     period INTEGER NOT NULL,
     home_control_seconds REAL,
     away_control_seconds REAL,
     contested_control_seconds REAL,
-    UNIQUE (game_id, period)
+    UNIQUE (game_id, season, period),
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
 ```
 
 ## shot_events
 
-Source: `shotmap` — **recent-seasons-only**, same failure mode as
-`game_stats` (500s on season=2010, works on season=2024). No natural unique
+Source: `shotmap` — ~~recent-seasons-only~~ **complete across the whole
+backfilled range**: zero `failed_permanent` games in any season 2015–2024,
+unlike `game_stats`. No natural unique
 key exists in the payload (no `eventId` field, unlike goals/penalties), so
 this table has no uniqueness constraint; re-parsing a game deletes and
 reinserts all its rows rather than upserting row-by-row.
@@ -391,7 +469,8 @@ reinserts all its rows rather than upserting row-by-row.
 ```sql
 CREATE TABLE shot_events (
     id INTEGER PRIMARY KEY,
-    game_id INTEGER NOT NULL REFERENCES games(game_id),
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
     period INTEGER,
     game_time_seconds INTEGER,
     shooting_team_id TEXT,
@@ -402,9 +481,10 @@ CREATE TABLE shot_events (
     event_type TEXT, -- e.g. GOALIE_BLOCKED, MISSED, GOAL
     strength_type TEXT, -- API's "type", e.g. EvenStrengthShot
     own_team_players_on_ice INTEGER,
-    other_team_players_on_ice INTEGER
+    other_team_players_on_ice INTEGER,
+    FOREIGN KEY (game_id, season) REFERENCES games (game_id, season)
 );
-CREATE INDEX idx_shot_events_game ON shot_events (game_id);
+CREATE INDEX idx_shot_events_game ON shot_events (game_id, season);
 ```
 
 ## standings
@@ -448,18 +528,21 @@ CREATE TABLE standings (
 
 ## Endpoint → table map
 
-| Endpoint (catalog name) | Feeds | Backfill granularity | Recent-seasons-only? |
+Season coverage below reflects the full 2015–2024 backfill, not the
+fixture-era guesses the draft originally carried.
+
+| Endpoint (catalog name) | Feeds | Backfill granularity | Season coverage |
 |---|---|---|---|
-| `games_by_season` | `games`, `game_goal_events` | 1 call/season | No — verified 1976–2024 |
-| `game_detail` | `game_rosters`, `players`, `game_penalty_events`, `game_goalkeeper_events` | 1 call/game | No — verified 2010, 2024 |
-| `game_stats` | `game_team_period_stats`, `game_player_period_stats`, `game_goalie_period_stats`, `game_puck_control` | 1 call/game | **Yes** — 500s pre-2024 in testing |
-| `shotmap` | `shot_events` | 1 call/game | **Yes** — 500s pre-2024 in testing |
-| `standings` | `standings` | 1 call/season | No — verified 2000, 2024 |
+| `games_by_season` | `games`, `game_goal_events` | 1 call/season | Full — verified 1976–2024 |
+| `game_detail` | `game_rosters`, `players`, `game_penalty_events`, `game_goalkeeper_events` | 1 call/game | Full — 5,517/5,517 games backfilled 2015–2024 |
+| `game_stats` | `game_team_period_stats`, `game_player_period_stats`, `game_goalie_period_stats`, `game_puck_control` | 1 call/game | 5,357/5,517 (2015–2024); 160 per-game gaps, **not** age-related |
+| `shotmap` | `shot_events` | 1 call/game | Full — 5,517/5,517 games backfilled 2015–2024 |
+| `standings` | `standings` | 1 call/season | Full — verified 2000, 2015–2024 |
 | `schedule_by_season` | *(not parsed — lighter duplicate of `games_by_season` without goal events; kept cataloged as a fallback if `games_by_season` ever breaks)* | — | — |
 | `games_by_date`, `games_by_week`, `gameweeks`, `tournament` | *(live/navigation helpers, not backfill sources — `games_by_date` explicitly ignores `season` per catalog notes)* | — | — |
 | `player_info`, `player_list`, `team_info`, `teams_stats`, `milestones` | *(deferred — see below)* | — | — |
 
-## Deferred (not built this pass)
+## Deferred (still not built, as of 2026-08-22)
 
 - **`player_info` / `player_list`**: real player-bio and roster-list tables.
   `game_rosters` + the minimal `players` dimension above already give
@@ -484,11 +567,19 @@ least one endpoint (`games_by_season`), the field set differs between the
 `end` present only in the 2024 sample) — plausibly fields that were `null`
 in the untrimmed response and got stripped during trimming, rather than
 fields that never existed for that season. **Every column in this schema is
-nullable unless it's part of a game's core identity** (`game_id`, `season`,
-team ids/names, `start_utc`) — the parser must not assume a field's absence
+nullable unless it's part of a game's core identity** (`game_id` *and*
+`season` — neither identifies a game alone, per design principle 5 — plus
+team ids/names and `start_utc`) — the parser must not assume a field's absence
 in one fetch means it's absent for that endpoint/season in general.
 
 ## Smoke test results (season=2024, 2026-07-13)
+
+> **Historical — preserved as written.** This section records the 20-game
+> smoke test that preceded the real backfill. Its row counts are a
+> 20-game sample under the *old* single-column key and do not describe
+> `data/hockey.db` as it stands now; the full 10-season counts are in
+> `docs/BACKFILL_RESULTS.md`. Both bugs written up below are real and
+> still worth reading — the NTFS one especially.
 
 Ran `PYTHONPATH=src python -m hockey_edge.ingest.liiga.backfill --season 2024
 --max-games 20`: fetched `games_by_season` across all 5 tournament values +

@@ -52,6 +52,18 @@ or shapes · one real sample response per verified endpoint/season checked into
 6. LightGBM + blend
 7. Prediction log + local dashboard
 
+## Status (as of 2026-08-22)
+- **Docs reconciled 2026-08-22 (no code change).** `docs/SCHEMA_DRAFT.md`
+  had been left describing the pre-fix world — bare `game_id PRIMARY KEY`,
+  single-column FKs on all nine per-game tables, and the wrong
+  "recent-seasons-only" claim about `game_stats`/`shotmap`. Its DDL now
+  matches `ingest/db.py`, its corrected assumptions are marked inline, and
+  **it is trustworthy again** — the design principles renumbered (the
+  composite-key rule is now principle 5; "IDs as the API gives them" moved
+  to 6). `README.md` and `docs/DATA_PIPELINE.md`'s storage-shape contract
+  also updated for the composite key. The smoke-test section at the bottom
+  of `SCHEMA_DRAFT.md` is preserved as dated history, not current state.
+
 ## Status (as of 2026-07-21)
 - **Step 1 (Liiga ingest): full 10-season backfill (2015–2024) complete and
   verified.** `python -m hockey_edge.ingest.liiga.backfill --season <N>` run
@@ -96,6 +108,12 @@ or shapes · one real sample response per verified endpoint/season checked into
   phase confirmation (zero games in either across all 10 seasons checked),
   and the Blues `game_stats` gap root cause (would need a liiga.fi devtools
   capture).
+- **Next in build order**: step 2's open blocker (whether `game_detail`
+  exposes lineups *before* puck drop) is now answerable — the season is
+  live again from October, so a real pre-game fetch can settle it, and
+  step 2 is the one that loses data permanently if it keeps slipping.
+  Step 4 (feature store) is otherwise unblocked on data: `data/hockey.db`
+  holds all 10 seasons.
 
 ## Status (historical — as of 2026-07-13)
 - **Step 1 (Liiga ingest): schema drafted and ingest machinery built, smoke-tested

@@ -12,16 +12,31 @@ Full plan: [docs/PLAN.md](docs/PLAN.md). Data contract:
 
 ## Status
 
-Liiga historical ingest (build-order step 1) is now runnable end to end for one
-season at a time. `docs/SCHEMA_DRAFT.md` documents the SQLite schema (14 curated
-tables + sync/raw metadata), derived from real fixtures in `fixtures/liiga/` and
-the endpoint catalog in `src/hockey_edge/ingest/liiga/endpoints.py`. The ingest
-machinery — DDL (`ingest/db.py`), rate-limited resumable fetch-and-cache
+**Build-order step 1 (Liiga historical ingest) is complete for seasons
+2015–2024.** The full 10-season backfill has run — 5,517 games with all
+per-game endpoints, no sampling — and `data/hockey.db` holds the result.
+`docs/BACKFILL_RESULTS.md` has the per-season row counts, sanity checks, and
+the known data gaps; **read it before trusting the DB for feature-store work**,
+particularly the notes on the 160 games (2.9%) missing `game_stats` and the
+xG-availability cutoff between 2019 and 2021.
+
+`docs/SCHEMA_DRAFT.md` documents the SQLite schema (14 curated tables +
+sync/raw metadata), derived from real fixtures in `fixtures/liiga/` and the
+endpoint catalog in `src/hockey_edge/ingest/liiga/endpoints.py`. The ingest
+machinery is DDL (`ingest/db.py`), rate-limited resumable fetch-and-cache
 (`ingest/raw_cache.py`), parsers (`ingest/liiga/parsers.py`), and a backfill CLI
-(`ingest/liiga/backfill.py`) — is smoke-tested against real season=2024 data (see
-`docs/SCHEMA_DRAFT.md`'s "Smoke test results" for row counts and two bugs found
-and fixed along the way). The full ~10-season backfill hasn't run yet — that's
-next, after schema review.
+(`ingest/liiga/backfill.py`).
+
+**One thing to know before touching the schema:** liiga.fi's `game_id` is not
+unique across seasons — regular-season and preseason ids are small per-season
+counters that get reused. `games` is keyed on the composite `(game_id, season)`
+and so is every per-game table. Keying on `game_id` alone silently corrupts data
+(it did, mid-backfill); the root-cause writeup is in `docs/BACKFILL_RESULTS.md`.
+
+Still open on step 1: seasons before 2015 are untested, the `PLAYOUT`/
+`QUALIFICATIONS` phase strings are unconfirmed (zero games in either across all
+ten seasons), and the HC Blues `game_stats` gap in 2015/2016 has no root cause
+yet.
 
 Build-order step 2 (snapshot capture job) has a working skeleton in
 `src/hockey_edge/snapshot/`: a swappable odds-provider interface, a working OddsPapi
@@ -37,9 +52,12 @@ Run a season backfill (from repo root, with `src` on `PYTHONPATH`):
 PYTHONPATH=src python -m hockey_edge.ingest.liiga.backfill --season 2024
 ```
 
-Safe to re-run — already-fetched entities are skipped, not refetched. Add
+Safe to re-run — already-fetched entities are skipped, not refetched, so
+re-running a completed season is a no-op costing zero HTTP requests. Add
 `--max-games N` to cap per-game endpoint fetches (useful for a quick check;
-omit for a real backfill) or `--force` to refetch everything regardless of cache.
+omit for a real backfill) or `--force` to refetch everything regardless of
+cache. A full season from cold is roughly 550 games x 3 endpoints x a 1.5s
+polite delay — budget ~40 minutes.
 
 ## Setup
 

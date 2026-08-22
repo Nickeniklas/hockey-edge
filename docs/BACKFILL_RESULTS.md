@@ -103,7 +103,9 @@ endpoint across all 10 seasons (`game_detail` 5,517/5,517, `game_stats`
 
 ### Critical finding: `game_id` is not globally unique across seasons
 
-`docs/SCHEMA_DRAFT.md` design principle 5 assumed the API's `game_id` is a
+`docs/SCHEMA_DRAFT.md`'s original design principle 5 ("IDs are carried as
+the API gives them" — renumbered to 6 when that doc was reconciled, with a
+new principle 5 stating the composite-key rule) assumed the API's `game_id` is a
 stable, standalone identifier and made it the `games` table's sole
 `PRIMARY KEY`, with every other per-game table (`game_rosters`,
 `game_goal_events`, `game_penalty_events`, `game_goalkeeper_events`,
