@@ -28,6 +28,13 @@ src/hockey_edge/ package layout · raw JSON cached as files under data/raw/
 tracks `verified_seasons`, since historical seasons may use different endpoints
 or shapes · one real sample response per verified endpoint/season checked into
 `fixtures/liiga/<name>/<season>.json` (git-tracked, unlike `data/raw/`).
+**Added 2026-08-23: `pyproject.toml` (setuptools, `pip install -e .`) makes
+`src/hockey_edge` an editable-installed package** — `python -m
+hockey_edge.<module>` and `import hockey_edge` now work directly from an
+activated venv, no `PYTHONPATH=src` needed. Not a stack change (still plain
+venv + requirements.txt for actual dependencies, no uv/poetry) — this is
+packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
+...` outside a preserved historical-log section is stale; run without it.
 
 ## Hard rules
 1. **No leakage.** Features use only information timestamped before puck drop.
@@ -51,6 +58,42 @@ or shapes · one real sample response per verified endpoint/season checked into
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-08-23)
+- **Backfill extended to seasons 2025 and 2026 (the 2024-25 and 2025-26
+  seasons) — `data/hockey.db` now covers 12 seasons, 2015–2026, 6,736 games
+  total.** Confirmed liiga.fi's season-numbering convention first
+  (`scripts/season_probe.py`, read-only, modelled on
+  `scripts/oddspapi_probe.py`): it's **ending-year** — `season=2024` covers
+  Sep 2023–Apr 2024. Also confirmed **season=2027 is the upcoming 2026-27
+  season** (17 teams, 544 scheduled `RUNKOSARJA` games, matching the
+  league's stated expansion — zero games `started` as of the check, so
+  correctly left un-backfilled; it belongs to the future snapshot job, not
+  historical ingest). Both new seasons ran clean: `PYTHONPATH=src python -m
+  hockey_edge.ingest.liiga.backfill --season <2026|2025>`, no `--max-games`,
+  zero `failed_permanent`/`failed_retryable` rows in either season (first
+  time `game_stats` has had a 100%-clean run) — season 2026: 605 games
+  (480/60/65 RUNKOSARJA/PLAYOFFS/PRACTICE); season 2025: 614 games
+  (480/55/5/5/69 RUNKOSARJA/PLAYOFFS/PLAYOUT/QUALIFICATIONS/PRACTICE).
+  Row counts, sync_state, goal-event cross-checks, xG coverage, and NTFS
+  spot-checks all verified clean for both — no per-season writeup file yet
+  (unlike `docs/BACKFILL_RESULTS.md` for the original 10 seasons); this
+  session's chat transcript has the full numbers if that's ever needed.
+- **`PLAYOUT`/`QUALIFICATIONS` `serie` values confirmed** (`docs/SCHEMA_DRAFT.md`
+  design principle 3): `"PLAYOUT"` and `"QUALIFICATIONS"` exactly, found in
+  season 2025 (Pelicans-Jukurit playout, Pelicans-Jokerit qualification, 5
+  games each). Also found `tournament=playoffs` returns a superset that
+  already includes both — not a 1:1 mapping to `serie`; harmless in
+  practice (upsert/`INSERT OR IGNORE` semantics absorb the duplication) but
+  worth knowing before assuming tournament-param == phase.
+- **Two data-completeness findings from this pass, both documented but not
+  acted on** — see Gotchas below and `docs/SCHEMA_DRAFT.md`'s `shot_events`
+  section + its 2026-08-23 data-completeness audit table: (1) liiga.fi
+  retroactively enriches `game_stats` responses after original fetch —
+  confirmed on a season=2024 game, likely affects `game_puck_control` for
+  all of 2015-2024; (2) season 2025 has a 79-game `shot_events` gap
+  (coordinates only, nothing else affected) clustered in the season's final
+  month, unlike any other season's pattern.
 
 ## Status (as of 2026-08-22)
 - **Docs reconciled 2026-08-22 (no code change).** `docs/SCHEMA_DRAFT.md`
@@ -198,6 +241,37 @@ or shapes · one real sample response per verified endpoint/season checked into
   open (see Gotchas).
 
 ## Gotchas
+- **liiga.fi retroactively enriches completed games' `game_stats` responses
+  — historical data is NOT immutable on the API side.** Confirmed
+  2026-08-22: season=2024 game_id=1's `game_stats` response had only 1
+  `puckStats` entry (period 1) when originally fetched in July 2026; a
+  live `--force` refetch of the same game on 2026-08-22 returned 3 entries
+  (all periods), with period 1's values unchanged (same underlying game,
+  just enriched). This is a genuine per-season-independent live-API change,
+  not a data-availability cutoff like xG or the recent-seasons-only 500s —
+  it likely affects all of `game_puck_control` for the original 2015-2024
+  backfill (see `docs/SCHEMA_DRAFT.md`'s design principle 4 area and
+  `docs/BACKFILL_RESULTS.md` for the original per-season puck-control
+  counts, all ~1 row/game where post-enrichment data would give ~3).
+  Two consequences, both **not yet acted on**: (a) a `--force` refetch of
+  `game_stats` for seasons 2015-2024 would likely recover the missing
+  puck-control periods — deferred, not done this session; (b) the future
+  live snapshot/ingest path must periodically re-sync recently-completed
+  games rather than fetch-once-and-mark-`success`-forever, or it will
+  permanently store whatever partial data the API happened to have at
+  first-fetch time. This is a raw-cache append-only-friendly append (a
+  refetch with different content writes a new file, per
+  `docs/SCHEMA_DRAFT.md`'s `raw_responses` naming scheme) but the current
+  ingest code has no mechanism that triggers such a re-fetch on its own.
+- **Goal-event surplus (`game_goal_events` count vs. final-score sum) is not
+  a single consistent pattern — magnitude varies season to season and
+  remains unexplained beyond the mechanisms already found.** Season 2026:
+  +62 surplus events (3,403 vs. 3,341 score-sum, ~1.8%). Season 2025: +3
+  surplus (3,480 vs. 3,477, ~0.09%) — an order of magnitude smaller than
+  every other season checked (2015-2024, 2026 all ran ~2-4%). The known
+  mechanisms (overturned/video-review goals, zero-goal-event foreign
+  friendlies) aren't sufficient to explain why 2025 is so much smaller;
+  not investigated further this session.
 - **`game_id` is not globally unique across seasons** — liiga.fi reuses
   small `RUNKOSARJA`/`PRACTICE` game_ids per season (confirmed: 449/450
   season-2023 regular-season game_ids collided with season 2024's). Any

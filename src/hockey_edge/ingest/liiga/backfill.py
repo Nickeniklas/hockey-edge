@@ -1,8 +1,9 @@
 """Resumable Liiga historical backfill — build-order step 1.
 
-Usage (from repo root, with src on PYTHONPATH):
+Usage (from repo root, venv active — src/hockey_edge is pip-install-e'd, see
+README.md's Setup section):
 
-    PYTHONPATH=src python -m hockey_edge.ingest.liiga.backfill --season 2024
+    python -m hockey_edge.ingest.liiga.backfill --season 2024
 
 Idempotent by design: every fetch goes through raw_cache.fetch(), which skips
 the network call entirely for anything already recorded 'success' (or

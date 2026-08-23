@@ -41,13 +41,25 @@ between Layer 1 and Layer 2).
    `serie="PRACTICE"`). `standings`, confusingly, keys its preseason phase
    dict as lowercase `valmistavat_ottelut` — the two endpoints use different
    vocabulary for the same phase. `tournament=playout` and
-   `tournament=qualifications` returned zero games for **every one of the ten
-   seasons 2015–2024**, not just season=2024, so their `serie` values are
-   still unconfirmed; don't assume they'll say `PLAYOUT`/`QUALIFICATIONS`
-   until a season that actually has games in those phases is backfilled —
-   which means going further back than 2015. Liiga's playoff format changed in 2024-25 and has varied
-   across seasons before that — never assume a fixed bracket shape, just
-   carry what the API says per game.
+   `tournament=qualifications` returned zero games for every one of the ten
+   seasons 2015–2024 — **confirmed 2026-08-22/23 via season 2025 (the
+   2024-25 season)**: `serie="PLAYOUT"` (5 games, Pelicans vs. Jukurit) and
+   `serie="QUALIFICATIONS"` (5 games, Pelicans vs. Jokerit), exactly the
+   values the naive assumption guessed. **The tournament query param and the
+   `serie` field are not 1:1**: `tournament=playoffs` returns a superset that
+   already includes the `PLAYOUT` and `QUALIFICATIONS` games alongside pure
+   `PLAYOFFS` ones (season 2025: 65 games returned for `tournament=playoffs`,
+   of which only 55 actually carry `serie="PLAYOFFS"`) — the same 10 games
+   then get fetched again under their own dedicated `tournament=playout`/
+   `tournament=qualifications` calls. Harmless in practice (`games` upserts
+   by `(game_id, season)`, `game_goal_events` inserts `OR IGNORE` against its
+   unique constraint — no duplication resulted, verified by distinct
+   `game_id` count matching row count), but it does mean `backfill_season`'s
+   own printed `total_games_in_season` overcounts by the number of
+   playout+qualification games in a season with both phases present. Liiga's
+   playoff format changed in 2024-25 and has varied across seasons before
+   that — never assume a fixed bracket shape, just carry what the API says
+   per game.
 4. **Per-game endpoints degrade gracefully when they fail.**
    ~~Recent-seasons-only:~~ **corrected 2026-07-21.** The original draft
    read a season=2010 fixture 500ing as evidence that `game_stats` and
@@ -459,12 +471,36 @@ CREATE TABLE game_puck_control (
 
 ## shot_events
 
-Source: `shotmap` — ~~recent-seasons-only~~ **complete across the whole
-backfilled range**: zero `failed_permanent` games in any season 2015–2024,
-unlike `game_stats`. No natural unique
-key exists in the payload (no `eventId` field, unlike goals/penalties), so
-this table has no uniqueness constraint; re-parsing a game deletes and
-reinserts all its rows rather than upserting row-by-row.
+Source: `shotmap` — ~~recent-seasons-only~~ **no `failed_permanent` HTTP
+failures in any season 2015–2026**, unlike `game_stats`. **Correction
+2026-08-23: "complete" was true only for HTTP-failure tracking, not content.**
+`sync_state` only ever recorded fetch-level failures, so it was blind to a
+different failure mode — an HTTP 200 with an empty `[]` body — which turns
+out to be common: **every season 2015–2026 has some games with zero
+`shot_events` rows despite a `success` sync_state row**, ranging 2.4%–12.1%
+of games in seasons 2015–2024/2026, always confined to a *partial* subset of
+`PRACTICE` games (plus 1-2 stray `RUNKOSARJA` games in 2016/2017/2021/2022).
+**Season 2025 breaks that pattern**: 148/614 games (24.1%) are empty —
+**100% of `PRACTICE` games (69/69, not partial)** plus **79/480 `RUNKOSARJA`
+games, all clustered 2025-02-15 through 2025-03-15** (the final month of the
+regular season), spread roughly evenly across all 16 teams (8-12 games each,
+proportional to games played — not team-specific like the 2015/2016 Blues
+`game_stats` gap). Verified coordinates-only, not a broader gap: all 79
+games have non-null `home_expected_goals`/`away_expected_goals`, full
+`game_team_period_stats` rows, and full `game_player_period_stats` rows with
+non-null `corsi_for`/`corsi_against` (0/9,370 player-period rows null) — only
+`shot_events` is affected, and only for these specific games. A live
+force-refetch of one of these games (season=2025, game_id=420, JYP-SaiPa,
+completed `RUNKOSARJA` game) still returned `[]` as of 2026-08-22 — unlike
+the `game_stats`/puck-control gap (see CLAUDE.md Gotchas), this is not a
+"not yet processed" lag that resolves on refetch; it's a standing gap as of
+that check. Root cause not investigated further (explicitly deferred, not a
+priority) — flagged here as a known, coordinates-only gap for season 2025's
+final month, worth checking again if it ever matters for the shot-quality
+feature family. No natural unique key exists in the payload (no `eventId`
+field, unlike goals/penalties), so this table has no uniqueness constraint;
+re-parsing a game deletes and reinserts all its rows rather than upserting
+row-by-row.
 
 ```sql
 CREATE TABLE shot_events (
@@ -486,6 +522,44 @@ CREATE TABLE shot_events (
 );
 CREATE INDEX idx_shot_events_game ON shot_events (game_id, season);
 ```
+
+### Data-completeness audit (2026-08-23): zero-rows-per-game rate by table/season
+
+`sync_state` only tracks HTTP-level failures (`failed_permanent`/
+`failed_retryable`), so it's blind to an HTTP 200 with an empty body — every
+number below is a `success` row in `sync_state` that nonetheless produced no
+curated rows for that game. SQL-only audit against the full `games` table
+(2015–2026), no refetches. `game_team_period_stats`/`game_player_period_stats`/
+`game_puck_control` track together since all three share the `game_stats`
+source and its already-documented `failed_permanent` gaps (foreign
+friendlies, the Blues 2015/2016 gap); `shot_events` (from `shotmap`) and
+`game_rosters` (from `game_detail`) are independent endpoints with their own,
+separate empty-response behavior.
+
+| season | games | shot_events empty | game_team_period_stats empty | game_player_period_stats empty | game_puck_control empty | game_rosters empty |
+|---|---|---|---|---|---|---|
+| 2015 | 507 | 2.4% | 2.0% | 2.0% | 4.9% | 1.2% |
+| 2016 | 554 | 8.1% | 12.8% | 12.8% | 13.9% | 0.4% |
+| 2017 | 549 | 2.9% | 1.1% | 1.1% | 3.6% | 0.2% |
+| 2018 | 572 | 6.8% | 3.1% | 3.1% | 6.1% | 0.0% |
+| 2019 | 573 | 5.6% | 3.8% | 3.8% | 6.5% | 0.0% |
+| 2020 | 530 | 12.1% | 6.4% | 6.4% | 7.0% | 0.8% |
+| 2021 | 540 | 2.8% | 0.2% | 0.2% | 2.0% | 0.0% |
+| 2022 | 569 | 4.2% | 1.2% | 1.2% | 3.9% | 0.0% |
+| 2023 | 562 | 9.8% | 2.7% | 2.7% | 5.3% | 0.2% |
+| 2024 | 561 | 7.7% | 2.5% | 2.5% | 5.9% | 0.5% |
+| 2025 | 614 | **24.1%** | 2.6% | 2.6% | 2.8% | 0.0% |
+| 2026 | 605 | 3.5% | 1.8% | 1.8% | 3.8% | 0.0% |
+
+Season 2025's `shot_events` rate is the outlier, driven by the 79-game
+`RUNKOSARJA` cluster documented above — see that section for the
+season-2025-specific breakdown (100% of `PRACTICE`, plus the final-month
+`RUNKOSARJA` games) and the confirmation that the gap doesn't extend to
+`game_team_period_stats`/`game_player_period_stats` (checked: 0/79 of those
+79 games are missing xG, team stats, or player corsi — the gap is
+coordinates-only). No further root-causing done on the baseline 2.4–12.1%
+`shot_events`/partial-`PRACTICE` rate seen in every other season — not a
+priority.
 
 ## standings
 
