@@ -1,7 +1,11 @@
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
 data/raw/
 *.db
 logs/
 .env
+
+# Ignore Python egg metadata
+src/*.egg-info/
