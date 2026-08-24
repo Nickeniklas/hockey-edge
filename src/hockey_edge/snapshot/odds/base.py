@@ -36,6 +36,13 @@ class OddsSnapshot:
 class OddsProvider(ABC):
     name: str
 
+    # True for a provider that makes zero HTTP requests (e.g. NullOddsProvider).
+    # job.py uses this to decide whether a fetch_odds() call is worth an
+    # api_usage row -- providers never write to storage themselves (see
+    # module docstring), so job.py is what records usage, and needs this to
+    # avoid recording a request that never happened.
+    is_stub: bool = False
+
     @abstractmethod
     def fetch_odds(self, *, tournament_ref: str, book: str) -> list[OddsSnapshot]:
         """Fetch current odds for every fixture on a tournament's board. Return

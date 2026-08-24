@@ -22,6 +22,15 @@ actually bettable in Finland) · odds capture behind a swappable provider
 interface (scaffolded in `src/hockey_edge/snapshot/odds/`) · Elo baseline +
 LightGBM blend · local compute only.
 
+**Re-opened, not still decided, as of 2026-08-25: which odds provider is
+primary for the live snapshot job.** OddsPapi's per-request billing and
+tournament id are still correct facts above, but whether `/odds-by-
+tournaments` actually returns usable prices at all is now in doubt (see the
+Gotchas entry on this) — `job.py` currently runs `NullOddsProvider`, not
+`OddsPapiProvider`. Don't treat "Liiga via OddsPapi" as settled until that's
+resolved; this is the user's call to make, not something to re-decide
+unilaterally either way.
+
 Tooling (decided session 1): plain venv + requirements.txt (no uv/poetry) ·
 src/hockey_edge/ package layout · raw JSON cached as files under data/raw/
 (gitignored), SQLite stores metadata only · each `Endpoint` in the catalog module
@@ -59,6 +68,95 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 6. LightGBM + blend
 7. Prediction log + local dashboard
 
+## Status (as of 2026-08-25)
+
+Session mid-flight, not a finished milestone — Phase 3 (real odds parsing,
+lineup capture) and the bulk of Phase 4 (actually running the recovery
+below) are explicitly deferred, not done. What did ship:
+
+- **Snapshot job (step 2) is substantially built, but still captures nothing
+  real.** `src/hockey_edge/snapshot/` now has live fixture discovery
+  (`fixtures.py`, polls `games_by_date`), a per-`(season, game_id, window)`
+  capture-window state table with sleep-safe due/missed logic (verified: a
+  simulated machine-asleep wake-up correctly fires overdue windows instead
+  of skipping them, and correctly waits for a not-yet-due closing window),
+  an `api_usage` table with a monthly ceiling, and `job.py --dry-run`/
+  `--once` modes. **The odds provider wired in is `NullOddsProvider` — zero
+  HTTP requests, by design, not `OddsPapiProvider`.** Reason: a live
+  `/odds-by-tournaments` call (2026-08-23, request 4/8 that session) showed
+  it returns fixture metadata only, no `bookmakerOdds`/prices, contradicting
+  OddsPapi's own docs — so the entire per-fixture-vs-per-tournament budget
+  math this design rested on is unresolved (see
+  `docs/SNAPSHOT_FINDINGS.md`'s Shape A/B analysis: same-tier-safe if the
+  docs are eventually right, ~225-300 req/month over the 250 tier if not).
+  Which provider/cadence is primary is explicitly the user's decision, not
+  made this session. Windows Task Scheduler XML written and is what's
+  actually being tested (`docs/snapshot_job_task_scheduler.xml`); launchd/
+  cron are scaffolding only.
+- **liiga.fi's `game_detail` responses can change in EITHER direction on
+  refetch — not just retroactive enrichment.** The 2026-08-23 CRITICAL
+  FINDING below only tested `game_stats` (which does only ever gain data).
+  `game_detail` can retroactively *lose* real event data
+  (`goalKeeperEvents`/`goalKeeperChanges`) on a refetch of the same
+  completed game; `shotmap` only ever corrects a stat in place. See
+  Gotchas for the corrected framing.
+- **The no-shrink guard (`src/hockey_edge/ingest/liiga/resync.py`) is the
+  mechanism that makes refetching safe again.** It reparses a refetched
+  response into curated tables only if doing so would not leave any
+  `(game_id, season)`-scoped table with fewer rows than it already has —
+  compared per-table, not per-team (an event legitimately moving between
+  the home/away arrays must not trip it). A would-shrink reparse is skipped,
+  logged at WARNING with before/after counts, existing curated rows are
+  left untouched, and the raw response is still saved to disk regardless
+  (nothing is ever lost, even when a reparse is refused). Verified
+  end-to-end against a scratch copy of `hockey.db`, never against the real
+  file. `backfill.py --force` still has no such guard — it does a blind
+  delete-and-reinsert, unchanged this session except for a new `--endpoints`
+  flag (4b: scopes which endpoints `--force` actually applies to, so a
+  targeted recovery doesn't triple its own traffic refetching endpoints
+  that don't need it).
+- **Found a real, bounded liiga.fi-side incident: an ~34-hour bad-response
+  window, 2026-07-19T19:55 UTC through 2026-07-21T05:53 UTC, during the
+  original 10-season backfill run.** liiga.fi intermittently served
+  `game_detail` responses missing real penalty/goalkeeper-event data during
+  that window — 1,164 games across 8 seasons (2015, 16, 17, 19, 20, 21, 23,
+  24) have zero `game_penalty_events` despite a `success` sync_state row,
+  in two distinct symptom shapes (missing the whole `game` JSON key vs. a
+  `game` key present with empty event arrays) — both confirmed independently
+  recoverable via a live refetch. Never recurred outside that window
+  (2025/2026's own small zero-penalty counts were fetched 2026-08-22, a
+  confirmed-clean run, and are more likely genuine than broken). Full
+  per-season/per-symptom-class breakdown, the exact recovery commands (via
+  the guarded `resync.py` path, not the unguarded `backfill.py` one — see
+  Gotchas), and cost estimates are in **`docs/RECOVERY_BACKLOG.md`** — not
+  run this session, ready to execute later. One open question logged there
+  with no proposed mechanism: 45 `PLAYOFFS` games fetched in the exact same
+  78-minute sub-window that broke 450 `RUNKOSARJA` games came through 100%
+  clean — phase seems to matter, timing alone doesn't explain it.
+- **`data/hockey.db` has zero rows for season=2027 (the live 2026-27
+  season)** — confirmed 2026-08-23, contradicting an earlier (design-chat)
+  belief that it was already backfilled. The live API has it (544
+  `RUNKOSARJA` + 52 preseason fixtures, confirmed by direct fetch, matching
+  the 17-team/64-game structural change) — it was just never ingested. Not
+  a blocker for the snapshot job (which reads live, not `hockey.db`, by
+  design) but a real gap if anyone assumes `hockey.db` is current for this
+  season. Backfilling it is out of scope for this session, deliberately.
+- **The pre-puck-drop lineup question is still open.** `game_detail`/
+  `game_preview` return a full extended squad (37/33 players, 4 goalies
+  each) with no `line` assignment and no way to identify a confirmed
+  starter, tested from T-9 days down to T-25 hours — worse, this doesn't
+  even resolve after the game ends for a historical sample, so identifying
+  the actual starter for training data needs a different source
+  (`game_goalkeeper_events`/ice-time, inherently post-hoc). `scripts/
+  lineup_probe.py` (new, read-only, zero DB writes) is built for exactly
+  this test and works. **Two scheduled one-shot checks are pending for
+  2026-08-25 at T-90min and T-30min before season=2027 game_id=2701831's
+  puck drop** (17:02 and 18:03 local) — results not yet known as of this
+  writeup; if the session that scheduled them isn't alive when they fire,
+  they silently don't happen (session-scoped cron, not persisted to disk).
+  Check `fixtures/liiga/lineup_probe/` and `docs/SNAPSHOT_FINDINGS.md` for
+  whether they landed.
+
 ## Status (as of 2026-08-23)
 - **Backfill extended to seasons 2025 and 2026 (the 2024-25 and 2025-26
   seasons) — `data/hockey.db` now covers 12 seasons, 2015–2026, 6,736 games
@@ -69,7 +167,7 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
   season** (17 teams, 544 scheduled `RUNKOSARJA` games, matching the
   league's stated expansion — zero games `started` as of the check, so
   correctly left un-backfilled; it belongs to the future snapshot job, not
-  historical ingest). Both new seasons ran clean: `PYTHONPATH=src python -m
+  historical ingest). Both new seasons ran clean: `python -m
   hockey_edge.ingest.liiga.backfill --season <2026|2025>`, no `--max-games`,
   zero `failed_permanent`/`failed_retryable` rows in either season (first
   time `game_stats` has had a 100%-clean run) — season 2026: 605 games
@@ -241,28 +339,44 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
   open (see Gotchas).
 
 ## Gotchas
-- **liiga.fi retroactively enriches completed games' `game_stats` responses
-  — historical data is NOT immutable on the API side.** Confirmed
-  2026-08-22: season=2024 game_id=1's `game_stats` response had only 1
-  `puckStats` entry (period 1) when originally fetched in July 2026; a
-  live `--force` refetch of the same game on 2026-08-22 returned 3 entries
-  (all periods), with period 1's values unchanged (same underlying game,
-  just enriched). This is a genuine per-season-independent live-API change,
-  not a data-availability cutoff like xG or the recent-seasons-only 500s —
-  it likely affects all of `game_puck_control` for the original 2015-2024
-  backfill (see `docs/SCHEMA_DRAFT.md`'s design principle 4 area and
-  `docs/BACKFILL_RESULTS.md` for the original per-season puck-control
-  counts, all ~1 row/game where post-enrichment data would give ~3).
-  Two consequences, both **not yet acted on**: (a) a `--force` refetch of
-  `game_stats` for seasons 2015-2024 would likely recover the missing
-  puck-control periods — deferred, not done this session; (b) the future
-  live snapshot/ingest path must periodically re-sync recently-completed
-  games rather than fetch-once-and-mark-`success`-forever, or it will
-  permanently store whatever partial data the API happened to have at
-  first-fetch time. This is a raw-cache append-only-friendly append (a
-  refetch with different content writes a new file, per
-  `docs/SCHEMA_DRAFT.md`'s `raw_responses` naming scheme) but the current
-  ingest code has no mechanism that triggers such a re-fetch on its own.
+- **liiga.fi's data for a completed game can change after original fetch —
+  in EITHER direction, not just enrichment. Historical data is NOT immutable
+  on the API side.** Originally found 2026-08-22 on `game_stats` (season=2024
+  game_id=1: 1 `puckStats` entry on first fetch, 3 on a later `--force`
+  refetch, period 1 unchanged — genuine enrichment). **Corrected 2026-08-24**
+  (`docs/RESYNC.md` has the full writeup — Phase 4a's scope check): the same
+  game's `game_detail` does the *opposite* on refetch — its
+  `goalKeeperEvents`/`goalKeeperChanges` arrays lost real rows (home team
+  4→1, away team 3→0), not gained them. `shotmap` showed a third pattern:
+  same event count, one stat corrected in place
+  (`ownTeamPlayersOnIce`/`otherTeamPlayersOnIce`, +1 on every one of 88
+  shots). **Do not assume "content changed" means "content improved" for any
+  endpoint** — this is why the re-sync mechanism
+  (`src/hockey_edge/ingest/liiga/resync.py`, `docs/RESYNC.md`) has a
+  universal no-shrink guard: a refetched response is only reparsed into
+  curated tables if no table it feeds would end up with fewer rows than it
+  already has; a would-shrink reparse is skipped and logged, existing
+  curated rows are kept untouched, and the raw response is still saved to
+  disk regardless (append-only, no loss either way). Consequences: (a) a
+  `game_stats`-scoped (and `shotmap`-scoped) `--force` refetch of seasons
+  2015-2024 would likely recover the missing `game_puck_control` periods —
+  still deferred, exact command in `docs/RESYNC.md`'s 4b section; (b) the
+  live snapshot/ingest path needed a periodic re-sync of recently-completed
+  games rather than fetch-once-and-mark-`success`-forever — built
+  2026-08-24 as `resync.py --days N`, see `docs/RESYNC.md`. This is a
+  raw-cache append-only-friendly append (a refetch with different content
+  writes a new file, per `docs/SCHEMA_DRAFT.md`'s `raw_responses` naming
+  scheme). **`backfill.py --force` still has no shrink guard of its own and
+  should not be used for a bulk historical `game_detail` refetch** — but
+  this is *not* a blanket "`game_detail` can never be safely refetched"
+  rule (an earlier, since-superseded version of this note said that): a
+  *targeted* `game_detail` recovery through the guarded `resync.py` path is
+  safe precisely because the guard blocks any reparse that would shrink
+  `game_rosters`/`game_penalty_events`/`game_goalkeeper_events`. 1,164
+  games across 8 seasons are confirmed to need exactly this recovery (a
+  bounded ~34h liiga.fi-side incident, 2026-07-19/21 — see the 2026-08-25
+  Status entry above) — exact commands and per-season counts in
+  `docs/RECOVERY_BACKLOG.md`, not run yet.
 - **Goal-event surplus (`game_goal_events` count vs. final-score sum) is not
   a single consistent pattern — magnitude varies season to season and
   remains unexplained beyond the mechanisms already found.** Season 2026:
@@ -294,11 +408,49 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 - Liiga odds are three-way (regulation 1X2); NHL moneyline is two-way incl. OT. Store market type.
 - Player-name normalization across sources (liiga.fi vs Veikkaus vs community) is a known pain.
 - Liiga small samples: regress early-season features hard to league mean.
-- Snapshot job needs an always-on machine — placement not yet decided (open item).
+- **Jokerit is not a blank slate for the Elo cold-start, but isn't much of a
+  signal either.** `data/hockey.db` has 18 Jokerit rows across 5 seasons
+  (2021, 22, 24, 25, 26) — mostly preseason friendlies, plus a real 5-game
+  2025 `QUALIFICATIONS` series against Pelicans. **Pelicans won that series
+  4-1** (confirmed 2026-08-24) — Jokerit lost it; it is not a promotion
+  result, despite how it might read at a glance. Net: five competitive games
+  from 16 months ago, all losses, plus scattered friendlies — barely
+  distinguishable from no data. See `docs/MODEL.md`'s promoted-team
+  cold-start note.
+- **Snapshot job scheduler: Windows Task Scheduler on the main desktop**
+  (decided 2026-08-24, not an always-on host — deliberate for preseason,
+  since a missed capture on an August friendly costs nothing;
+  `docs/snapshot_job_task_scheduler.xml`, `StartWhenAvailable=true`,
+  `WakeToRun=false` so a sleeping machine catches up on wake rather than
+  being forced awake). The job's own due/missed window logic
+  (`storage.get_due_windows`/`mark_missed_windows`) is what makes a late
+  wake-up correct, not the scheduler — never replace that with a naive
+  "is now ≈ the window time" check. launchd/cron variants are scaffolding
+  only, not deployed.
 - OddsPapi returns HTTP 404 with `code: "FIXTURE_NOT_FOUND"` for a tournament
   with no fixtures currently posted, not `HTTP 200` with `[]` — the snapshot job
   handles this explicitly as "no odds yet," not a failure; don't reintroduce a
   bare `raise_for_status()` that would misclassify it.
+- **`GET /v4/odds-by-tournaments` does not carry price/market data** —
+  confirmed live 2026-08-23 (2 separate calls, `fixtures/oddspapi/`): a
+  fixture with `hasOdds: true` still has no `bookmakerOdds` key at all, only
+  metadata (participant ids, tournament id, `startTime`). This contradicts
+  OddsPapi's own published docs, which describe a full `bookmakerOdds`/
+  `markets`/`outcomes` block on that same endpoint — unresolved which is
+  right; not re-tested with a real fixture board yet. Real per-fixture
+  pricing likely needs `GET /v4/odds` (confirmed single-`fixtureId`-only, no
+  bulk form) — see `docs/SNAPSHOT_FINDINGS.md`'s Shape A/B cost analysis
+  before assuming the original "one poll/night covers everything" budget
+  math still holds. This is why `OddsPapiProvider` is built but not wired
+  into `job.py` — see the 2026-08-25 Status entry.
+- `GET /v4/participants?sportId=<id>` resolves OddsPapi's bare numeric
+  participant ids (e.g. `3836`) to team names in one call, no
+  fixture/tournament scoping, cacheable for a season — solves half of the
+  OddsPapi↔liiga.fi join-key problem cheaply. The other half doesn't have a
+  cheap fix: two fixtures can share the exact same `startTime` on a
+  multi-game night (confirmed: 5 liiga.fi games at one identical kickoff),
+  so `startTime` alone can't disambiguate — the join needs resolved
+  participant names, not just time.
 
 ## Secrets
 Odds API keys via environment / untracked `.env`. Never commit keys. If the repo goes

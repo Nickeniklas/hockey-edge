@@ -1,0 +1,222 @@
+{
+  "games": [
+    {
+      "id": 2701831,
+      "season": 2027,
+      "start": "2026-08-25T15:30:00Z",
+      "homeTeam": {
+        "teamId": "651304385:tps",
+        "teamPlaceholder": null,
+        "teamName": "TPS",
+        "goals": 0,
+        "timeOut": null,
+        "goalEvents": [],
+        "powerplayInstances": 0,
+        "powerplayGoals": 0,
+        "shortHandedInstances": 0,
+        "shortHandedGoals": 0,
+        "ranking": null,
+        "gameStartDateTime": "2026-08-25T18:30:00+03:00",
+        "logos": {
+          "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe07109c96edf4561b8b5021e7fc44526",
+          "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe07109c96edf4561b8b5021e7fc44526",
+          "darkBgOriginal": null,
+          "lightBgOriginal": null
+        }
+      },
+      "awayTeam": {
+        "teamId": "238306801:jokerit",
+        "teamPlaceholder": null,
+        "teamName": "Jokerit",
+        "goals": 0,
+        "timeOut": null,
+        "goalEvents": [],
+        "powerplayInstances": 0,
+        "powerplayGoals": 0,
+        "shortHandedInstances": 0,
+        "shortHandedGoals": 0,
+        "ranking": null,
+        "gameStartDateTime": "2026-08-25T18:30:00+03:00",
+        "logos": {
+          "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Faaa8acd74adb43f4bfd3de3e9af484b0",
+          "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Faaa8acd74adb43f4bfd3de3e9af484b0",
+          "darkBgOriginal": null,
+          "lightBgOriginal": null
+        }
+      },
+      "periods": [
+        {
+          "index": 1,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "NORMAL",
+          "startTime": 0,
+          "endTime": 1200
+        },
+        {
+          "index": 2,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "NORMAL",
+          "startTime": 1200,
+          "endTime": 2400
+        },
+        {
+          "index": 3,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "NORMAL",
+          "startTime": 2400,
+          "endTime": 3600
+        },
+        {
+          "index": 4,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "OVERTIME",
+          "startTime": 3600,
+          "endTime": 3900
+        },
+        {
+          "index": 5,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "WINNING_SHOT_COMPETITION",
+          "startTime": 3900,
+          "endTime": 3900
+        }
+      ],
+      "finishedType": "ACTIVE_OR_NOT_STARTED",
+      "started": false,
+      "ended": false,
+      "gameTime": 0,
+      "playOffPair": 0,
+      "playOffPhase": 0,
+      "playOffReqWins": 0,
+      "buyTicketsUrl": "https://www.lippu.fi/artist/hctps/",
+      "iceRink": {
+        "id": 199,
+        "name": "Turun Monitoimihalli Oy",
+        "latitude": 60.4562,
+        "longitude": 22.1869,
+        "streetAddress": "Artukaisentie 8",
+        "zip": "20210",
+        "city": "TURKU"
+      },
+      "currentPeriod": 0,
+      "stale": false,
+      "serie": "PRACTICE",
+      "gameWeek": 4
+    },
+    {
+      "id": 2705524,
+      "season": 2027,
+      "start": "2026-08-25T15:30:00Z",
+      "homeTeam": {
+        "teamId": "875886777:pelicans",
+        "teamPlaceholder": null,
+        "teamName": "Pelicans",
+        "goals": 0,
+        "timeOut": null,
+        "goalEvents": [],
+        "powerplayInstances": 0,
+        "powerplayGoals": 0,
+        "shortHandedInstances": 0,
+        "shortHandedGoals": 0,
+        "ranking": null,
+        "gameStartDateTime": "2026-08-25T18:30:00+03:00",
+        "logos": {
+          "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F269341129a1449ccb0a64345337c3273",
+          "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F269341129a1449ccb0a64345337c3273",
+          "darkBgOriginal": null,
+          "lightBgOriginal": null
+        }
+      },
+      "awayTeam": {
+        "teamId": "461765763:kookoo",
+        "teamPlaceholder": null,
+        "teamName": "KooKoo",
+        "goals": 0,
+        "timeOut": null,
+        "goalEvents": [],
+        "powerplayInstances": 0,
+        "powerplayGoals": 0,
+        "shortHandedInstances": 0,
+        "shortHandedGoals": 0,
+        "ranking": null,
+        "gameStartDateTime": "2026-08-25T18:30:00+03:00",
+        "logos": {
+          "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F7d933387f498496094d7ef1928e9fa7b",
+          "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F7d933387f498496094d7ef1928e9fa7b",
+          "darkBgOriginal": null,
+          "lightBgOriginal": null
+        }
+      },
+      "periods": [
+        {
+          "index": 1,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "NORMAL",
+          "startTime": 0,
+          "endTime": 1200
+        },
+        {
+          "index": 2,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "NORMAL",
+          "startTime": 1200,
+          "endTime": 2400
+        },
+        {
+          "index": 3,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "NORMAL",
+          "startTime": 2400,
+          "endTime": 3600
+        },
+        {
+          "index": 4,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "OVERTIME",
+          "startTime": 3600,
+          "endTime": 3900
+        },
+        {
+          "index": 5,
+          "homeTeamGoals": 0,
+          "awayTeamGoals": 0,
+          "category": "WINNING_SHOT_COMPETITION",
+          "startTime": 3900,
+          "endTime": 3900
+        }
+      ],
+      "finishedType": "ACTIVE_OR_NOT_STARTED",
+      "started": false,
+      "ended": false,
+      "gameTime": 0,
+      "playOffPair": 0,
+      "playOffPhase": 0,
+      "playOffReqWins": 0,
+      "buyTicketsUrl": "https://www.lippu.fi/artist/pelicans/",
+      "iceRink": {
+        "id": 85,
+        "name": "Lahden jäähalli",
+        "latitude": 60.9819,
+        "longitude": 25.6399,
+        "streetAddress": "Svinhufudinkatu 29",
+        "zip": "15110",
+        "city": "LAHTI"
+      },
+      "currentPeriod": 0,
+      "stale": false,
+      "serie": "PRACTICE",
+      "gameWeek": 4
+    }
+  ],
+  "previousGameDate": "2026-08-22",
+  "nextGameDate": "2026-08-26"
+}

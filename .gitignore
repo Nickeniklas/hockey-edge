@@ -2,10 +2,14 @@
 __pycache__/
 *.pyc
 *.egg-info/
+data/
 data/raw/
 *.db
 logs/
 .env
+.env.*
+# Ignore all .env files except for the example file
+!.env.example
 
 # Ignore Python egg metadata
 src/*.egg-info/

@@ -41,8 +41,20 @@ Compute is trivial (CPU, seconds–minutes). No deep learning in v1.
 - **Pre-puck-drop information only.** Every feature must be derivable from rows whose
   `captured_at` / game date precedes the predicted game. Starting-goalie and injury
   features are the classic leak path (post-game box scores dressed as pre-game info).
-- Early-season handling: regress team stats to league means; Liiga (15 teams,
-  60 games) needs harder regression and wider uncertainty than NHL.
+- Early-season handling: regress team stats to league means; Liiga needs
+  harder regression and wider uncertainty than NHL. League size/length has
+  changed across the backfilled seasons — 15 teams/60 games historically, 16
+  teams (K-Espoo joined) for 2024-25 and 2025-26, **17 teams/64 games from
+  2026-27** (Jokerit promoted) — treat this as season-varying, not a
+  constant, and see the promoted-team note below for Jokerit specifically.
+- **Promoted-team cold start (Jokerit, 2026-27):** league-mean regression
+  alone is not enough. Jokerit has 18 rows in the 2015-2026 backfill, all
+  low-signal — preseason friendlies plus a 5-game 2025 promotion/relegation
+  qualification series **lost** to Pelicans 4-1 (confirmed 2026-08-23; an
+  earlier read of this series as a promotion-clinching win was wrong — see
+  `docs/SNAPSHOT_FINDINGS.md`). Five games from 16 months ago, all losses,
+  is close to no signal at all. The Elo baseline needs an explicit
+  cold-start rule for a promoted team, not just a wider prior.
 - Every trained model version is tagged; predictions record the model version.
 
 ## Prediction log (the product's spine)

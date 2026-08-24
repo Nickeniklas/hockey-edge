@@ -48,13 +48,37 @@ Still open on step 1: seasons before 2015 are untested, and the HC Blues
 `QUALIFICATIONS` `serie` strings, previously unconfirmed, were confirmed via
 season 2025 — see `docs/SCHEMA_DRAFT.md` design principle 3.)
 
-Build-order step 2 (snapshot capture job) has a working skeleton in
-`src/hockey_edge/snapshot/`: a swappable odds-provider interface, a working OddsPapi
-implementation (billing confirmed per-HTTP-request, Liiga tournamentId=134), a stubbed
-Veikkaus fallback, append-only SQLite storage, and a manually-runnable job
-(`python -m hockey_edge.snapshot.job`) with failure alerting. Lineup capture and odds
-parsing are still stubbed pending live Liiga data. See the Status section in
-`CLAUDE.md` for exactly what's done vs. pending.
+**Build-order step 2 (snapshot capture job) is substantially built (2026-08-24/25),
+but not yet capturing real odds.** `src/hockey_edge/snapshot/` now has live
+fixture discovery (`fixtures.py`), a sleep-safe capture-window scheduler (a
+game's opening/mid/closing odds windows are tracked per `(season, game_id,
+window)`, not inferred from timestamp proximity — verified against a
+simulated missed-tick scenario), an `api_usage` table with a monthly
+ceiling, and `job.py --dry-run` / `--once` modes. The odds provider wired in
+right now is `NullOddsProvider` (zero HTTP requests) rather than the
+existing `OddsPapiProvider` — a live OddsPapi call found `/odds-by-
+tournaments` returns no price data, contradicting its own docs, so which
+provider/cadence is actually viable is unresolved. Lineup capture is still
+stubbed; `scripts/lineup_probe.py` is a new standalone read-only tool built
+to test the pre-puck-drop lineup question directly against a live game.
+Full findings: **`docs/SNAPSHOT_FINDINGS.md`**. See `CLAUDE.md`'s
+2026-08-25 Status entry for the complete picture.
+
+```
+python -m hockey_edge.snapshot.job --once       # normal pass
+python -m hockey_edge.snapshot.job --dry-run    # zero HTTP requests, reports what's due
+```
+
+**A separate re-sync mechanism now exists for historical data**:
+`data/hockey.db`'s completed-game data isn't immutable on liiga.fi's side —
+it can change after original fetch, in either direction (not just
+enrichment). `src/hockey_edge/ingest/liiga/resync.py` re-fetches recently-
+completed games and reparses them only if doing so wouldn't leave any
+curated table with fewer rows than it already has (the "no-shrink guard").
+`backfill.py --force` also gained an `--endpoints` flag to scope a targeted
+recovery to just the endpoint(s) that need it. See **`docs/RESYNC.md`**
+(mechanism) and **`docs/RECOVERY_BACKLOG.md`** (two deferred recovery runs,
+ready-to-execute commands, not run yet) for detail.
 
 Run a season backfill (from repo root, with the venv active — see Setup):
 
@@ -68,7 +92,12 @@ re-running a completed season is a no-op costing zero HTTP requests. Add
 omit for a real backfill) or `--force` to refetch everything regardless of
 cache. A full season from cold is 500–625 games (varies by season — playoff
 length, preseason friendlies) x 3 endpoints x a 1.5s polite delay — budget
-40–55 minutes.
+40–55 minutes. Add `--endpoints game_stats` (or a comma-separated subset of
+`games_by_season,standings,game_detail,game_stats,shotmap`) to scope
+`--force` to just the endpoint(s) that actually need refetching — see
+`docs/RECOVERY_BACKLOG.md` before running a targeted `game_detail` recovery
+this way; the guarded alternative (`resync.py`) is usually the safer choice
+for that specific endpoint.
 
 ## Setup
 
@@ -86,9 +115,7 @@ any working directory — no `PYTHONPATH` needed. `requirements.txt` is still
 the source of truth for runtime dependencies (`pyproject.toml` declares no
 `[project.dependencies]` itself); run both `pip install` steps on setup.
 
-Put `ODDSPAPI_KEY=...` in an untracked `.env` at the repo root (never commit it) to
-run the OddsPapi probe/snapshot job, e.g. (from the repo root, venv active):
-
-```
-python -m hockey_edge.snapshot.job
-```
+Put `ODDSPAPI_KEY=...` in an untracked `.env` at the repo root (never commit it) —
+needed for `scripts/oddspapi_probe.py` and for `OddsPapiProvider` itself, though
+`job.py` currently runs `NullOddsProvider` (zero HTTP requests) instead — see the
+Status section above for the snapshot job commands.

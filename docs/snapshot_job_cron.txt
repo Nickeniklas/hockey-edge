@@ -1,0 +1,17 @@
+# hockey-edge snapshot job — plain cron line, for a Linux always-on host.
+#
+# Scaffolding only, not deployed/tested this session — Windows Task
+# Scheduler on the desktop is what's actually being tested (see
+# docs/snapshot_job_task_scheduler.xml). Where this ultimately runs is
+# still an open decision.
+#
+# Edit REPO_ROOT below (crontab does not expand ~ reliably in PATH-like
+# contexts, use an absolute path), then: crontab -e, paste the line.
+#
+# Standard cron has no "wake and catch up" concept at all — if the host is
+# off at a fire time, that tick simply never runs, full stop (this is the
+# scenario a real always-on host is meant to avoid; if this ever runs on a
+# machine that sleeps, the missed-tick recovery still works correctly on
+# the *next* tick that does fire, same mechanism as Windows/launchd).
+
+*/15 * * * * cd REPO_ROOT && REPO_ROOT/.venv/bin/python -m hockey_edge.snapshot.job --once >> REPO_ROOT/logs/snapshot_job_cron.log 2>&1

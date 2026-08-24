@@ -60,9 +60,9 @@ for the build to be worth it — worst case is a great personal tool.
 | NHL data | Official NHL API | Free, documented, Niklas has used it (nhl-stats-app) |
 | NHL advanced stats bootstrap | MoneyPuck / Natural Stat Trick downloads | Skip computing own xG at first; replace later if needed |
 | Odds — NHL | The Odds API free tier (500 credits/mo; one call = all NHL games for a market+region = 1 credit, checked 2026-07) | 16 pulls/day covers closing captures with room to spare; NHL odds solved for free, zero risk |
-| Odds — Liiga | OddsPapi free tier (250 req/mo; Liiga confirmed listed on all plans, checked 2026-07 off-season). **Guaranteed fallback: scrape Veikkaus**, which posts odds on every Liiga game | Splitting leagues across two free tiers frees the whole OddsPapi budget for Liiga (~70–90 games/mo → closing + 1–2 earlier captures per game even under worst-case per-fixture billing). Veikkaus odds are also the odds actually bettable in Finland, so a Veikkaus edge is the actionable one |
+| Odds — Liiga | OddsPapi free tier (250 req/mo; Liiga confirmed listed on all plans, checked 2026-07 off-season). **Guaranteed fallback: scrape Veikkaus**, which posts odds on every Liiga game | Splitting leagues across two free tiers frees the whole OddsPapi budget for Liiga (~70–90 games/mo → closing + 1–2 earlier captures per game even under worst-case per-fixture billing). Veikkaus odds are also the odds actually bettable in Finland, so a Veikkaus edge is the actionable one. **Re-opened 2026-08-25**: the "worst-case per-fixture billing" caveat here turned out to be the real case — a live call confirmed `/odds-by-tournaments` has no price data, contradicting OddsPapi's own docs (see `CLAUDE.md`'s Gotchas and `docs/SNAPSHOT_FINDINGS.md`). Which provider is actually primary is undecided again, not settled by this row. |
 | Odds benchmark | Pinnacle closing (via OddsPapi) preferred; **Veikkaus closing as the practical benchmark** if Pinnacle unavailable | Pinnacle = sharp/academic benchmark; Veikkaus closing measures the edge at the book Niklas can actually use |
-| Models | Elo/ridge baseline + LightGBM, blended | GBM alone is overconfident and drifts early-season; Elo is calibrated and works on small data (Liiga: 15 teams, 60-game seasons) |
+| Models | Elo/ridge baseline + LightGBM, blended | GBM alone is overconfident and drifts early-season; Elo is calibrated and works on small data. Liiga league size/length has changed across seasons — 15 teams/60 games historically, **17 teams/64 games from 2026-27** (Jokerit promoted) — treat as season-varying, and give a promoted team its own cold-start rule rather than just a wider prior (see `docs/MODEL.md`). |
 | Metrics | Log loss + calibration, NOT accuracy | Product is probabilities vs odds; miscalibration produces fake edges |
 | Validation | Strict walk-forward by season, pre-puck-drop info only | The place these projects usually lie to themselves |
 | Compute | Local machines (RTX 3060 Ti desktop / M1 Mac) | GBM is CPU-trivial; no cloud needed for v1 |
@@ -114,9 +114,13 @@ odds (OddsPapi /    │
   script) — see `docs/DATA_PIPELINE.md` for detail, including Liiga's
   tournamentId (134). Liiga book depth / how early lines post still can only be
   verified in-season. Veikkaus scrape fallback stays in reserve either way.
-- **Snapshot job needs an always-on machine** — where it runs (desktop, Mac, small
-  VPS) not yet decided.
-- **Small Liiga samples** — 15 teams × 60 games; wider uncertainty bands, regress
-  early-season stats hard to league mean. Accepted as part of the challenge.
+- **Snapshot job scheduler decided 2026-08-24**: Windows Task Scheduler on the
+  main desktop, not an always-on host — deliberate for preseason, since a
+  missed capture now costs nothing. See `CLAUDE.md` Gotchas for the
+  sleep-safe scheduling design this required.
+- **Small Liiga samples** — league size/length varies by season (15
+  teams/60 games historically, 17 teams/64 games from 2026-27); wider
+  uncertainty bands, regress early-season stats hard to league mean.
+  Accepted as part of the challenge.
 - **Season = Oct–June** — off-season is for backfill/model work.
 - **liiga.fi terms of service** — review before any public/commercial use of the data.

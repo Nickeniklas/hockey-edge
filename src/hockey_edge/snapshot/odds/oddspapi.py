@@ -23,6 +23,7 @@ unrecoverable failure mode here).
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 
 import requests
@@ -33,6 +34,14 @@ logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.oddspapi.io/v4"
 LIIGA_TOURNAMENT_ID = "134"
+
+
+def _redact_api_key(text: str) -> str:
+    """apiKey is a query param (never a header), so it lands in requests'
+    default HTTPError message (which includes resp.url) and in resp.url
+    itself. A bare raise_for_status()/str(exc) would leak it into a log line
+    or an unhandled traceback -- redact before it can reach either."""
+    return re.sub(r"(apiKey=)[^&\s]+", r"\1<redacted>", text)
 
 
 class OddsPapiProvider(OddsProvider):
@@ -46,15 +55,20 @@ class OddsPapiProvider(OddsProvider):
         self, *, tournament_ref: str = LIIGA_TOURNAMENT_ID, book: str = "pinnacle"
     ) -> list[OddsSnapshot]:
         captured_at = datetime.now(timezone.utc)
-        resp = requests.get(
-            f"{BASE_URL}/odds-by-tournaments",
-            params={
-                "tournamentIds": tournament_ref,
-                "bookmaker": book,
-                "apiKey": self.api_key,
-            },
-            timeout=self.timeout,
-        )
+        try:
+            resp = requests.get(
+                f"{BASE_URL}/odds-by-tournaments",
+                params={
+                    "tournamentIds": tournament_ref,
+                    "bookmaker": book,
+                    "apiKey": self.api_key,
+                },
+                timeout=self.timeout,
+            )
+        except requests.RequestException as exc:
+            # A connection/timeout error's str() can embed the request URL
+            # (with apiKey) -- redact before it's allowed to propagate.
+            raise RuntimeError(_redact_api_key(str(exc))) from None
 
         if resp.status_code == 404:
             body = resp.json()
@@ -65,9 +79,12 @@ class OddsPapiProvider(OddsProvider):
                     book,
                 )
                 return []
-            raise RuntimeError(f"oddspapi: unexpected 404 body: {body}")
+            raise RuntimeError(f"oddspapi: unexpected 404 body: {_redact_api_key(json.dumps(body))}")
 
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as exc:
+            raise RuntimeError(_redact_api_key(str(exc))) from None
         fixtures = resp.json()
 
         snapshots = [

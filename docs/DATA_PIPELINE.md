@@ -152,8 +152,13 @@ strictly from data with timestamps **before that game's puck drop**. Feature fam
    Liiga's geography)
 5. Home advantage: league constant + team offsets (bigger in Liiga than NHL)
 6. Roster availability: share of team ice time missing (crude version OK)
-7. Motivation proxy: playoff-probability delta late season; Liiga playout/relegation
-   dynamics at the bottom
+7. Motivation proxy: playoff-probability delta late season; Liiga relegation
+   pressure at the bottom. **From 2026-27, bottom-three relegate directly —
+   no playout/qualification bracket** (confirmed empty for season=2027;
+   `PLAYOUT`/`QUALIFICATIONS` `serie` values were real through season 2025,
+   see `docs/SCHEMA_DRAFT.md`). This makes relegation pressure a season-long
+   signal for the bottom teams rather than a late-season bracket the way it
+   was in seasons with a playout round.
 
 Explicitly excluded: win/loss streaks, head-to-head history, player point streaks
 (noise / superstition).
@@ -161,8 +166,15 @@ Explicitly excluded: win/loss streaks, head-to-head history, player point streak
 ## Gotchas
 - Leakage sneaks in via post-game box scores used to build "pre-game" features —
   the `captured_at` discipline exists to catch exactly this.
-- Liiga season structure changed 2024-25 (top-4 straight to quarterfinals, 5–12 play
-  a best-of-5 first round; playout best-of-7 at the bottom) — regular season vs
-  playoffs must be flagged per game, and formats differ across historical seasons.
-- 60-game Liiga seasons → early-season features are mostly prior; blend with
-  league-mean priors instead of trusting 5-game windows.
+- Liiga season structure keeps changing — never assume a fixed bracket, carry
+  whatever `serie`/`playOffPhase` the API reports per game. 2024-25: top-4
+  straight to quarterfinals, 5–12 play a best-of-5 first round, playout
+  best-of-7 at the bottom. **2026-27: 17 teams (Jokerit promoted), 64-game
+  regular season, bottom three relegate directly — no playout/qualification
+  round at all** (season=2027's `games_by_season` returns zero `PLAYOUT`/
+  `QUALIFICATIONS` games, confirmed 2026-08-23). Regular season vs. playoffs
+  must be flagged per game regardless of format.
+- Liiga season length isn't fixed either: 60 games historically, 64 from
+  2026-27 (16 teams in 2024-25/2025-26 after K-Espoo joined, 17 from
+  2026-27). Whatever the length, early-season features are mostly prior;
+  blend with league-mean priors instead of trusting 5-game windows.

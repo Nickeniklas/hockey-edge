@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  hockey-edge snapshot job — launchd definition for macOS (M1 Mac per
+  CLAUDE.md). Scaffolding only, not deployed/tested this session (Task
+  Scheduler on the Windows desktop is what's actually being tested — see
+  docs/snapshot_job_task_scheduler.xml). Where this runs long-term is still
+  an open decision.
+
+  Edit REPO_ROOT and PYTHON_PATH below, then:
+    cp this file ~/Library/LaunchAgents/com.hockeyedge.snapshot.plist
+    launchctl load ~/Library/LaunchAgents/com.hockeyedge.snapshot.plist
+
+  StartInterval fires every 900s (15 min). launchd does not have an
+  equivalent to Windows' StartWhenAvailable/WakeToRun split built in this
+  simply — if the Mac is asleep at a fire time, launchd runs the job once
+  on wake (missed intervals are not queued/replayed), same practical effect
+  as the Windows config's StartWhenAvailable=true. The job's own missed-tick
+  recovery (hockey_edge.snapshot.job / storage.get_due_windows /
+  mark_missed_windows) is what actually makes a late run correct, same as
+  on Windows — this file just needs to fire roughly every 15 minutes.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hockeyedge.snapshot</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>PYTHON_PATH</string>          <!-- e.g. REPO_ROOT/.venv/bin/python -->
+        <string>-m</string>
+        <string>hockey_edge.snapshot.job</string>
+        <string>--once</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>REPO_ROOT</string>                <!-- data/, logs/, data/raw/ are relative paths -->
+
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <key>StandardOutPath</key>
+    <string>REPO_ROOT/logs/snapshot_job_launchd.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>REPO_ROOT/logs/snapshot_job_launchd.err.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

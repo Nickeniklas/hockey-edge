@@ -1,0 +1,489 @@
+{
+  "teamComparison": {
+    "238306801": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    },
+    "651304385": {
+      "pointsAverage": 1.1833333333333333,
+      "pointsAverageRank": 13,
+      "goalsScored": 141,
+      "goalsScoredRank": 13,
+      "goalsAgainst": 177,
+      "goalsAgainstRank": 11,
+      "gf_gp": 2.35,
+      "gf_gpRank": 13,
+      "ga_gp": 2.95,
+      "ga_gpRank": 11,
+      "powerplayPercentage": 16.577540106951872,
+      "powerplayPercentageRank": 13,
+      "penaltykillPercentage": 78.88198852539062,
+      "penaltykillPercentageRank": 10,
+      "faceoffPercentage": 49.088771310993536,
+      "faceoffPercentageRank": 12,
+      "shotsPerGame": 46.43333333333333,
+      "shotsPerGameRank": 8
+    }
+  },
+  "playersToWatch": {
+    "all": {
+      "238306801": [
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 5,
+          "category": "points"
+        },
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 30712591,
+          "playerName": "Nikkanen Henri",
+          "playerJersey": "82",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 24641005,
+          "playerName": "Kalapudas Antti",
+          "playerJersey": "51",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 34323261,
+          "playerName": "Kuusla Emil",
+          "playerJersey": "25",
+          "role": "H",
+          "value": 460.75,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 3267.834,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 40009767,
+          "playerName": "Pulli Valtteri",
+          "playerJersey": "0",
+          "role": "P",
+          "value": 5,
+          "category": "shots"
+        }
+      ],
+      "651304385": [
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 7,
+          "category": "points"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40225344,
+          "playerName": "Fugleberg Paavo",
+          "playerJersey": "17",
+          "role": "H",
+          "value": 783,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 40225344,
+          "playerName": "Fugleberg Paavo",
+          "playerJersey": "17",
+          "role": "H",
+          "value": 2846.88,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 5,
+          "category": "shots"
+        }
+      ]
+    },
+    "defenders": {
+      "238306801": [
+        {
+          "playerId": 33296797,
+          "playerName": "Tuomola Riku",
+          "playerJersey": "52",
+          "role": "P",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 60619008,
+          "playerName": "Tumanovs Miks",
+          "playerJersey": "12",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 33296797,
+          "playerName": "Tuomola Riku",
+          "playerJersey": "52",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 61074400,
+          "playerName": "Krogdahl Max",
+          "playerJersey": "43",
+          "role": "P",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60578087,
+          "playerName": "Larsen Oliver",
+          "playerJersey": "98",
+          "role": "P",
+          "value": 372,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 40009767,
+          "playerName": "Pulli Valtteri",
+          "playerJersey": "0",
+          "role": "P",
+          "value": 2905.8875,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 40009767,
+          "playerName": "Pulli Valtteri",
+          "playerJersey": "0",
+          "role": "P",
+          "value": 5,
+          "category": "shots"
+        }
+      ],
+      "651304385": [
+        {
+          "playerId": 61029234,
+          "playerName": "Binner Alexis",
+          "playerJersey": "61",
+          "role": "P",
+          "value": 2,
+          "category": "points"
+        },
+        {
+          "playerId": 32219869,
+          "playerName": "Rafkin Ruben",
+          "playerJersey": "6",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 61029234,
+          "playerName": "Binner Alexis",
+          "playerJersey": "61",
+          "role": "P",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 23837234,
+          "playerName": "Friman Niklas",
+          "playerJersey": "5",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40005133,
+          "playerName": "Lehtonen Sisu-Petteri",
+          "playerJersey": "40",
+          "role": "P",
+          "value": 294,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 40005133,
+          "playerName": "Lehtonen Sisu-Petteri",
+          "playerJersey": "40",
+          "role": "P",
+          "value": 1001.225,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 40101174,
+          "playerName": "Tuhkala Arttu",
+          "playerJersey": "2",
+          "role": "P",
+          "value": 2,
+          "category": "shots"
+        }
+      ]
+    },
+    "forwards": {
+      "238306801": [
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 5,
+          "category": "points"
+        },
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 30712591,
+          "playerName": "Nikkanen Henri",
+          "playerJersey": "82",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 24641005,
+          "playerName": "Kalapudas Antti",
+          "playerJersey": "51",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 34323261,
+          "playerName": "Kuusla Emil",
+          "playerJersey": "25",
+          "role": "H",
+          "value": 460.75,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 3267.834,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60866735,
+          "playerName": "Curry Patrick",
+          "playerJersey": "71",
+          "role": "H",
+          "value": 4,
+          "category": "shots"
+        }
+      ],
+      "651304385": [
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 7,
+          "category": "points"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40225344,
+          "playerName": "Fugleberg Paavo",
+          "playerJersey": "17",
+          "role": "H",
+          "value": 783,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 40225344,
+          "playerName": "Fugleberg Paavo",
+          "playerJersey": "17",
+          "role": "H",
+          "value": 2846.88,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 5,
+          "category": "shots"
+        }
+      ]
+    }
+  },
+  "goaliesToWatch": {
+    "238306801": [],
+    "651304385": [
+      {
+        "record": "",
+        "gaa": 2.441176,
+        "savePercentage": 89.413265,
+        "so": 2,
+        "player": {
+          "id": 30117507,
+          "countryOfBirth": "FIN",
+          "dateOfBirth": "1999-04-19",
+          "firstName": "Eetu",
+          "lastName": "Mäkiniemi",
+          "hand": "L",
+          "height": 188,
+          "placeOfBirth": "Vantaa",
+          "weight": 83,
+          "nationality": "FIN",
+          "lastUpdate": null,
+          "eliteProspectsId": null,
+          "namesFixed": true
+        }
+      },
+      {
+        "record": "",
+        "gaa": 2.545455,
+        "savePercentage": 89.126214,
+        "so": 1,
+        "player": {
+          "id": 40103808,
+          "countryOfBirth": "FIN",
+          "dateOfBirth": "2005-04-19",
+          "firstName": "Noa",
+          "lastName": "Vali",
+          "hand": "L",
+          "height": 185,
+          "placeOfBirth": "Forssa",
+          "weight": 72,
+          "nationality": "FIN",
+          "lastUpdate": null,
+          "eliteProspectsId": null,
+          "namesFixed": true
+        }
+      },
+      {
+        "record": "",
+        "gaa": 2,
+        "savePercentage": 81.538462,
+        "so": 0,
+        "player": {
+          "id": 40214744,
+          "countryOfBirth": "USA",
+          "dateOfBirth": "2005-09-07",
+          "firstName": "Aatu",
+          "lastName": "Niittymäki",
+          "hand": "L",
+          "height": 182,
+          "placeOfBirth": "Voorhees, NJ",
+          "weight": 73,
+          "nationality": "FIN",
+          "lastUpdate": null,
+          "eliteProspectsId": null,
+          "namesFixed": true
+        }
+      },
+      {
+        "record": "",
+        "gaa": 1.666667,
+        "savePercentage": 90.909091,
+        "so": 0,
+        "player": {
+          "id": 29857823,
+          "countryOfBirth": "FIN",
+          "dateOfBirth": "1997-08-23",
+          "firstName": "Markus",
+          "lastName": "Ruusu",
+          "hand": "L",
+          "height": 188,
+          "placeOfBirth": "Jämsä",
+          "weight": 86,
+          "nationality": "FIN",
+          "lastUpdate": null,
+          "eliteProspectsId": null,
+          "namesFixed": true
+        }
+      }
+    ]
+  }
+}

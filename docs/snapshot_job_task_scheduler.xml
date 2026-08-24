@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-16"?>
+<!--
+  hockey-edge snapshot job — Windows Task Scheduler definition.
+
+  This is the scheduler actually being used this session (2026-08-23):
+  Niklas's main desktop, not an always-on host — a deliberate choice for
+  preseason, since a missed capture on an August friendly costs nothing.
+  Because the host sleeps, the job itself (not this scheduler config) is
+  responsible for correct missed-tick recovery — see
+  hockey_edge.snapshot.job's docstring and storage.get_due_windows/
+  mark_missed_windows. This file only has to fire --once roughly every 15
+  minutes; it does not need to be clever about missed ticks itself.
+
+  Import: Task Scheduler -> Action pane -> "Import Task..." -> select this
+  file. Edit the two placeholder paths below first:
+    - REPO_ROOT: absolute path to this checkout (e.g.
+      C:\Users\Nikla_000\Documents\local-repo\hockey-edge) — must match
+      <WorkingDirectory> AND the venv python path in <Command>, since
+      data/, logs/, and data/raw/ are relative paths (see CLAUDE.md).
+    - Adjust <StartBoundary> to any time today/tomorrow; the repeat pattern
+      below runs it every 15 minutes indefinitely from that point.
+
+  "Wake the computer to run this task" is deliberately left OFF (false) —
+  the whole point of testing on a sleeping desktop is to exercise the
+  missed-tick recovery path for real, not to paper over it by forcing the
+  machine awake. Toggle it on later if that trade-off changes.
+-->
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>hockey-edge Layer 2 snapshot capture job (--once), every 15 minutes.</Description>
+  </RegistrationInfo>
+  <Triggers>
+    <TimeTrigger>
+      <Repetition>
+        <Interval>PT15M</Interval>
+        <StopAtDurationEnd>false</StopAtDurationEnd>
+      </Repetition>
+      <StartBoundary>2026-08-23T00:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+    </TimeTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT5M</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>REPO_ROOT\.venv\Scripts\python.exe</Command>
+      <Arguments>-m hockey_edge.snapshot.job --once</Arguments>
+      <WorkingDirectory>REPO_ROOT</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>

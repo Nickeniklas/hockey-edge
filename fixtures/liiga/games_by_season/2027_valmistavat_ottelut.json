@@ -1,0 +1,656 @@
+[
+  {
+    "id": 2705868,
+    "season": 2027,
+    "start": "2026-08-07T05:45:00Z",
+    "end": "2026-08-07T03:30:27Z",
+    "homeTeam": {
+      "teamId": "626537494:sport",
+      "teamPlaceholder": null,
+      "teamName": "Sport",
+      "goals": 2,
+      "timeOut": null,
+      "goalEvents": [
+        {
+          "scorerPlayerId": 61073929,
+          "scorerPlayer": {
+            "playerId": 61073929,
+            "firstName": "Eric",
+            "lastName": "Bûrger"
+          },
+          "logTime": "2026-08-07T03:21:28Z",
+          "winningGoal": true,
+          "gameTime": 1510,
+          "period": 2,
+          "eventId": 44,
+          "goalTypes": [],
+          "assistantPlayerIds": [
+            61073937,
+            60662386
+          ],
+          "assistantPlayers": [
+            {
+              "playerId": 61073937,
+              "firstName": "Luke",
+              "lastName": "Grainger"
+            },
+            {
+              "playerId": 60662386,
+              "firstName": "Philip",
+              "lastName": "Granath"
+            }
+          ],
+          "plusPlayerIds": "9 17 26 62 86",
+          "minusPlayerIds": "2 40 54 57",
+          "homeTeamScore": 1,
+          "awayTeamScore": 0,
+          "assistsSoFarInSeason": {
+            "60662386": 1,
+            "61073937": 1
+          },
+          "goalsSoFarInSeason": 1,
+          "videoClipUrl": null,
+          "videoClipPlaylistUrl": null,
+          "videoThumbnailUrl": null
+        },
+        {
+          "scorerPlayerId": 61073936,
+          "scorerPlayer": {
+            "playerId": 61073936,
+            "firstName": "Isak",
+            "lastName": "Walther"
+          },
+          "logTime": "2026-08-07T03:24:32Z",
+          "winningGoal": false,
+          "gameTime": 1615,
+          "period": 2,
+          "eventId": 50,
+          "goalTypes": [],
+          "assistantPlayerIds": [
+            61073932,
+            32300435
+          ],
+          "assistantPlayers": [
+            {
+              "playerId": 61073932,
+              "firstName": "George",
+              "lastName": "Diaco"
+            },
+            {
+              "playerId": 32300435,
+              "firstName": "Jasper",
+              "lastName": "Valtanen"
+            }
+          ],
+          "plusPlayerIds": "4 17 21 22 77",
+          "minusPlayerIds": "2 9 40 47 54",
+          "homeTeamScore": 2,
+          "awayTeamScore": 0,
+          "assistsSoFarInSeason": {
+            "32300435": 1,
+            "61073932": 1
+          },
+          "goalsSoFarInSeason": 1,
+          "videoClipUrl": null,
+          "videoClipPlaylistUrl": null,
+          "videoThumbnailUrl": null
+        }
+      ],
+      "powerplayInstances": 1,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 1,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-08-07T08:45:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F77efd6df129843699ae9a4c2e94efcb2",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2F77efd6df129843699ae9a4c2e94efcb2",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "awayTeam": {
+      "teamId": "651304385:tps",
+      "teamPlaceholder": null,
+      "teamName": "TPS",
+      "goals": 0,
+      "timeOut": null,
+      "goalEvents": [],
+      "powerplayInstances": 1,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 1,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-08-07T08:45:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe07109c96edf4561b8b5021e7fc44526",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe07109c96edf4561b8b5021e7fc44526",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "periods": [
+      {
+        "index": 1,
+        "homeTeamGoals": 0,
+        "awayTeamGoals": 0,
+        "category": "NORMAL",
+        "startTime": 0,
+        "endTime": 900
+      },
+      {
+        "index": 2,
+        "homeTeamGoals": 2,
+        "awayTeamGoals": 0,
+        "category": "NORMAL",
+        "startTime": 900,
+        "endTime": 1800
+      },
+      {
+        "index": 3,
+        "homeTeamGoals": 0,
+        "awayTeamGoals": 0,
+        "category": "WINNING_SHOT_COMPETITION",
+        "startTime": 1800,
+        "endTime": 1800
+      }
+    ],
+    "finishedType": "ENDED_DURING_REGULAR_GAME_TIME",
+    "started": true,
+    "ended": true,
+    "gameTime": 1800,
+    "spectators": 4500,
+    "playOffPair": 0,
+    "playOffPhase": 0,
+    "playOffReqWins": 0,
+    "iceRink": {
+      "id": 166,
+      "name": "Rauman jäähalli / Äijänsuo Areena",
+      "latitude": 61.1203,
+      "longitude": 21.501,
+      "streetAddress": "Nortamonkatu 23",
+      "zip": "26100",
+      "city": "RAUMA"
+    },
+    "currentPeriod": 2,
+    "stale": false,
+    "serie": "PITSITURNAUS",
+    "gameWeek": 1
+  },
+  {
+    "id": 2705869,
+    "season": 2027,
+    "start": "2026-08-07T07:00:00Z",
+    "end": "2026-08-07T04:46:37Z",
+    "homeTeam": {
+      "teamId": "624554857:lukko",
+      "teamPlaceholder": null,
+      "teamName": "Lukko",
+      "goals": 1,
+      "timeOut": null,
+      "goalEvents": [
+        {
+          "scorerPlayerId": 60351426,
+          "scorerPlayer": {
+            "playerId": 60351426,
+            "firstName": "Jakob",
+            "lastName": "Stenqvist"
+          },
+          "logTime": "2026-08-07T04:25:39Z",
+          "winningGoal": false,
+          "gameTime": 1062,
+          "period": 2,
+          "eventId": 32,
+          "goalTypes": [],
+          "assistantPlayerIds": [
+            29870486,
+            40064941
+          ],
+          "assistantPlayers": [
+            {
+              "playerId": 29870486,
+              "firstName": "Topias",
+              "lastName": "Haapanen"
+            },
+            {
+              "playerId": 40064941,
+              "firstName": "Leo",
+              "lastName": "Tuuva"
+            }
+          ],
+          "plusPlayerIds": "9 27 29 47 48",
+          "minusPlayerIds": "18 24 37 48 55",
+          "homeTeamScore": 1,
+          "awayTeamScore": 1,
+          "assistsSoFarInSeason": {
+            "29870486": 1,
+            "40064941": 1
+          },
+          "goalsSoFarInSeason": 1,
+          "videoClipUrl": null,
+          "videoClipPlaylistUrl": null,
+          "videoThumbnailUrl": null
+        }
+      ],
+      "powerplayInstances": 2,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 0,
+      "shortHandedGoals": 0,
+      "expectedGoals": 1.05,
+      "ranking": null,
+      "gameStartDateTime": "2026-08-07T10:00:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fc7acfb63cfe7436b9778f1e684cd0c57",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fec75b8794b254061bc4b72cf22c489f4",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "awayTeam": {
+      "teamId": "679171680:ässät",
+      "teamPlaceholder": null,
+      "teamName": "Ässät",
+      "goals": 1,
+      "timeOut": null,
+      "goalEvents": [
+        {
+          "scorerPlayerId": 33562188,
+          "scorerPlayer": {
+            "playerId": 33562188,
+            "firstName": "Patrik",
+            "lastName": "Juhola"
+          },
+          "logTime": "2026-08-07T04:15:18Z",
+          "winningGoal": false,
+          "gameTime": 684,
+          "period": 1,
+          "eventId": 18,
+          "goalTypes": [],
+          "assistantPlayerIds": [
+            60960748,
+            33410418
+          ],
+          "assistantPlayers": [
+            {
+              "playerId": 60960748,
+              "firstName": "Johan",
+              "lastName": "Olofsson"
+            },
+            {
+              "playerId": 33410418,
+              "firstName": "Arttu",
+              "lastName": "Alasiurua"
+            }
+          ],
+          "plusPlayerIds": "3 8 19 80 92",
+          "minusPlayerIds": "9 27 29 47 48",
+          "homeTeamScore": 0,
+          "awayTeamScore": 1,
+          "assistsSoFarInSeason": {
+            "33410418": 1,
+            "60960748": 1
+          },
+          "goalsSoFarInSeason": 1,
+          "videoClipUrl": null,
+          "videoClipPlaylistUrl": null,
+          "videoThumbnailUrl": null
+        }
+      ],
+      "powerplayInstances": 0,
+      "powerplayGoals": 0,
+      "shortHandedInstances": 2,
+      "shortHandedGoals": 0,
+      "expectedGoals": 0.26,
+      "ranking": null,
+      "gameStartDateTime": "2026-08-07T10:00:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe4c7031958a043cdb8ca80c3c353f0c6",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe4c7031958a043cdb8ca80c3c353f0c6",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "periods": [
+      {
+        "index": 1,
+        "homeTeamGoals": 0,
+        "awayTeamGoals": 1,
+        "category": "NORMAL",
+        "startTime": 0,
+        "endTime": 900
+      },
+      {
+        "index": 2,
+        "homeTeamGoals": 1,
+        "awayTeamGoals": 0,
+        "category": "NORMAL",
+        "startTime": 900,
+        "endTime": 1800
+      },
+      {
+        "index": 3,
+        "homeTeamGoals": 0,
+        "awayTeamGoals": 0,
+        "category": "WINNING_SHOT_COMPETITION",
+        "startTime": 1800,
+        "endTime": 1800
+      }
+    ],
+    "finishedType": "ENDED_DURING_REGULAR_GAME_TIME",
+    "started": true,
+    "ended": true,
+    "gameTime": 1800,
+    "spectators": 4500,
+    "playOffPair": 0,
+    "playOffPhase": 0,
+    "playOffReqWins": 0,
+    "iceRink": {
+      "id": 166,
+      "name": "Rauman jäähalli / Äijänsuo Areena",
+      "latitude": 61.1203,
+      "longitude": 21.501,
+      "streetAddress": "Nortamonkatu 23",
+      "zip": "26100",
+      "city": "RAUMA"
+    },
+    "currentPeriod": 2,
+    "stale": false,
+    "serie": "PITSITURNAUS",
+    "gameWeek": 1
+  },
+  {
+    "id": 2705870,
+    "season": 2027,
+    "start": "2026-08-07T08:15:00Z",
+    "end": "2026-08-07T06:07:40Z",
+    "homeTeam": {
+      "teamId": "651304385:tps",
+      "teamPlaceholder": null,
+      "teamName": "TPS",
+      "goals": 3,
+      "timeOut": null,
+      "goalEvents": [
+        {
+          "scorerPlayerId": 60799830,
+          "scorerPlayer": {
+            "playerId": 60799830,
+            "firstName": "Lukas",
+            "lastName": "Wernblom"
+          },
+          "logTime": "2026-08-07T05:25:38Z",
+          "winningGoal": false,
+          "gameTime": 505,
+          "period": 1,
+          "eventId": 16,
+          "goalTypes": [],
+          "assistantPlayerIds": [
+            60953549
+          ],
+          "assistantPlayers": [
+            {
+              "playerId": 60953549,
+              "firstName": "Axel",
+              "lastName": "Landen"
+            }
+          ],
+          "plusPlayerIds": "5 22 38 49 97",
+          "minusPlayerIds": "14 21 43 52 92",
+          "homeTeamScore": 1,
+          "awayTeamScore": 0,
+          "assistsSoFarInSeason": {
+            "60953549": 1
+          },
+          "goalsSoFarInSeason": 1,
+          "videoClipUrl": null,
+          "videoClipPlaylistUrl": null,
+          "videoThumbnailUrl": null
+        },
+        {
+          "scorerPlayerId": 40101174,
+          "scorerPlayer": {
+            "playerId": 40101174,
+            "firstName": "Arttu",
+            "lastName": "Tuhkala"
+          },
+          "logTime": "2026-08-07T05:56:45Z",
+          "winningGoal": false,
+          "gameTime": 1591,
+          "period": 2,
+          "eventId": 76,
+          "goalTypes": [
+            "YV"
+          ],
+          "assistantPlayerIds": [
+            23837263,
+            60799830
+          ],
+          "assistantPlayers": [
+            {
+              "playerId": 23837263,
+              "firstName": "Hannu",
+              "lastName": "Kuru"
+            },
+            {
+              "playerId": 60799830,
+              "firstName": "Lukas",
+              "lastName": "Wernblom"
+            }
+          ],
+          "plusPlayerIds": null,
+          "minusPlayerIds": null,
+          "homeTeamScore": 2,
+          "awayTeamScore": 2,
+          "assistsSoFarInSeason": {
+            "23837263": 1,
+            "60799830": 1
+          },
+          "goalsSoFarInSeason": 1,
+          "videoClipUrl": null,
+          "videoClipPlaylistUrl": null,
+          "videoThumbnailUrl": null
+        },
+        {
+          "scorerPlayerId": 60799830,
+          "scorerPlayer": {
+            "playerId": 60799830,
+            "firstName": "Lukas",
+            "lastName": "Wernblom"
+          },
+          "logTime": "2026-08-07T06:01:34Z",
+          "winningGoal": true,
+          "gameTime": 1793,
+          "period": 2,
+          "eventId": 88,
+          "goalTypes": [],
+          "assistantPlayerIds": [
+            61081277,
+            60660278
+          ],
+          "assistantPlayers": [
+            {
+              "playerId": 61081277,
+              "firstName": "Lukas",
+              "lastName": "Haudum"
+            },
+            {
+              "playerId": 60660278,
+              "firstName": "Lars",
+              "lastName": "Bryggman"
+            }
+          ],
+          "plusPlayerIds": "5 22 38 49 97",
+          "minusPlayerIds": "7 33 55 92 98",
+          "homeTeamScore": 3,
+          "awayTeamScore": 2,
+          "assistsSoFarInSeason": {
+            "60660278": 1,
+            "61081277": 1
+          },
+          "goalsSoFarInSeason": 2,
+          "videoClipUrl": null,
+          "videoClipPlaylistUrl": null,
+          "videoThumbnailUrl": null
+        }
+      ],
+      "powerplayInstances": 2,
+      "powerplayGoals": 1,
+      "shortHandedInstances": 2,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-08-07T11:15:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe07109c96edf4561b8b5021e7fc44526",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Fe07109c96edf4561b8b5021e7fc44526",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "awayTeam": {
+      "teamId": "238306801:jokerit",
+      "teamPlaceholder": null,
+      "teamName": "Jokerit",
+      "goals": 2,
+      "timeOut": null,
+      "goalEvents": [
+        {
+          "scorerPlayerId": 21722684,
+          "scorerPlayer": {
+            "playerId": 21722684,
+            "firstName": "Markus",
+            "lastName": "Hännikäinen"
+          },
+          "logTime": "2026-08-07T05:32:27Z",
+          "winningGoal": false,
+          "gameTime": 740,
+          "period": 1,
+          "eventId": 28,
+          "goalTypes": [],
+          "assistantPlayerIds": [
+            61074400,
+            60342512
+          ],
+          "assistantPlayers": [
+            {
+              "playerId": 61074400,
+              "firstName": "Max",
+              "lastName": "Krogdahl"
+            },
+            {
+              "playerId": 60342512,
+              "firstName": "Matthew",
+              "lastName": "Caito"
+            }
+          ],
+          "plusPlayerIds": "4 7 28 33 43",
+          "minusPlayerIds": "9 24 42 47 61",
+          "homeTeamScore": 1,
+          "awayTeamScore": 1,
+          "assistsSoFarInSeason": {
+            "60342512": 1,
+            "61074400": 1
+          },
+          "goalsSoFarInSeason": 1,
+          "videoClipUrl": null,
+          "videoClipPlaylistUrl": null,
+          "videoThumbnailUrl": null
+        },
+        {
+          "scorerPlayerId": 30712591,
+          "scorerPlayer": {
+            "playerId": 30712591,
+            "firstName": "Henri",
+            "lastName": "Nikkanen"
+          },
+          "logTime": "2026-08-07T05:44:00Z",
+          "winningGoal": false,
+          "gameTime": 1112,
+          "period": 2,
+          "eventId": 53,
+          "goalTypes": [
+            "YV"
+          ],
+          "assistantPlayerIds": [
+            24641005
+          ],
+          "assistantPlayers": [
+            {
+              "playerId": 24641005,
+              "firstName": "Antti",
+              "lastName": "Kalapudas"
+            }
+          ],
+          "plusPlayerIds": null,
+          "minusPlayerIds": null,
+          "homeTeamScore": 1,
+          "awayTeamScore": 2,
+          "assistsSoFarInSeason": {
+            "24641005": 1
+          },
+          "goalsSoFarInSeason": 1,
+          "videoClipUrl": null,
+          "videoClipPlaylistUrl": null,
+          "videoThumbnailUrl": null
+        }
+      ],
+      "powerplayInstances": 2,
+      "powerplayGoals": 1,
+      "shortHandedInstances": 2,
+      "shortHandedGoals": 0,
+      "ranking": null,
+      "gameStartDateTime": "2026-08-07T11:15:00+03:00",
+      "logos": {
+        "darkBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Faaa8acd74adb43f4bfd3de3e9af484b0",
+        "lightBg": "https://cdn.builder.io/api/v1/image/assets%2Ff11503eeae084753968caac3899a5d78%2Faaa8acd74adb43f4bfd3de3e9af484b0",
+        "darkBgOriginal": null,
+        "lightBgOriginal": null
+      }
+    },
+    "periods": [
+      {
+        "index": 1,
+        "homeTeamGoals": 1,
+        "awayTeamGoals": 1,
+        "category": "NORMAL",
+        "startTime": 0,
+        "endTime": 900
+      },
+      {
+        "index": 2,
+        "homeTeamGoals": 2,
+        "awayTeamGoals": 1,
+        "category": "NORMAL",
+        "startTime": 900,
+        "endTime": 1800
+      },
+      {
+        "index": 3,
+        "homeTeamGoals": 0,
+        "awayTeamGoals": 0,
+        "category": "WINNING_SHOT_COMPETITION",
+        "startTime": 1800,
+        "endTime": 1800
+      }
+    ],
+    "finishedType": "ENDED_DURING_REGULAR_GAME_TIME",
+    "started": true,
+    "ended": true,
+    "gameTime": 1800,
+    "spectators": 4500,
+    "playOffPair": 0,
+    "playOffPhase": 0,
+    "playOffReqWins": 0,
+    "iceRink": {
+      "id": 166,
+      "name": "Rauman jäähalli / Äijänsuo Areena",
+      "latitude": 61.1203,
+      "longitude": 21.501,
+      "streetAddress": "Nortamonkatu 23",
+      "zip": "26100",
+      "city": "RAUMA"
+    },
+    "currentPeriod": 2,
+    "stale": false,
+    "serie": "PITSITURNAUS",
+    "gameWeek": 1
+  }
+]
