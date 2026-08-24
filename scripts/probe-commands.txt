@@ -1,0 +1,7 @@
+git clone <repo>
+cd hockey-edge
+python -m venv .venv
+<activate>
+pip install -r requirements.txt
+pip install -e .
+python scripts/lineup_probe.py --season 2027 --game-id 2701831
