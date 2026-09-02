@@ -1,0 +1,404 @@
+{
+  "teamComparison": {
+    "859884935": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    },
+    "1368624751": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    }
+  },
+  "playersToWatch": {
+    "all": {
+      "859884935": [
+        {
+          "playerId": 30793837,
+          "playerName": "Vilén Elias",
+          "playerJersey": "91",
+          "role": "H",
+          "value": 6,
+          "category": "points"
+        },
+        {
+          "playerId": 31578145,
+          "playerName": "Mäenpää Juuso",
+          "playerJersey": "9",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 30793837,
+          "playerName": "Vilén Elias",
+          "playerJersey": "91",
+          "role": "H",
+          "value": 4,
+          "category": "goals"
+        },
+        {
+          "playerId": 24338350,
+          "playerName": "Hartikainen Teemu",
+          "playerJersey": "70",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 31578145,
+          "playerName": "Mäenpää Juuso",
+          "playerJersey": "9",
+          "role": "H",
+          "value": 0,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 25567120,
+          "playerName": "Somppi Otto",
+          "playerJersey": "85",
+          "role": "H",
+          "value": 3174.2,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 22895620,
+          "playerName": "Piitulainen Jesper",
+          "playerJersey": "54",
+          "role": "H",
+          "value": 8,
+          "category": "shots"
+        }
+      ],
+      "1368624751": [
+        {
+          "playerId": 30731093,
+          "playerName": "Hämäläinen Janne",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 61067273,
+          "playerName": "From Mathias",
+          "playerJersey": "77",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 24650025,
+          "playerName": "Kangasniemi Iikka",
+          "playerJersey": "4",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 30731093,
+          "playerName": "Hämäläinen Janne",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 30731093,
+          "playerName": "Hämäläinen Janne",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 0,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 29936715,
+          "playerName": "Kotkansalo Kasper",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 2514.4866666666667,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 30731093,
+          "playerName": "Hämäläinen Janne",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 4,
+          "category": "shots"
+        }
+      ]
+    },
+    "defenders": {
+      "859884935": [
+        {
+          "playerId": 22474067,
+          "playerName": "Lyytinen Joonas",
+          "playerJersey": "57",
+          "role": "P",
+          "value": 2,
+          "category": "points"
+        },
+        {
+          "playerId": 40431875,
+          "playerName": "Gallet Hugo",
+          "playerJersey": "18",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 22474067,
+          "playerName": "Lyytinen Joonas",
+          "playerJersey": "57",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 40215681,
+          "playerName": "Ruotsalainen Ville",
+          "playerJersey": "8",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60671583,
+          "playerName": "Karlsson Anton",
+          "playerJersey": "3",
+          "role": "P",
+          "value": 0,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 40215681,
+          "playerName": "Ruotsalainen Ville",
+          "playerJersey": "8",
+          "role": "P",
+          "value": 2045.57,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 40109642,
+          "playerName": "Mononen Veikka",
+          "playerJersey": "7",
+          "role": "P",
+          "value": 7,
+          "category": "shots"
+        }
+      ],
+      "1368624751": [
+        {
+          "playerId": 29936715,
+          "playerName": "Kotkansalo Kasper",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 1,
+          "category": "points"
+        },
+        {
+          "playerId": 29936715,
+          "playerName": "Kotkansalo Kasper",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 1,
+          "category": "assists"
+        },
+        {
+          "playerId": 29936715,
+          "playerName": "Kotkansalo Kasper",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 0,
+          "category": "goals"
+        },
+        {
+          "playerId": 29936715,
+          "playerName": "Kotkansalo Kasper",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 29936715,
+          "playerName": "Kotkansalo Kasper",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 0,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 29936715,
+          "playerName": "Kotkansalo Kasper",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 2514.4866666666667,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 29936715,
+          "playerName": "Kotkansalo Kasper",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 4,
+          "category": "shots"
+        }
+      ]
+    },
+    "forwards": {
+      "859884935": [
+        {
+          "playerId": 30793837,
+          "playerName": "Vilén Elias",
+          "playerJersey": "91",
+          "role": "H",
+          "value": 6,
+          "category": "points"
+        },
+        {
+          "playerId": 31578145,
+          "playerName": "Mäenpää Juuso",
+          "playerJersey": "9",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 30793837,
+          "playerName": "Vilén Elias",
+          "playerJersey": "91",
+          "role": "H",
+          "value": 4,
+          "category": "goals"
+        },
+        {
+          "playerId": 24338350,
+          "playerName": "Hartikainen Teemu",
+          "playerJersey": "70",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 31578145,
+          "playerName": "Mäenpää Juuso",
+          "playerJersey": "9",
+          "role": "H",
+          "value": 0,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 25567120,
+          "playerName": "Somppi Otto",
+          "playerJersey": "85",
+          "role": "H",
+          "value": 3174.2,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 22895620,
+          "playerName": "Piitulainen Jesper",
+          "playerJersey": "54",
+          "role": "H",
+          "value": 8,
+          "category": "shots"
+        }
+      ],
+      "1368624751": [
+        {
+          "playerId": 30731093,
+          "playerName": "Hämäläinen Janne",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 61067273,
+          "playerName": "From Mathias",
+          "playerJersey": "77",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 24650025,
+          "playerName": "Kangasniemi Iikka",
+          "playerJersey": "4",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 30731093,
+          "playerName": "Hämäläinen Janne",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 30731093,
+          "playerName": "Hämäläinen Janne",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 0,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 34132533,
+          "playerName": "Tuomaala Arttu",
+          "playerJersey": "78",
+          "role": "H",
+          "value": 1736.726,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 30731093,
+          "playerName": "Hämäläinen Janne",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 4,
+          "category": "shots"
+        }
+      ]
+    }
+  },
+  "goaliesToWatch": {
+    "859884935": [],
+    "1368624751": []
+  }
+}

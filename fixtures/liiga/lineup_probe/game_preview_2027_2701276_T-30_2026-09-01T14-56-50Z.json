@@ -1,0 +1,404 @@
+{
+  "teamComparison": {
+    "495643563": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    },
+    "679171680": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    }
+  },
+  "playersToWatch": {
+    "all": {
+      "495643563": [
+        {
+          "playerId": 29864256,
+          "playerName": "Erholtz Eemil",
+          "playerJersey": "73",
+          "role": "H",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 29864256,
+          "playerName": "Erholtz Eemil",
+          "playerJersey": "73",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 31632421,
+          "playerName": "Paaso Arttu",
+          "playerJersey": "25",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 32269686,
+          "playerName": "Hirvonen Roni",
+          "playerJersey": "33",
+          "role": "H",
+          "value": 3,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 24406130,
+          "playerName": "Hermonen Julius",
+          "playerJersey": "59",
+          "role": "H",
+          "value": 0,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60716456,
+          "playerName": "Kantner Matyas",
+          "playerJersey": "93",
+          "role": "H",
+          "value": 3140.7025,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 30984675,
+          "playerName": "Matinmikko Aleksi",
+          "playerJersey": "21",
+          "role": "P",
+          "value": 18,
+          "category": "shots"
+        }
+      ],
+      "679171680": [
+        {
+          "playerId": 60902372,
+          "playerName": "Klingberg Carl",
+          "playerJersey": "48",
+          "role": "H",
+          "value": 7,
+          "category": "points"
+        },
+        {
+          "playerId": 60861292,
+          "playerName": "Hillis Cameron",
+          "playerJersey": "10",
+          "role": "H",
+          "value": 6,
+          "category": "assists"
+        },
+        {
+          "playerId": 60902372,
+          "playerName": "Klingberg Carl",
+          "playerJersey": "48",
+          "role": "H",
+          "value": 5,
+          "category": "goals"
+        },
+        {
+          "playerId": 24962616,
+          "playerName": "Ojantakanen Kasperi",
+          "playerJersey": "72",
+          "role": "H",
+          "value": 3,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40087955,
+          "playerName": "Heinilä Eemeli",
+          "playerJersey": "23",
+          "role": "P",
+          "value": 600,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60861292,
+          "playerName": "Hillis Cameron",
+          "playerJersey": "10",
+          "role": "H",
+          "value": 4346.992,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61074020,
+          "playerName": "Pinard Simon",
+          "playerJersey": "47",
+          "role": "H",
+          "value": 16,
+          "category": "shots"
+        }
+      ]
+    },
+    "defenders": {
+      "495643563": [
+        {
+          "playerId": 31632421,
+          "playerName": "Paaso Arttu",
+          "playerJersey": "25",
+          "role": "P",
+          "value": 1,
+          "category": "points"
+        },
+        {
+          "playerId": 30730803,
+          "playerName": "Loponen Kalle",
+          "playerJersey": "43",
+          "role": "P",
+          "value": 1,
+          "category": "assists"
+        },
+        {
+          "playerId": 31632421,
+          "playerName": "Paaso Arttu",
+          "playerJersey": "25",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 40391496,
+          "playerName": "Ruotsalainen Veeti",
+          "playerJersey": "4",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 31632421,
+          "playerName": "Paaso Arttu",
+          "playerJersey": "25",
+          "role": "P",
+          "value": 0,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 25657580,
+          "playerName": "Rissanen Rasmus",
+          "playerJersey": "2",
+          "role": "P",
+          "value": 2651.8425,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 30984675,
+          "playerName": "Matinmikko Aleksi",
+          "playerJersey": "21",
+          "role": "P",
+          "value": 18,
+          "category": "shots"
+        }
+      ],
+      "679171680": [
+        {
+          "playerId": 22709389,
+          "playerName": "Nikkilä Petteri",
+          "playerJersey": "79",
+          "role": "P",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 22709389,
+          "playerName": "Nikkilä Petteri",
+          "playerJersey": "79",
+          "role": "P",
+          "value": 3,
+          "category": "assists"
+        },
+        {
+          "playerId": 29934157,
+          "playerName": "Anttalainen Aleksi",
+          "playerJersey": "3",
+          "role": "P",
+          "value": 0,
+          "category": "goals"
+        },
+        {
+          "playerId": 33424682,
+          "playerName": "Määttä Rami",
+          "playerJersey": "37",
+          "role": "P",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40087955,
+          "playerName": "Heinilä Eemeli",
+          "playerJersey": "23",
+          "role": "P",
+          "value": 600,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 22709389,
+          "playerName": "Nikkilä Petteri",
+          "playerJersey": "79",
+          "role": "P",
+          "value": 4058.3900000000003,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 22709389,
+          "playerName": "Nikkilä Petteri",
+          "playerJersey": "79",
+          "role": "P",
+          "value": 11,
+          "category": "shots"
+        }
+      ]
+    },
+    "forwards": {
+      "495643563": [
+        {
+          "playerId": 29864256,
+          "playerName": "Erholtz Eemil",
+          "playerJersey": "73",
+          "role": "H",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 29864256,
+          "playerName": "Erholtz Eemil",
+          "playerJersey": "73",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 29864256,
+          "playerName": "Erholtz Eemil",
+          "playerJersey": "73",
+          "role": "H",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 32269686,
+          "playerName": "Hirvonen Roni",
+          "playerJersey": "33",
+          "role": "H",
+          "value": 3,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 24406130,
+          "playerName": "Hermonen Julius",
+          "playerJersey": "59",
+          "role": "H",
+          "value": 0,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60716456,
+          "playerName": "Kantner Matyas",
+          "playerJersey": "93",
+          "role": "H",
+          "value": 3140.7025,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 29864256,
+          "playerName": "Erholtz Eemil",
+          "playerJersey": "73",
+          "role": "H",
+          "value": 7,
+          "category": "shots"
+        }
+      ],
+      "679171680": [
+        {
+          "playerId": 60902372,
+          "playerName": "Klingberg Carl",
+          "playerJersey": "48",
+          "role": "H",
+          "value": 7,
+          "category": "points"
+        },
+        {
+          "playerId": 60861292,
+          "playerName": "Hillis Cameron",
+          "playerJersey": "10",
+          "role": "H",
+          "value": 6,
+          "category": "assists"
+        },
+        {
+          "playerId": 60902372,
+          "playerName": "Klingberg Carl",
+          "playerJersey": "48",
+          "role": "H",
+          "value": 5,
+          "category": "goals"
+        },
+        {
+          "playerId": 24962616,
+          "playerName": "Ojantakanen Kasperi",
+          "playerJersey": "72",
+          "role": "H",
+          "value": 3,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60861292,
+          "playerName": "Hillis Cameron",
+          "playerJersey": "10",
+          "role": "H",
+          "value": 525.4,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60861292,
+          "playerName": "Hillis Cameron",
+          "playerJersey": "10",
+          "role": "H",
+          "value": 4346.992,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61074020,
+          "playerName": "Pinard Simon",
+          "playerJersey": "47",
+          "role": "H",
+          "value": 16,
+          "category": "shots"
+        }
+      ]
+    }
+  },
+  "goaliesToWatch": {
+    "495643563": [],
+    "679171680": []
+  }
+}

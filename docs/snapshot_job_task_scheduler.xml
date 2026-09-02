@@ -1,43 +1,102 @@
-<?xml version="1.0" encoding="UTF-16"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
   hockey-edge snapshot job — Windows Task Scheduler definition.
 
-  This is the scheduler actually being used this session (2026-08-23):
-  Niklas's main desktop, not an always-on host — a deliberate choice for
-  preseason, since a missed capture on an August friendly costs nothing.
-  Because the host sleeps, the job itself (not this scheduler config) is
-  responsible for correct missed-tick recovery — see
-  hockey_edge.snapshot.job's docstring and storage.get_due_windows/
-  mark_missed_windows. This file only has to fire --once roughly every 15
-  minutes; it does not need to be clever about missed ticks itself.
+  Ready to register as-is (2026-09-02): the paths below are absolute and
+  point at this checkout. A scheduled task inherits neither a shell's working
+  directory nor its PATH, so <Command> must be the venv interpreter itself
+  (NOT "python"), and every path here is spelled out in full.
 
-  Import: Task Scheduler -> Action pane -> "Import Task..." -> select this
-  file. Edit the two placeholder paths below first:
-    - REPO_ROOT: absolute path to this checkout (e.g.
-      C:\Users\Nikla_000\Documents\local-repo\hockey-edge) — must match
-      <WorkingDirectory> AND the venv python path in <Command>, since
-      data/, logs/, and data/raw/ are relative paths (see CLAUDE.md).
-    - Adjust <StartBoundary> to any time today/tomorrow; the repeat pattern
-      below runs it every 15 minutes indefinitely from that point.
+    repo root : C:\Users\Nikla_000\Documents\local-repo\hockey-edge
+    python    : C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\python.exe
 
-  "Wake the computer to run this task" is deliberately left OFF (false) —
-  the whole point of testing on a sleeping desktop is to exercise the
-  missed-tick recovery path for real, not to paper over it by forcing the
-  machine awake. Toggle it on later if that trade-off changes.
+  On paths: the job's data/log locations are NOT cwd-relative — job.py,
+  storage.py and raw_cache.py all anchor to Path(__file__).resolve().
+  parents[3], i.e. the repo root as derived from the module's own location.
+  Verified 2026-09-02 by running the job from C:\ and watching it find this
+  repo's data/snapshots.db and logs/ correctly. <WorkingDirectory> is still
+  set to the repo root, because job.py calls python-dotenv's load_dotenv(),
+  whose .env discovery does depend on where the process starts.
+
+  Trigger window: every 15 minutes, 11:00–23:00 local, daily.
+
+  NOTE ON THE WINDOW: 11:00, not 14:00. Liiga's regular season is mostly
+  17:00/18:30 starts, but not entirely — season 2027 has 15 RUNKOSARJA games
+  starting before 17:00 local, including one at 12:00 (2026-10-07) and two at
+  14:00 (2026-11-21, 2027-03-20). The binding constraint is not the T-24h
+  window but the CLOSING one (T-25min), which is where a confirmed lineup
+  actually appears (see docs/SNAPSHOT_FINDINGS.md's T-30 finding). With a
+  14:00 start those three games' closing windows come due before the first
+  tick, and storage.get_due_windows only returns a window while
+  start_utc > now — so they would be recorded MISSED, permanently, rather
+  than captured. 11:00 covers every scheduled 2026-27 fixture with margin and
+  still never ticks overnight. Re-check this if a future season schedules
+  anything earlier than ~11:30 local.
+
+  WakeToRun=true (changed 2026-09-02, was false). The earlier false was a
+  preseason choice: leave the desktop asleep and let the missed-tick recovery
+  path get exercised for real, back when a missed August friendly cost
+  nothing. That trade-off inverted once the season started — relying on the
+  machine happening to be awake at T-25min makes the job close to useless in
+  practice, and a missed capture is unrecoverable.
+
+  Two things this depends on, both outside this file: the power plan must
+  permit wake timers ("Allow wake timers" = Enabled), or WakeToRun silently
+  does nothing; and a wake timer only wakes a machine that is ASLEEP, never
+  one hibernated or shut down. Also be aware this asks Windows to wake for
+  every 15-minute repetition inside the 11:00-23:00 window, not just for
+  games — in practice the machine will stay up most of the day.
+
+  StartWhenAvailable=true is still set and still matters: it covers the case
+  where the machine was off/hibernated through a tick. The job's own
+  due/missed logic (storage.get_due_windows / mark_missed_windows) remains
+  what makes a late tick correct — never a naive "is now ≈ the window time"
+  check. See job.py's docstring.
+
+  REGISTRATION — what actually worked (PowerShell 7, confirmed 2026-09-02):
+
+    $xml = Get-Content -Raw "docs\snapshot_job_task_scheduler.xml"
+    $xml = $xml -replace '<\?xml[^>]*\?>', ''
+    Register-ScheduledTask -TaskName "hockey-edge snapshot job" -Xml $xml
+
+  The middle line is required, not cosmetic. Register-ScheduledTask takes the
+  XML as a *string*, which PowerShell holds as UTF-16 in memory, so a document
+  declaring any encoding at all is a contradiction the parser rejects
+  ("Cannot use a prefix with an empty namespace" / malformed-XML style errors).
+  Stripping the whole declaration sidesteps it. Note this is independent of
+  the file's own encoding: the declaration was previously (and wrongly) UTF-16
+  while the bytes were UTF-8, which breaks `schtasks /XML` — that is now fixed
+  to UTF-8, but the PowerShell path still needs the declaration stripped.
+
+  Alternatives, if the above is unavailable: `schtasks /Create /TN
+  "hockey-edge snapshot job" /XML "<abs path to this file>"`, or Task
+  Scheduler -> Action pane -> "Import Task...".
+
+  Task Scheduler history is OFF by default. Enable "Enable All Tasks
+  History" in the Actions pane, or the History tab stays empty and there is
+  no scheduler-side evidence a run happened. The job's own
+  logs/snapshot_job.log is the authoritative record either way.
 -->
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>hockey-edge Layer 2 snapshot capture job (--once), every 15 minutes.</Description>
+    <Description>hockey-edge Layer 2 snapshot capture job (--once), every 15 minutes, 11:00-23:00 local.</Description>
+    <URI>\hockey-edge snapshot job</URI>
   </RegistrationInfo>
   <Triggers>
-    <TimeTrigger>
+    <CalendarTrigger>
       <Repetition>
         <Interval>PT15M</Interval>
+        <Duration>PT12H</Duration>
+        <!-- false: never hard-kill an in-flight capture at 23:00; let the
+             run it's already doing finish. -->
         <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
-      <StartBoundary>2026-08-23T00:00:00</StartBoundary>
+      <StartBoundary>2026-09-02T11:00:00</StartBoundary>
       <Enabled>true</Enabled>
-    </TimeTrigger>
+      <ScheduleByDay>
+        <DaysInterval>1</DaysInterval>
+      </ScheduleByDay>
+    </CalendarTrigger>
   </Triggers>
   <Principals>
     <Principal id="Author">
@@ -46,21 +105,31 @@
     </Principal>
   </Principals>
   <Settings>
+    <!-- IgnoreNew: if a run is still going when the next 15-minute tick
+         fires, that tick is dropped rather than started alongside it. No two
+         instances ever write to snapshots.db at once. -->
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
     <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
     <AllowHardTerminate>true</AllowHardTerminate>
     <StartWhenAvailable>true</StartWhenAvailable>
     <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
-    <WakeToRun>false</WakeToRun>
-    <ExecutionTimeLimit>PT5M</ExecutionTimeLimit>
+    <WakeToRun>true</WakeToRun>
+    <!-- PT0S = no execution time limit. Was PT5M, which would hard-kill a
+         slow run: a busy night's pass does fixture discovery plus one
+         game_detail + game_preview per due game, and a stalled HTTP request
+         alone can burn most of five minutes. A killed pass loses that
+         window's capture permanently. -->
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
     <Priority>7</Priority>
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>REPO_ROOT\.venv\Scripts\python.exe</Command>
+      <Command>C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\python.exe</Command>
       <Arguments>-m hockey_edge.snapshot.job --once</Arguments>
-      <WorkingDirectory>REPO_ROOT</WorkingDirectory>
+      <WorkingDirectory>C:\Users\Nikla_000\Documents\local-repo\hockey-edge</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>

@@ -1,0 +1,404 @@
+{
+  "teamComparison": {
+    "55786244": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    },
+    "292293444": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    }
+  },
+  "playersToWatch": {
+    "all": {
+      "55786244": [
+        {
+          "playerId": 61073597,
+          "playerName": "Ranford Brendan",
+          "playerJersey": "95",
+          "role": "H",
+          "value": 7,
+          "category": "points"
+        },
+        {
+          "playerId": 61068162,
+          "playerName": "Kukuca Andrej",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 40039427,
+          "playerName": "Kopiloff Oliver",
+          "playerJersey": "44",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 21870028,
+          "playerName": "Kainulainen Harri",
+          "playerJersey": "64",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 30417647,
+          "playerName": "Korhonen Olli",
+          "playerJersey": "15",
+          "role": "H",
+          "value": 497.25,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 40172010,
+          "playerName": "Oden Joonas",
+          "playerJersey": "81",
+          "role": "H",
+          "value": 4169.32,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61073595,
+          "playerName": "Nychuk Chad",
+          "playerJersey": "39",
+          "role": "P",
+          "value": 11,
+          "category": "shots"
+        }
+      ],
+      "292293444": [
+        {
+          "playerId": 40032907,
+          "playerName": "Soini Sebastian",
+          "playerJersey": "6",
+          "role": "P",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 61073533,
+          "playerName": "Sjödin Linus",
+          "playerJersey": "25",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 40032907,
+          "playerName": "Soini Sebastian",
+          "playerJersey": "6",
+          "role": "P",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 60456415,
+          "playerName": "Hodass Bogdans",
+          "playerJersey": "27",
+          "role": "P",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60898910,
+          "playerName": "Sustr Andrej",
+          "playerJersey": "26",
+          "role": "P",
+          "value": 346.5,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60898910,
+          "playerName": "Sustr Andrej",
+          "playerJersey": "26",
+          "role": "P",
+          "value": 4635.1875,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61073535,
+          "playerName": "Olofsson Jesper",
+          "playerJersey": "92",
+          "role": "H",
+          "value": 12,
+          "category": "shots"
+        }
+      ]
+    },
+    "defenders": {
+      "55786244": [
+        {
+          "playerId": 61073595,
+          "playerName": "Nychuk Chad",
+          "playerJersey": "39",
+          "role": "P",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 61073595,
+          "playerName": "Nychuk Chad",
+          "playerJersey": "39",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 61032982,
+          "playerName": "Pyke Garrett",
+          "playerJersey": "7",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 33494007,
+          "playerName": "Piironen Valtteri",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 31585390,
+          "playerName": "Kukkonen Miska",
+          "playerJersey": "43",
+          "role": "P",
+          "value": 462.6,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 31585390,
+          "playerName": "Kukkonen Miska",
+          "playerJersey": "43",
+          "role": "P",
+          "value": 3314.022,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61073595,
+          "playerName": "Nychuk Chad",
+          "playerJersey": "39",
+          "role": "P",
+          "value": 11,
+          "category": "shots"
+        }
+      ],
+      "292293444": [
+        {
+          "playerId": 40032907,
+          "playerName": "Soini Sebastian",
+          "playerJersey": "6",
+          "role": "P",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 60456415,
+          "playerName": "Hodass Bogdans",
+          "playerJersey": "27",
+          "role": "P",
+          "value": 1,
+          "category": "assists"
+        },
+        {
+          "playerId": 40032907,
+          "playerName": "Soini Sebastian",
+          "playerJersey": "6",
+          "role": "P",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 60456415,
+          "playerName": "Hodass Bogdans",
+          "playerJersey": "27",
+          "role": "P",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60898910,
+          "playerName": "Sustr Andrej",
+          "playerJersey": "26",
+          "role": "P",
+          "value": 346.5,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60898910,
+          "playerName": "Sustr Andrej",
+          "playerJersey": "26",
+          "role": "P",
+          "value": 4635.1875,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 24783853,
+          "playerName": "Lintuniemi Alex",
+          "playerJersey": "40",
+          "role": "P",
+          "value": 8,
+          "category": "shots"
+        }
+      ]
+    },
+    "forwards": {
+      "55786244": [
+        {
+          "playerId": 61073597,
+          "playerName": "Ranford Brendan",
+          "playerJersey": "95",
+          "role": "H",
+          "value": 7,
+          "category": "points"
+        },
+        {
+          "playerId": 61068162,
+          "playerName": "Kukuca Andrej",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 40039427,
+          "playerName": "Kopiloff Oliver",
+          "playerJersey": "44",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 21870028,
+          "playerName": "Kainulainen Harri",
+          "playerJersey": "64",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 30417647,
+          "playerName": "Korhonen Olli",
+          "playerJersey": "15",
+          "role": "H",
+          "value": 497.25,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 40172010,
+          "playerName": "Oden Joonas",
+          "playerJersey": "81",
+          "role": "H",
+          "value": 4169.32,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61073590,
+          "playerName": "De Jong Ethan",
+          "playerJersey": "11",
+          "role": "H",
+          "value": 9,
+          "category": "shots"
+        }
+      ],
+      "292293444": [
+        {
+          "playerId": 61073533,
+          "playerName": "Sjödin Linus",
+          "playerJersey": "25",
+          "role": "H",
+          "value": 2,
+          "category": "points"
+        },
+        {
+          "playerId": 61073533,
+          "playerName": "Sjödin Linus",
+          "playerJersey": "25",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 60860218,
+          "playerName": "Olsen Thomas",
+          "playerJersey": "10",
+          "role": "H",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 40069442,
+          "playerName": "Frilander Jiro",
+          "playerJersey": "96",
+          "role": "H",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 61026835,
+          "playerName": "Boudon Louis",
+          "playerJersey": "29",
+          "role": "H",
+          "value": 276.5,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 61026835,
+          "playerName": "Boudon Louis",
+          "playerJersey": "29",
+          "role": "H",
+          "value": 4329.7225,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61073535,
+          "playerName": "Olofsson Jesper",
+          "playerJersey": "92",
+          "role": "H",
+          "value": 12,
+          "category": "shots"
+        }
+      ]
+    }
+  },
+  "goaliesToWatch": {
+    "55786244": [],
+    "292293444": []
+  }
+}

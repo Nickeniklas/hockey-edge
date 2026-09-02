@@ -12,13 +12,14 @@ Full plan: [docs/PLAN.md](docs/PLAN.md). Data contract:
 
 ## Status
 
-**Build-order step 1 (Liiga historical ingest) covers seasons 2015–2026.**
+**Build-order step 1 (Liiga historical ingest) covers seasons 2015–2027.**
 The original 10-season backfill (2015–2024, 5,517 games) ran first;
 seasons 2025 and 2026 were added in a later pass (2026-08-23), bringing
-`data/hockey.db` to 12 seasons and 6,736 games total, all with full
-per-game endpoints, no sampling. Season 2027 (the in-progress 2026-27
-season) is deliberately **not** backfilled — it belongs to the future
-snapshot job, not historical ingest.
+`data/hockey.db` to 12 seasons and 6,736 games. Season 2027 (the live
+2026-27 season) was ingested on 2026-09-01 — 595 fixtures, of which 58 had
+ended at that point, all fetched clean with zero failures. Keeping it
+current is now an ongoing job, not a one-off: see `scripts/nightly_sync.py`
+below.
 
 `docs/BACKFILL_RESULTS.md` has the detailed per-season row counts, sanity
 checks, and known data gaps for the original 2015–2024 run; **read it before
@@ -46,27 +47,44 @@ and so is every per-game table. Keying on `game_id` alone silently corrupts data
 Still open on step 1: seasons before 2015 are untested, and the HC Blues
 `game_stats` gap in 2015/2016 has no root cause yet. (The `PLAYOUT`/
 `QUALIFICATIONS` `serie` strings, previously unconfirmed, were confirmed via
-season 2025 — see `docs/SCHEMA_DRAFT.md` design principle 3.)
+season 2025 — see `docs/SCHEMA_DRAFT.md` design principle 3. Season 2027
+added another, `PITSITURNAUS`, a preseason tournament: treat the `serie`
+vocabulary as open-ended, not a closed set.)
 
-**Build-order step 2 (snapshot capture job) is substantially built (2026-08-24/25),
-but not yet capturing real odds.** `src/hockey_edge/snapshot/` now has live
-fixture discovery (`fixtures.py`), a sleep-safe capture-window scheduler (a
-game's opening/mid/closing odds windows are tracked per `(season, game_id,
-window)`, not inferred from timestamp proximity — verified against a
-simulated missed-tick scenario), an `api_usage` table with a monthly
-ceiling, and `job.py --dry-run` / `--once` modes. The odds provider wired in
-right now is `NullOddsProvider` (zero HTTP requests) rather than the
-existing `OddsPapiProvider` — a live OddsPapi call found `/odds-by-
-tournaments` returns no price data, contradicting its own docs, so which
-provider/cadence is actually viable is unresolved. Lineup capture is still
-stubbed; `scripts/lineup_probe.py` is a new standalone read-only tool built
-to test the pre-puck-drop lineup question directly against a live game.
-Full findings: **`docs/SNAPSHOT_FINDINGS.md`**. See `CLAUDE.md`'s
-2026-08-25 Status entry for the complete picture.
+**Build-order step 2 (snapshot capture job) is deployed and capturing
+lineups; odds are still not being captured.** `src/hockey_edge/snapshot/`
+has live fixture discovery (`fixtures.py`), a sleep-safe capture-window
+scheduler (a game's opening/mid/closing windows are tracked per `(season,
+game_id, window)`, not inferred from timestamp proximity — verified against
+a simulated missed-tick scenario), an `api_usage` table with a monthly
+ceiling, and `job.py --dry-run` / `--once` modes. It is registered as a
+Windows scheduled task (2026-09-02), running every 15 minutes 11:00–23:00
+local — see `docs/snapshot_job_task_scheduler.xml`, which carries the
+working registration command and why the window starts at 11:00.
+
+**Lineup capture is live** (`snapshot/lineups.py`, previously stubbed).
+liiga.fi publishes a confirmed 22-player lineup per team roughly half an
+hour before puck drop — `line` is non-null for exactly 20 skaters + 2
+goalies at T-30, versus null for everyone at T-9 days. The starting goalie
+is inferred from `line == 1` (there is no literal "starter" field); that
+inference scored 14/14 against real results on the 2026-09-01 slate, while
+the competing array-order candidate scored 7/14. Every stored starter is
+still marked as an inference (`starter_source`/`starter_confidence`) and
+`scripts/verify_starters.py` re-scores it against completed games so drift
+is monitored rather than assumed.
+
+The odds provider wired in is still `NullOddsProvider` (zero HTTP requests)
+rather than the existing `OddsPapiProvider` — a live OddsPapi call found
+`/odds-by-tournaments` returns no price data, contradicting its own docs, so
+which provider/cadence is viable remains **the open decision**. Full
+findings: **`docs/SNAPSHOT_FINDINGS.md`**.
 
 ```
 python -m hockey_edge.snapshot.job --once       # normal pass
 python -m hockey_edge.snapshot.job --dry-run    # zero HTTP requests, reports what's due
+
+python scripts/verify_starters.py               # read-only: score captured starters vs real results
+python scripts/lineup_probe.py --date 2026-09-01 --label T-30   # read-only ad-hoc lineup probe
 ```
 
 **A separate re-sync mechanism now exists for historical data**:
@@ -80,11 +98,34 @@ recovery to just the endpoint(s) that need it. See **`docs/RESYNC.md`**
 (mechanism) and **`docs/RECOVERY_BACKLOG.md`** (two deferred recovery runs,
 ready-to-execute commands, not run yet) for detail.
 
-Run a season backfill (from repo root, with the venv active — see Setup):
+**Keeping the live season current — `scripts/nightly_sync.py`, needs to run
+daily while the season is on.** Nothing else puts completed 2026-27 games
+into `hockey.db`: the snapshot job writes only to `snapshots.db`, and
+`backfill.py` was built as a one-time-per-historical-season pass. This
+wrapper runs the season backfill (season-level endpoints force-refreshed,
+per-game restricted to games that have ended) followed by `resync.py` over
+the last 7 days, logging to `logs/nightly_sync.log`:
+
+```
+python scripts/nightly_sync.py              # season 2027, 7-day resync window
+python scripts/nightly_sync.py --dry-run    # resync pass only, zero HTTP requests
+```
+
+It is **not** scheduled by this repo — registering it is a manual step. See
+`docs/RESYNC.md`'s nightly-sync section for why both passes are required and
+why the season-level force is load-bearing.
+
+Run a season backfill directly (from repo root, with the venv active — see Setup):
 
 ```
 python -m hockey_edge.ingest.liiga.backfill --season 2024
+python -m hockey_edge.ingest.liiga.backfill --season 2027 --only-ended   # live season
 ```
+
+Use `--only-ended` for a **live** season: without it, per-game endpoints are
+fetched for games that haven't been played, and liiga.fi's pre-game shell
+gets cached as `sync_state` `success` — which this backfill then skips
+forever, so the real post-game data never arrives by that path.
 
 Safe to re-run — already-fetched entities are skipped, not refetched, so
 re-running a completed season is a no-op costing zero HTTP requests. Add

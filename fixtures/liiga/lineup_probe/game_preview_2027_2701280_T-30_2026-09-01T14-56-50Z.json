@@ -1,0 +1,404 @@
+{
+  "teamComparison": {
+    "238306801": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    },
+    "626537494": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    }
+  },
+  "playersToWatch": {
+    "all": {
+      "238306801": [
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 6,
+          "category": "points"
+        },
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 30712591,
+          "playerName": "Nikkanen Henri",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 24641005,
+          "playerName": "Kalapudas Antti",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 3,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 30712591,
+          "playerName": "Nikkanen Henri",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 591,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 30712591,
+          "playerName": "Nikkanen Henri",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 3496.8025,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60954325,
+          "playerName": "Fortier Maxime",
+          "playerJersey": "7",
+          "role": "H",
+          "value": 9,
+          "category": "shots"
+        }
+      ],
+      "626537494": [
+        {
+          "playerId": 61073933,
+          "playerName": "Östman Kalle",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 31896306,
+          "playerName": "Nieminen Viljami",
+          "playerJersey": "71",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 61073933,
+          "playerName": "Östman Kalle",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 61073929,
+          "playerName": "Bürger Eric",
+          "playerJersey": "26",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60351425,
+          "playerName": "Åkerström Simon",
+          "playerJersey": "62",
+          "role": "P",
+          "value": 574.75,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60744050,
+          "playerName": "Miketinac Kalle",
+          "playerJersey": "80",
+          "role": "H",
+          "value": 4172.515,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 25334515,
+          "playerName": "Viljanen Valtteri",
+          "playerJersey": "8",
+          "role": "P",
+          "value": 11,
+          "category": "shots"
+        }
+      ]
+    },
+    "defenders": {
+      "238306801": [
+        {
+          "playerId": 33296797,
+          "playerName": "Tuomola Riku",
+          "playerJersey": "52",
+          "role": "P",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 60619008,
+          "playerName": "Tumanovs Miks",
+          "playerJersey": "12",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 33296797,
+          "playerName": "Tuomola Riku",
+          "playerJersey": "52",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 40009767,
+          "playerName": "Pulli Valtteri",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60578087,
+          "playerName": "Larsen Oliver",
+          "playerJersey": "98",
+          "role": "P",
+          "value": 442,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60578087,
+          "playerName": "Larsen Oliver",
+          "playerJersey": "98",
+          "role": "P",
+          "value": 3419.685,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60619008,
+          "playerName": "Tumanovs Miks",
+          "playerJersey": "12",
+          "role": "P",
+          "value": 7,
+          "category": "shots"
+        }
+      ],
+      "626537494": [
+        {
+          "playerId": 60351425,
+          "playerName": "Åkerström Simon",
+          "playerJersey": "62",
+          "role": "P",
+          "value": 2,
+          "category": "points"
+        },
+        {
+          "playerId": 60351425,
+          "playerName": "Åkerström Simon",
+          "playerJersey": "62",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 60744048,
+          "playerName": "Johnsson Theodor",
+          "playerJersey": "16",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 61073929,
+          "playerName": "Bürger Eric",
+          "playerJersey": "26",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60351425,
+          "playerName": "Åkerström Simon",
+          "playerJersey": "62",
+          "role": "P",
+          "value": 574.75,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60351425,
+          "playerName": "Åkerström Simon",
+          "playerJersey": "62",
+          "role": "P",
+          "value": 2814.0525000000002,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 25334515,
+          "playerName": "Viljanen Valtteri",
+          "playerJersey": "8",
+          "role": "P",
+          "value": 11,
+          "category": "shots"
+        }
+      ]
+    },
+    "forwards": {
+      "238306801": [
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 6,
+          "category": "points"
+        },
+        {
+          "playerId": 31275998,
+          "playerName": "Forslund Alexander",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 30712591,
+          "playerName": "Nikkanen Henri",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 24641005,
+          "playerName": "Kalapudas Antti",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 3,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 30712591,
+          "playerName": "Nikkanen Henri",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 591,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 30712591,
+          "playerName": "Nikkanen Henri",
+          "playerJersey": "28",
+          "role": "H",
+          "value": 3496.8025,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60954325,
+          "playerName": "Fortier Maxime",
+          "playerJersey": "7",
+          "role": "H",
+          "value": 9,
+          "category": "shots"
+        }
+      ],
+      "626537494": [
+        {
+          "playerId": 61073933,
+          "playerName": "Östman Kalle",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 31896306,
+          "playerName": "Nieminen Viljami",
+          "playerJersey": "71",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 61073933,
+          "playerName": "Östman Kalle",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 61073933,
+          "playerName": "Östman Kalle",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 61073932,
+          "playerName": "Diaco George",
+          "playerJersey": "17",
+          "role": "H",
+          "value": 514.5,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60744050,
+          "playerName": "Miketinac Kalle",
+          "playerJersey": "80",
+          "role": "H",
+          "value": 4172.515,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61073933,
+          "playerName": "Östman Kalle",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 7,
+          "category": "shots"
+        }
+      ]
+    }
+  },
+  "goaliesToWatch": {
+    "238306801": [],
+    "626537494": []
+  }
+}

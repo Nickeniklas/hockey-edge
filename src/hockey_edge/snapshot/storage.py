@@ -6,9 +6,11 @@ the model may see; append-only writes with `captured_at` are what make that
 claim checkable later, so nothing here may rewrite history.
 """
 
+import json
 import sqlite3
 from pathlib import Path
 
+from hockey_edge.snapshot.lineups import LineupSnapshot
 from hockey_edge.snapshot.odds.base import OddsSnapshot
 
 DB_PATH = Path(__file__).resolve().parents[3] / "data" / "snapshots.db"
@@ -28,14 +30,39 @@ CREATE TABLE IF NOT EXISTS odds_snapshots (
     raw_payload TEXT NOT NULL
 );
 
+-- One row per (league, season, game_id, team_role) per capture poll --
+-- append-only, same as odds_snapshots: a later poll writes a fresh row, it
+-- never updates a prior one, so "what the lineup looked like at time T" stays
+-- reconstructable. starter_* fields are always an INFERENCE, never a fact --
+-- see hockey_edge.snapshot.lineups module docstring for why (no literal
+-- "starter" field exists in the source payload) and scripts/verify_starters.py
+-- for the periodic check against real results that starter_source's choice
+-- (currently 'goalie_line_value') depends on. raw_payload retains the full
+-- game_detail (+ game_preview, when available) response regardless of
+-- whether parsing succeeded, same append-only-friendly contract as odds.
 CREATE TABLE IF NOT EXISTS lineup_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    game_id TEXT NOT NULL,
-    source TEXT NOT NULL,
+    league TEXT NOT NULL DEFAULT 'liiga',
+    season INTEGER NOT NULL,
+    game_id INTEGER NOT NULL,
+    team_role TEXT NOT NULL CHECK (team_role IN ('home', 'away')),
+    team_name TEXT NOT NULL,
+    window TEXT,
     captured_at TEXT NOT NULL,
-    goalie_confirmed INTEGER,
+    source TEXT NOT NULL,
+    confirmed_player_count INTEGER NOT NULL,
+    confirmed_goalie_count INTEGER NOT NULL,
+    roster_json TEXT NOT NULL,
+    starter_player_id INTEGER,
+    starter_name TEXT,
+    starter_jersey INTEGER,
+    starter_source TEXT,
+    starter_confidence TEXT,
+    parsed INTEGER NOT NULL,
     raw_payload TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_lineup_snapshots_game
+    ON lineup_snapshots (league, season, game_id);
 
 -- Append-only: every discovery poll writes a fresh row per fixture it saw,
 -- never updates one. This makes the schedule the job acted on auditable
@@ -122,6 +149,37 @@ def insert_odds_snapshot(conn: sqlite3.Connection, snapshot: OddsSnapshot) -> No
             snapshot.home_odds,
             snapshot.draw_odds,
             snapshot.away_odds,
+            int(snapshot.parsed),
+            snapshot.raw_payload,
+        ),
+    )
+    conn.commit()
+
+
+def insert_lineup_snapshot(conn: sqlite3.Connection, snapshot: LineupSnapshot) -> None:
+    conn.execute(
+        "INSERT INTO lineup_snapshots "
+        "(league, season, game_id, team_role, team_name, window, captured_at, source, "
+        "confirmed_player_count, confirmed_goalie_count, roster_json, starter_player_id, "
+        "starter_name, starter_jersey, starter_source, starter_confidence, parsed, raw_payload) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            snapshot.league,
+            snapshot.season,
+            snapshot.game_id,
+            snapshot.team_role,
+            snapshot.team_name,
+            snapshot.window,
+            snapshot.captured_at.isoformat(),
+            snapshot.source,
+            snapshot.confirmed_player_count,
+            snapshot.confirmed_goalie_count,
+            json.dumps(snapshot.roster, ensure_ascii=False),
+            snapshot.starter_player_id,
+            snapshot.starter_name,
+            snapshot.starter_jersey,
+            snapshot.starter_source,
+            snapshot.starter_confidence,
             int(snapshot.parsed),
             snapshot.raw_payload,
         ),

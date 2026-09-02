@@ -61,12 +61,80 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 
 ## Build order
 1. Liiga ingest (endpoint discovery → schema → ~10-season backfill, resumable)
+   — **done** for 2015–2027; live season kept current by `scripts/nightly_sync.py`
 2. Snapshot capture job (lineups/goalies/odds) — deploy EARLY; missed data is gone forever
+   — **deployed 2026-09-02**; lineups capturing, odds still `NullOddsProvider`
 3. NHL ingest
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-09-02)
+
+Step 2 is **deployed and capturing lineups**. The odds question is the one
+big thing still open, unchanged and still the user's call.
+
+- **The pre-puck-drop lineup question is ANSWERED: liiga.fi publishes a
+  confirmed lineup, but only close to game time.** A T-30 probe across the
+  full 2026-09-01 opening slate (7 games, `scripts/lineup_probe.py --date
+  2026-09-01 --label T-30`) found `line` non-null for **exactly 22 players
+  per team-side (20 skaters + 2 goalies), on all 14 team-sides, zero
+  exceptions** — versus `line=null` for every player on the same games at
+  T-9 days. This retires the long-standing "does game_detail ever narrow?"
+  blocker and means veikkaus.fi is not needed as a lineup fallback.
+- **Starting goalie: no literal field exists, but `line == 1` identifies it,
+  and that is now measured, not assumed.** Every field on every goalie
+  object was dumped — nothing says "starter". What is real: `line` (the same
+  depth-chart field used for forward lines/D-pairs) is populated for goalies
+  and splits exactly one at `line=1` and one at `line=2` per team-side.
+  Scored against real results once season 2027 was ingested: **`line==1` went
+  14/14 (100%); the competing "first goalie in array order" candidate went
+  7/14 (50%)** — array order carries no signal, exactly as its 7/14
+  structural split against `line` predicted. An earlier manual Flashscore
+  check that appeared to validate array order 7/7 was drawn from the subset
+  where the two coincide. Full analysis + caveats (n=14, one night) in
+  `docs/SNAPSHOT_FINDINGS.md`.
+- **`snapshot/lineups.py` is implemented** (was stubbed) and wired into
+  `job.py`'s `capture_lineups`: one `game_detail`(+`game_preview`) fetch per
+  due `(season, game_id)`, one append-only `lineup_snapshots` row per
+  team-side, full raw payload retained regardless of parse outcome.
+  `lineup_snapshots`' schema was replaced (the old stub had never had a row
+  written to it, so no migration was needed) and is now keyed
+  `(league, season, game_id, team_role)` per capture. Every starter is
+  stored with `starter_source='goalie_line_value'` and
+  `starter_confidence='inferred_structural'` so downstream feature code can
+  see the basis rather than treating it as fact.
+- **`scripts/verify_starters.py` (new, read-only both DBs) turns that
+  inference into something monitored.** GOTCHA it surfaced:
+  `game_goalkeeper_events` **cannot** identify a starter — zero rows anywhere
+  have `begin_time=0`, and 36% of season-2026 games have no rows in it at
+  all; it only logs mid-game subs/empty-net pulls. Ground truth is derived
+  from `game_goalie_period_stats` (period-1 `shots_on_goal > 0`) instead,
+  with early-substitution cases flagged rather than silently resolved.
+- **Season 2027 is now ingested** — 595 fixtures (544 RUNKOSARJA / 41
+  PRACTICE / 10 PITSITURNAUS), 58 ended at ingest time, zero failures across
+  every endpoint. The 7 completed regular-season games have full per-game
+  data (rosters, events, period stats, shots, xG). This closes the
+  "hockey.db has zero rows for season 2027" gap from 2026-08-23.
+- **`scripts/nightly_sync.py` (new) must run daily while the season is on.**
+  Nothing else keeps hockey.db current: the snapshot job writes only to
+  snapshots.db, and backfill.py was a one-time-per-historical-season pass.
+  It runs backfill (season-level endpoints forced, `--only-ended`) then
+  `resync --days 7`. **Not scheduled** — that's a manual step. See
+  `docs/RESYNC.md`'s nightly-sync section.
+- **Snapshot job is registered as a Windows scheduled task (2026-09-02)**,
+  every 15 min, **11:00–23:00 local** — not 14:00, see Gotchas.
+  `docs/snapshot_job_task_scheduler.xml` now has absolute paths, no
+  execution time limit, `IgnoreNew` for overlap, and the working PowerShell 7
+  registration command.
+- **Not done / still open**: the odds provider decision (unchanged — still
+  `NullOddsProvider`, still the user's call); `lineup_snapshots` has **zero
+  rows** so far, because the 2026-09-01 T-30 capture was a manual probe run
+  (writes to `fixtures/`, never to a DB) and the job hasn't yet had a due
+  window for a real slate — whether to inject that probe data has
+  provenance implications and was deliberately left to the user;
+  `docs/RECOVERY_BACKLOG.md`'s 1,164-game recovery still not run.
 
 ## Status (as of 2026-08-25)
 
@@ -135,7 +203,8 @@ below) are explicitly deferred, not done. What did ship:
   clean — phase seems to matter, timing alone doesn't explain it.
 - **`data/hockey.db` has zero rows for season=2027 (the live 2026-27
   season)** — confirmed 2026-08-23, contradicting an earlier (design-chat)
-  belief that it was already backfilled. The live API has it (544
+  belief that it was already backfilled. **[Fixed 2026-09-01: season 2027 is
+  now ingested, 595 fixtures. See the 2026-09-02 Status entry.]** The live API has it (544
   `RUNKOSARJA` + 52 preseason fixtures, confirmed by direct fetch, matching
   the 17-team/64-game structural change) — it was just never ingested. Not
   a blocker for the snapshot job (which reads live, not `hockey.db`, by
@@ -156,6 +225,10 @@ below) are explicitly deferred, not done. What did ship:
   they silently don't happen (session-scoped cron, not persisted to disk).
   Check `fixtures/liiga/lineup_probe/` and `docs/SNAPSHOT_FINDINGS.md` for
   whether they landed.
+  **[Resolved 2026-09-01 — see the 2026-09-02 Status entry at the top: the
+  question was settled by a T-30 probe of the full 2026-09-01 slate instead.
+  liiga.fi does publish a confirmed lineup, ~30 min out. Nothing to chase
+  here.]**
 
 ## Status (as of 2026-08-23)
 - **Backfill extended to seasons 2025 and 2026 (the 2024-25 and 2025-26
@@ -339,6 +412,49 @@ below) are explicitly deferred, not done. What did ship:
   open (see Gotchas).
 
 ## Gotchas
+- **A live season needs `backfill.py --only-ended`; a historical one doesn't.**
+  Without it, per-game endpoints get fetched for not-yet-played games,
+  liiga.fi returns a pre-game shell, `raw_cache` records it `success`, and
+  `sync_state` then skips that game **forever** — the real post-game data
+  never arrives via backfill again (only a `resync.py` run landing inside its
+  `--days` window could repair it). Flag added 2026-09-01, default off so
+  historical backfills are unchanged.
+- **`games_by_season`/`standings` must be force-refetched on every live-season
+  run, or the schedule freezes.** `sync_state` marks them `success` on first
+  fetch and skips the network forever after, so `games.ended` never updates and
+  the job never learns last night's games finished. `nightly_sync.py` passes
+  `--force --endpoints games_by_season,standings` for exactly this
+  (verified: an unforced second run left `fetched_at` unchanged). Per-game
+  endpoints are deliberately NOT force-refetched there — that's the unsafe
+  bulk `game_detail` operation `docs/RESYNC.md` warns about; `resync.py` is
+  the guarded route.
+- **`game_goalkeeper_events` cannot tell you who started a game.** Zero rows
+  anywhere have `begin_time=0`, and 36% of season-2026 games have no rows in
+  it at all — it only records mid-game substitutions and empty-net pulls. Use
+  `game_goalie_period_stats` (period-1 `shots_on_goal > 0`) for the actual
+  starter, as `scripts/verify_starters.py` does.
+- **Snapshot task window is 11:00–23:00 local, not 14:00.** Liiga is *mostly*
+  17:00/18:30 starts, but season 2027 has 15 RUNKOSARJA games starting
+  earlier, including one at 12:00 and two at 14:00. The binding constraint is
+  the **closing** (T-25min) window, not T-24h: `storage.get_due_windows` only
+  returns a window while `start_utc > now`, so a closing window that comes due
+  before the first tick is recorded MISSED permanently, not fired late. Verify
+  against the real schedule before narrowing this window again.
+- **Registering the scheduled task from PowerShell 7 requires stripping the
+  XML declaration**: `Register-ScheduledTask -Xml` takes a *string*, which PS
+  holds as UTF-16, so any encoding declaration is a contradiction the parser
+  rejects. `$xml -replace '<\?xml[^>]*\?>', ''` first. Separately, the file's
+  declaration used to claim UTF-16 while the bytes were UTF-8, which breaks
+  `schtasks /XML` — fixed to UTF-8. Both notes are in the XML's own header.
+- **`serie` is an open-ended vocabulary.** Season 2027 introduced
+  `PITSITURNAUS` (a preseason tournament) on top of the known
+  RUNKOSARJA/PLAYOFFS/PRACTICE/PLAYOUT/QUALIFICATIONS. Never treat the list as
+  closed or constrain a column to it.
+- **`roleCode` vocabulary changes as a game approaches**, on the same game_id:
+  `{H, P, MV}` (generic) at T-9 days vs. the full
+  `{KH, VL, OL, H, VP, OP, MV, P, 7. P, 13. H, 8. P}` at T-30. The
+  earlier-flagged "season change or pre/post-game shape?" question is
+  resolved — it's proximity to game time. Don't hardcode either vocabulary.
 - **liiga.fi's data for a completed game can change after original fetch —
   in EITHER direction, not just enrichment. Historical data is NOT immutable
   on the API side.** Originally found 2026-08-22 on `game_stats` (season=2024
@@ -418,15 +534,20 @@ below) are explicitly deferred, not done. What did ship:
   distinguishable from no data. See `docs/MODEL.md`'s promoted-team
   cold-start note.
 - **Snapshot job scheduler: Windows Task Scheduler on the main desktop**
-  (decided 2026-08-24, not an always-on host — deliberate for preseason,
-  since a missed capture on an August friendly costs nothing;
-  `docs/snapshot_job_task_scheduler.xml`, `StartWhenAvailable=true`,
-  `WakeToRun=false` so a sleeping machine catches up on wake rather than
-  being forced awake). The job's own due/missed window logic
-  (`storage.get_due_windows`/`mark_missed_windows`) is what makes a late
-  wake-up correct, not the scheduler — never replace that with a naive
-  "is now ≈ the window time" check. launchd/cron variants are scaffolding
-  only, not deployed.
+  (decided 2026-08-24, registered 2026-09-02 — not an always-on host;
+  `docs/snapshot_job_task_scheduler.xml`, every 15 min, 11:00–23:00 local,
+  `StartWhenAvailable=true`, **`WakeToRun=true`**). WakeToRun was `false`
+  through preseason — a deliberate choice to exercise missed-tick recovery
+  on a sleeping desktop, back when a missed August friendly cost nothing.
+  **Flipped to `true` 2026-09-02 once the season started**: relying on the
+  machine happening to be awake at T-25min makes the job close to useless in
+  practice, and a missed capture is unrecoverable. Depends on the power plan
+  permitting wake timers, and only wakes a *sleeping* machine (not
+  hibernated/shut down) — hence StartWhenAvailable stays on too. The job's
+  own due/missed window logic (`storage.get_due_windows`/
+  `mark_missed_windows`) is still what makes a late wake-up correct, not the
+  scheduler — never replace that with a naive "is now ≈ the window time"
+  check. launchd/cron variants are scaffolding only, not deployed.
 - OddsPapi returns HTTP 404 with `code: "FIXTURE_NOT_FOUND"` for a tournament
   with no fixtures currently posted, not `HTTP 200` with `[]` — the snapshot job
   handles this explicitly as "no odds yet," not a failure; don't reintroduce a

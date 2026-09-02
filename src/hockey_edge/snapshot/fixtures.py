@@ -2,9 +2,13 @@
 
 Deliberately reads from liiga.fi's live `games_by_date` endpoint, not
 `data/hockey.db`: the two databases stay decoupled, and the live endpoint
-picks up preseason games and schedule changes the backfilled DB won't have
-(confirmed 2026-08-23 -- `hockey.db` has zero rows for season 2027 even though
-the live API already returns all of it; see docs/SNAPSHOT_FINDINGS.md).
+picks up preseason games and schedule changes the backfilled DB won't have.
+The original motivating case (2026-08-23: `hockey.db` had zero rows for
+season 2027 while the live API already returned all of it) has since been
+closed -- season 2027 was ingested 2026-09-01 and `scripts/nightly_sync.py`
+keeps it current -- but the decoupling is deliberate regardless: this job
+must not depend on an ingest pass having run, and must never write to
+hockey.db's tables. See docs/SNAPSHOT_FINDINGS.md.
 
 This module only ever performs GET requests against liiga.fi and writes to
 `data/snapshots.db` (via storage.py) -- it must never write to `data/hockey.db`

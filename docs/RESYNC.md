@@ -176,3 +176,104 @@ enriches completed games' responses" — true for `game_stats` and `shotmap`,
 **false as a general claim**: `game_detail` can retroactively *lose* data.
 Treat "liiga.fi's data for a completed game can still change after original
 fetch, in either direction" as the accurate framing going forward.
+
+---
+
+# Nightly live-season sync (added 2026-09-01)
+
+**`scripts/nightly_sync.py` needs to run daily for as long as the season is
+underway.** It is not scheduled by this repo — scheduling it is a manual
+step, alongside the snapshot job's Windows Task Scheduler entry
+(`docs/snapshot_job_task_scheduler.xml`). Unlike the snapshot job, missing a
+night is recoverable (the data is still on liiga.fi tomorrow), so it does not
+need the same 15-minute cadence or wake-from-sleep care — once a day, after
+the night's games have finished, is enough. The `--days 7` resync window
+means several consecutive missed nights still get caught up.
+
+    python scripts/nightly_sync.py
+
+Why it's needed at all: **nothing else puts completed live-season games into
+`hockey.db`.** `hockey_edge.snapshot.job` writes only to `snapshots.db` (it
+reads liiga.fi live and deliberately never touches `hockey.db`), and
+`backfill.py` was built as a one-time-per-historical-season pass. Without
+this running, `scripts/verify_starters.py` has nothing to score and the
+feature store has no current-season rows.
+
+Two passes, both required, for different reasons:
+
+1. **backfill**, with `--force` scoped to `{games_by_season, standings}` and
+   `--only-ended` set. The scoped force is **load-bearing, not an
+   optimization**: `sync_state` marks those endpoints `success` on first
+   fetch and then skips the network forever, so without forcing them the
+   pass would never learn that last night's games now have `ended=1` — the
+   `games` table would stay frozen at whatever the schedule looked like the
+   first time it ran. Verified 2026-09-01: a second unforced run left
+   `games_by_season`'s `fetched_at` unchanged, confirming the freeze. Costs
+   6 requests/night (5 tournament phases + standings).
+2. **resync `--days 7`**, the guarded path from 4c above, which keeps
+   correcting a game for a week after it's played.
+
+**`--only-ended` (new flag on `backfill.py`, 2026-09-01) is the live-season
+counterpart to that same trap**, in the other direction: a not-yet-played
+game returns a pre-game shell (roster, no events), `raw_cache` records it
+`success`, and `sync_state` then skips that game forever — so its real
+post-game data would never arrive through the backfill path at all, and only
+a `resync.py` run happening to fall inside its `--days` window could repair
+it. Restricting per-game fetches to `ended=1` games avoids creating that
+debt. It also avoids ~45 minutes of pointless traffic per run against 537
+fixtures that haven't happened. Default is off, so historical-season
+backfills are unaffected.
+
+Per-game endpoints are deliberately **not** force-refetched by pass 1 — a
+blind bulk `game_detail` refetch is exactly the unsafe operation the 4b
+warning above describes. Pass 2 is the guarded route for re-reading a
+completed game.
+
+## How the nightly sync is scheduled — recovery note
+
+**This task has no committed definition.** Unlike the snapshot job (which has
+`docs/snapshot_job_task_scheduler.xml`), the nightly sync was registered
+inline on 2026-09-02 and exists only in Windows Task Scheduler. These are the
+exact commands, recorded so it can be recreated on a rebuild — or translated
+to a cron entry / systemd timer on a future Linux host, where only the
+schedule and the two paths need substituting.
+
+Register (runs daily at 23:30 local):
+
+```
+schtasks /Create /TN "hockey-edge nightly sync" /TR "C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\python.exe C:\Users\Nikla_000\Documents\local-repo\hockey-edge\scripts\nightly_sync.py" /SC DAILY /ST 23:30
+```
+
+Then set the working directory, which the above cannot do:
+
+```
+$t = Get-ScheduledTask -TaskName "hockey-edge nightly sync"
+$t.Actions[0].WorkingDirectory = "C:\Users\Nikla_000\Documents\local-repo\hockey-edge"
+Set-ScheduledTask -TaskName "hockey-edge nightly sync" -Action $t.Actions
+```
+
+**The second block is not optional.** `schtasks` has no inline way to set a
+working directory, and it matters: `job.py` calls python-dotenv's
+`load_dotenv()`, whose `.env` discovery depends on where the process starts.
+That is currently harmless — `NullOddsProvider` needs no key — but it becomes
+a silent failure the moment a real odds provider replaces it and
+`ODDSPAPI_KEY` can't be found. Fixing it now means that swap doesn't come
+with a scheduling bug attached. Note the data/log paths themselves are *not*
+cwd-dependent (they anchor to `Path(__file__).resolve().parents[3]`); `.env`
+discovery is the one thing that is.
+
+**Sleep behaviour: a sleeping machine skips that night entirely.** No wake
+timer is set (`WakeToRun=False`), and unlike the snapshot job this task also
+has `StartWhenAvailable=False`, so a missed 23:30 does not run late on the
+next wake — it simply waits for the following night. That is deliberate and
+harmless: both passes are resumable and idempotent, so the next successful
+run picks up everything the skipped one would have done. The `--days 7`
+resync window is the real bound — up to about a week of consecutive missed
+nights is still fully recoverable, and beyond that the only loss is
+retroactive corrections to games that have aged out of the window, not the
+games themselves.
+
+23:30 is chosen to sit after the snapshot job's 11:00–23:00 window (no
+overlap, no contention on `hockey.db`) and late enough that a 19:30 puck drop
+— the latest regular start on the 2026-27 schedule — has finished and been
+marked `ended=1` on liiga.fi's side.

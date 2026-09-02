@@ -1,0 +1,404 @@
+{
+  "teamComparison": {
+    "624554857": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    },
+    "951626834": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    }
+  },
+  "playersToWatch": {
+    "all": {
+      "624554857": [
+        {
+          "playerId": 60960461,
+          "playerName": "Beaucage Alex",
+          "playerJersey": "16",
+          "role": "H",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 30687613,
+          "playerName": "Saarela Antti",
+          "playerJersey": "25",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 60960461,
+          "playerName": "Beaucage Alex",
+          "playerJersey": "16",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 61073530,
+          "playerName": "Harpur Chris",
+          "playerJersey": "96",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60351426,
+          "playerName": "Stenqvist Jakob",
+          "playerJersey": "9",
+          "role": "P",
+          "value": 473,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60960461,
+          "playerName": "Beaucage Alex",
+          "playerJersey": "16",
+          "role": "H",
+          "value": 3698.0099999999998,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60960461,
+          "playerName": "Beaucage Alex",
+          "playerJersey": "16",
+          "role": "H",
+          "value": 13,
+          "category": "shots"
+        }
+      ],
+      "951626834": [
+        {
+          "playerId": 60361530,
+          "playerName": "Török Matic",
+          "playerJersey": "46",
+          "role": "H",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 60361530,
+          "playerName": "Török Matic",
+          "playerJersey": "46",
+          "role": "H",
+          "value": 3,
+          "category": "assists"
+        },
+        {
+          "playerId": 21848539,
+          "playerName": "Järvinen Jan-Mikael",
+          "playerJersey": "44",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 21848539,
+          "playerName": "Järvinen Jan-Mikael",
+          "playerJersey": "44",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 34570580,
+          "playerName": "Hynninen Topias",
+          "playerJersey": "25",
+          "role": "H",
+          "value": 974,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 61084035,
+          "playerName": "Strand Austin",
+          "playerJersey": "27",
+          "role": "P",
+          "value": 4255.65,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61084035,
+          "playerName": "Strand Austin",
+          "playerJersey": "27",
+          "role": "P",
+          "value": 19,
+          "category": "shots"
+        }
+      ]
+    },
+    "defenders": {
+      "624554857": [
+        {
+          "playerId": 60351426,
+          "playerName": "Stenqvist Jakob",
+          "playerJersey": "9",
+          "role": "P",
+          "value": 2,
+          "category": "points"
+        },
+        {
+          "playerId": 60794693,
+          "playerName": "Olsson Anton",
+          "playerJersey": "56",
+          "role": "P",
+          "value": 1,
+          "category": "assists"
+        },
+        {
+          "playerId": 60351426,
+          "playerName": "Stenqvist Jakob",
+          "playerJersey": "9",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 61073530,
+          "playerName": "Harpur Chris",
+          "playerJersey": "96",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60351426,
+          "playerName": "Stenqvist Jakob",
+          "playerJersey": "9",
+          "role": "P",
+          "value": 473,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 32033595,
+          "playerName": "Seppälä Peetro",
+          "playerJersey": "27",
+          "role": "P",
+          "value": 3594.49,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 29948651,
+          "playerName": "Viitasalo Nuutti",
+          "playerJersey": "34",
+          "role": "P",
+          "value": 11,
+          "category": "shots"
+        }
+      ],
+      "951626834": [
+        {
+          "playerId": 28905831,
+          "playerName": "Parikka Jarkko",
+          "playerJersey": "57",
+          "role": "P",
+          "value": 2,
+          "category": "points"
+        },
+        {
+          "playerId": 28905831,
+          "playerName": "Parikka Jarkko",
+          "playerJersey": "57",
+          "role": "P",
+          "value": 1,
+          "category": "assists"
+        },
+        {
+          "playerId": 24223973,
+          "playerName": "Sund Tony",
+          "playerJersey": "6",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 61084035,
+          "playerName": "Strand Austin",
+          "playerJersey": "27",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 24223973,
+          "playerName": "Sund Tony",
+          "playerJersey": "6",
+          "role": "P",
+          "value": 682,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 61084035,
+          "playerName": "Strand Austin",
+          "playerJersey": "27",
+          "role": "P",
+          "value": 4255.65,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61084035,
+          "playerName": "Strand Austin",
+          "playerJersey": "27",
+          "role": "P",
+          "value": 19,
+          "category": "shots"
+        }
+      ]
+    },
+    "forwards": {
+      "624554857": [
+        {
+          "playerId": 60960461,
+          "playerName": "Beaucage Alex",
+          "playerJersey": "16",
+          "role": "H",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 30687613,
+          "playerName": "Saarela Antti",
+          "playerJersey": "25",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 60960461,
+          "playerName": "Beaucage Alex",
+          "playerJersey": "16",
+          "role": "H",
+          "value": 3,
+          "category": "goals"
+        },
+        {
+          "playerId": 30356928,
+          "playerName": "Virtanen Santeri",
+          "playerJersey": "75",
+          "role": "H",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60960461,
+          "playerName": "Beaucage Alex",
+          "playerJersey": "16",
+          "role": "H",
+          "value": 403.25,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60960461,
+          "playerName": "Beaucage Alex",
+          "playerJersey": "16",
+          "role": "H",
+          "value": 3698.0099999999998,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60960461,
+          "playerName": "Beaucage Alex",
+          "playerJersey": "16",
+          "role": "H",
+          "value": 13,
+          "category": "shots"
+        }
+      ],
+      "951626834": [
+        {
+          "playerId": 60361530,
+          "playerName": "Török Matic",
+          "playerJersey": "46",
+          "role": "H",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 60361530,
+          "playerName": "Török Matic",
+          "playerJersey": "46",
+          "role": "H",
+          "value": 3,
+          "category": "assists"
+        },
+        {
+          "playerId": 21848539,
+          "playerName": "Järvinen Jan-Mikael",
+          "playerJersey": "44",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 21848539,
+          "playerName": "Järvinen Jan-Mikael",
+          "playerJersey": "44",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 34570580,
+          "playerName": "Hynninen Topias",
+          "playerJersey": "25",
+          "role": "H",
+          "value": 974,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60972169,
+          "playerName": "Henman Luke",
+          "playerJersey": "92",
+          "role": "H",
+          "value": 4239.295,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60661835,
+          "playerName": "Kos Ondrej",
+          "playerJersey": "15",
+          "role": "H",
+          "value": 12,
+          "category": "shots"
+        }
+      ]
+    }
+  },
+  "goaliesToWatch": {
+    "624554857": [],
+    "951626834": []
+  }
+}

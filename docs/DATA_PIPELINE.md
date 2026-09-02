@@ -131,7 +131,18 @@ Guideline shapes — final DDL decided in implementation, but keep these separat
 - `game_events` (game_id, event_type, period, time, players…, raw payload ref)
 - `players` / `rosters` (league-scoped IDs; **name normalization across sources is a
   known pain** — Liiga vs Veikkaus vs community spellings)
-- `lineup_snapshots` (game_id, source, captured_at, goalie_confirmed?, payload)
+- `lineup_snapshots` — **as shipped** (2026-09-01, `snapshot/storage.py`), one
+  append-only row per `(league, season, game_id, team_role)` per capture:
+  team_name, window, captured_at, source, confirmed_player_count,
+  confirmed_goalie_count, roster_json, starter_player_id/_name/_jersey,
+  **starter_source + starter_confidence**, parsed, raw_payload. The two
+  starter_* provenance columns are not decoration: liiga.fi has no literal
+  "starter" field, so the starting goalie is an inference (currently
+  `line == 1`) and downstream feature code must be able to see that. The
+  original guideline shape here was (game_id, source, captured_at,
+  goalie_confirmed?, payload) — superseded, and `goalie_confirmed` in
+  particular was a boolean that would have hidden exactly the provenance the
+  shipped columns expose.
 - `odds_snapshots` (game_id, book, market, captured_at, home_odds, away_odds, draw_odds)
   — Liiga/European books price regulation 1X2 three-way; NHL moneyline is two-way
   incl. OT. Store market type explicitly.

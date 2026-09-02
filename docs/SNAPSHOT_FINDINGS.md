@@ -340,3 +340,115 @@ Per the user's correction: the 2025 Jokerit–Pelicans `QUALIFICATIONS` series
 was **won by Pelicans 4–1** — Jokerit lost it. The "Jokerit — contradicts
 `PROJECT_CONTEXT.md`" paragraph above has been corrected in place (the 18-rows/
 zero-rows-is-wrong finding stands; the promotion-series inference does not).
+
+---
+
+# 1b resolved (2026-09-01) — lineups confirmed at T-30; starter signal still unverified
+
+**`game_detail` DOES publish a confirmed lineup pre-puck-drop — it just doesn't
+show up until close to game time.** `scripts/lineup_probe.py --date
+2026-09-01 --label T-30`, run ~30 minutes before the 2026-09-01 opening
+slate's 18:30 local puck drop, probed all 7 games live. Result: **`line` is
+non-null for exactly 22 players per team-side (20 skaters + 2 goalies), on
+all 14 team-sides, zero exceptions** — versus `line=null` for every player on
+the same games at T-9 days (§1b above). This settles the "genuinely
+unresolved whether either [endpoint] ever narrows closer to puck drop"
+question left open in the original 1b write-up: yes, `game_detail` narrows,
+but only close in.
+
+Same-game roleCode-vocabulary comparison, now resolvable: `game_id=2701274`
+at T-9d had roleCodes `{H, P, MV}` only (generic); the identical game_id at
+T-30 had the full `{KH, VL, OL, H, VP, OP, MV, P, 7. P, 13. H, 8. P}` set —
+matching the "older completed-game" vocabulary from the original 1b note,
+not the sparse pre-game one. So the vocabulary difference flagged as
+"unresolved — season change or pre/post-game shape" in the original 1b is
+**neither** — it's proximity to game time, confirmed on the same game_id at
+two points in its own lifecycle.
+
+**No literal "starter" field exists — every field on every T-30 goalie
+object was dumped and checked** (id, jersey, handedness, height/weight,
+captain/rookie/alternateCaptain, injured/suspended/removed, pictureUrl,
+awards, sponsors, extra_*). What is real: `line`, the same depth-chart field
+used for forward lines/D-pairs, is populated for goalies too, and splits
+**exactly one goalie at `line=1` and one at `line=2` per team-side, on all 14
+team-sides, no exceptions**. `hockey_edge.snapshot.lineups` uses
+`line==1` as the primary starter signal (`starter_source=
+'goalie_line_value'`) on that basis.
+
+**This conflicts with a competing candidate raised the same day**: a manual
+Flashscore cross-check against array order (the raw position of a goalie in
+`homeTeamPlayers`/`awayTeamPlayers`) reportedly matched the actual starter in
+7/7 games checked. A structural check across the same 2026-09-01 T-30
+payloads found **array-order-first agrees with `line==1` in only 7 of 14
+team-sides — a 50/50 split, statistically indistinguishable from a randomly
+ordered array**. The two signals cannot both be right in the 7 team-sides
+where they disagree, and nothing in this session's data can arbitrate that
+independently.
+
+**`scripts/verify_starters.py` exists specifically to settle this — not by
+further guessing, but against real results.** It compares
+`lineup_snapshots.starter_player_id` (captured pre-game) against the actual
+starter derived from `data/hockey.db` once a game has `ended=1`. Building it
+surfaced its own gotcha: **`game_goalkeeper_events` — the table originally
+named for this check — never records who started** (zero rows anywhere with
+`begin_time=0`, checked across all of season 2026; it only logs mid-game
+subs/empty-net pulls), and **36% of season-2026 games have zero rows in it
+at all** (a goalie who plays the whole game with no empty-net pull leaves no
+trace there). The script instead derives ground truth from
+`game_goalie_period_stats`: the goalie with period-1 `shots_on_goal > 0` is
+who started, cross-checked against `game_goalkeeper_events` only to flag (not
+silently resolve) games with a substitution inside the first 5 minutes.
+Verified against a real completed game (season=2026, game_id=2, HIFK @
+Jukurit) with injected correct/incorrect test rows — both scored correctly
+(1 agree, 1 disagree) — before being pointed at real captured data.
+
+## Provisional result (2026-09-01, same evening): `line==1` went 14/14
+
+Once season 2027 was ingested into `hockey.db` (see the nightly-sync section
+of `docs/RESYNC.md`), the 2026-09-01 slate's real results became available to
+check against the T-30 probe fixtures. Scored **read-only and in memory** —
+nothing was written to `lineup_snapshots`, since the probe data's provenance
+is the user's call, not this session's:
+
+| candidate signal | agreement with actual starter |
+|---|---|
+| `line == 1` | **14 / 14 (100%)** |
+| first goalie in array order | 7 / 14 (50%) |
+
+Zero undetermined — ground truth resolved cleanly for all 14 team-sides.
+**The structural prediction held exactly**: `line==1` identified every
+starter, and array order performed at precisely chance, as the 7/14
+structural split implied it would. The earlier manual Flashscore check that
+appeared to validate array order 7/7 must have been drawn from the subset
+where the two signals happen to coincide (they agree on 7 of 14 team-sides
+here — e.g. HPK, Ilves, SaiPa, Tappara, KooKoo, Sport, Jokerit — and diverge
+on the other 7).
+
+Caveats, so this isn't over-read: **n = 14 team-sides from a single night**,
+all season-openers, scored against a ground-truth derivation
+(period-1 `shots_on_goal`) that is itself an inference from stats rather than
+a declared field. It is strong evidence for the choice already made in
+`lineups.py`, not proof for the season. `starter_confidence` stays
+`'inferred_structural'` — the flag describes the *basis* (a structural
+inference, no literal field), which this result does not change.
+
+**Run `verify_starters.py` periodically once the 2026-27 season has more
+completed games AND real job-captured snapshots exist.** As of 2026-09-01 the ground-truth half of that is now in
+place — season 2027 is ingested (595 games, 58 ended) — but the *captured*
+half is not: `lineup_snapshots` has **zero rows**, because the 2026-09-01
+T-30 capture was a manual `scripts/lineup_probe.py` run, which by design
+writes only to `fixtures/liiga/lineup_probe/` and never to a database, and
+`job.py` has not run a pass with a due window for those games. So
+`verify_starters.py` reports "nothing to verify yet" — correct behavior, not
+a bug. It starts producing real numbers once `job.py` captures a slate
+itself. Until a monitored agreement rate accumulates that way, treat every
+`starter_source='goalie_line_value'` value written by the snapshot job as an
+**inference**, not a fact — `starter_confidence='inferred_structural'` is
+there on every row specifically to make that visible downstream.
+
+`hockey_edge.snapshot.lineups` and `job.py`'s `capture_lineups` are wired
+(previously stubbed) on the basis of the above; `lineup_snapshots`' schema
+was replaced (the old stub had never had a row written to it, so no
+migration was needed — see `storage.py`) with one row per
+(league, season, game_id, team_role) per capture, keeping the full raw
+`game_detail`(+`game_preview`) payload regardless of parse outcome.

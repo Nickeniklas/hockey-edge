@@ -1,0 +1,404 @@
+{
+  "teamComparison": {
+    "461765763": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    },
+    "651304385": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    }
+  },
+  "playersToWatch": {
+    "all": {
+      "461765763": [
+        {
+          "playerId": 34601572,
+          "playerName": "Pärssinen Jiri",
+          "playerJersey": "7",
+          "role": "P",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 60705422,
+          "playerName": "Davidsson Marcus",
+          "playerJersey": "70",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 32378409,
+          "playerName": "Jaakola Ossi-Petteri",
+          "playerJersey": "15",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 61017171,
+          "playerName": "Berger Joseph",
+          "playerJersey": "41",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 32713394,
+          "playerName": "Luoto Oskari",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 868,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 61017171,
+          "playerName": "Berger Joseph",
+          "playerJersey": "41",
+          "role": "P",
+          "value": 4708.6475,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 30832947,
+          "playerName": "Miettinen Veeti",
+          "playerJersey": "24",
+          "role": "H",
+          "value": 34,
+          "category": "shots"
+        }
+      ],
+      "651304385": [
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 6,
+          "category": "points"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40225344,
+          "playerName": "Fugleberg Paavo",
+          "playerJersey": "71",
+          "role": "H",
+          "value": 783,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 40225344,
+          "playerName": "Fugleberg Paavo",
+          "playerJersey": "71",
+          "role": "H",
+          "value": 2846.88,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 4,
+          "category": "shots"
+        }
+      ]
+    },
+    "defenders": {
+      "461765763": [
+        {
+          "playerId": 34601572,
+          "playerName": "Pärssinen Jiri",
+          "playerJersey": "7",
+          "role": "P",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 34601572,
+          "playerName": "Pärssinen Jiri",
+          "playerJersey": "7",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 34601572,
+          "playerName": "Pärssinen Jiri",
+          "playerJersey": "7",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 61017171,
+          "playerName": "Berger Joseph",
+          "playerJersey": "41",
+          "role": "P",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 34601572,
+          "playerName": "Pärssinen Jiri",
+          "playerJersey": "7",
+          "role": "P",
+          "value": 641.5,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 61017171,
+          "playerName": "Berger Joseph",
+          "playerJersey": "41",
+          "role": "P",
+          "value": 4708.6475,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 34601572,
+          "playerName": "Pärssinen Jiri",
+          "playerJersey": "7",
+          "role": "P",
+          "value": 22,
+          "category": "shots"
+        }
+      ],
+      "651304385": [
+        {
+          "playerId": 61029234,
+          "playerName": "Binner Alexis",
+          "playerJersey": "61",
+          "role": "P",
+          "value": 2,
+          "category": "points"
+        },
+        {
+          "playerId": 32219869,
+          "playerName": "Rafkin Ruben",
+          "playerJersey": "6",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 61029234,
+          "playerName": "Binner Alexis",
+          "playerJersey": "61",
+          "role": "P",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 40005133,
+          "playerName": "Lehtonen Sisu-Petteri",
+          "playerJersey": "40",
+          "role": "P",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 60953549,
+          "playerName": "Landen Axel",
+          "playerJersey": "38",
+          "role": "P",
+          "value": 269.5,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 61029234,
+          "playerName": "Binner Alexis",
+          "playerJersey": "61",
+          "role": "P",
+          "value": 1845.5324999999998,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61029234,
+          "playerName": "Binner Alexis",
+          "playerJersey": "61",
+          "role": "P",
+          "value": 4,
+          "category": "shots"
+        }
+      ]
+    },
+    "forwards": {
+      "461765763": [
+        {
+          "playerId": 27355408,
+          "playerName": "Siikonen Miska",
+          "playerJersey": "71",
+          "role": "H",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 60705422,
+          "playerName": "Davidsson Marcus",
+          "playerJersey": "70",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 32378409,
+          "playerName": "Jaakola Ossi-Petteri",
+          "playerJersey": "15",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 32378409,
+          "playerName": "Jaakola Ossi-Petteri",
+          "playerJersey": "15",
+          "role": "H",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 32713394,
+          "playerName": "Luoto Oskari",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 868,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60705422,
+          "playerName": "Davidsson Marcus",
+          "playerJersey": "70",
+          "role": "H",
+          "value": 4649.09,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 30832947,
+          "playerName": "Miettinen Veeti",
+          "playerJersey": "24",
+          "role": "H",
+          "value": 34,
+          "category": "shots"
+        }
+      ],
+      "651304385": [
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 6,
+          "category": "points"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 4,
+          "category": "assists"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 2,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40225344,
+          "playerName": "Fugleberg Paavo",
+          "playerJersey": "71",
+          "role": "H",
+          "value": 783,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 40225344,
+          "playerName": "Fugleberg Paavo",
+          "playerJersey": "71",
+          "role": "H",
+          "value": 2846.88,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 60799830,
+          "playerName": "Wernblom Lukas",
+          "playerJersey": "49",
+          "role": "H",
+          "value": 4,
+          "category": "shots"
+        }
+      ]
+    }
+  },
+  "goaliesToWatch": {
+    "461765763": [],
+    "651304385": []
+  }
+}

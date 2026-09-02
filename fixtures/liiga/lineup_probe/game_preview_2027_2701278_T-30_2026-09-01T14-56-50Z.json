@@ -1,0 +1,404 @@
+{
+  "teamComparison": {
+    "362185137": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    },
+    "933686567": {
+      "pointsAverage": 0,
+      "pointsAverageRank": 0,
+      "goalsScored": 0,
+      "goalsScoredRank": 0,
+      "goalsAgainst": 0,
+      "goalsAgainstRank": 0,
+      "gf_gp": 0,
+      "gf_gpRank": 0,
+      "ga_gp": 0,
+      "ga_gpRank": 0,
+      "powerplayPercentage": 0,
+      "powerplayPercentageRank": 0,
+      "penaltykillPercentage": 0,
+      "penaltykillPercentageRank": 0,
+      "faceoffPercentage": 0,
+      "faceoffPercentageRank": 0,
+      "shotsPerGame": 0,
+      "shotsPerGameRank": 0
+    }
+  },
+  "playersToWatch": {
+    "all": {
+      "362185137": [
+        {
+          "playerId": 61081809,
+          "playerName": "Lindqvist Michael",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 23517198,
+          "playerName": "Tuulola Joni",
+          "playerJersey": "63",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 31574013,
+          "playerName": "Simontaival Kasper",
+          "playerJersey": "11",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 29780877,
+          "playerName": "Almari Niclas",
+          "playerJersey": "38",
+          "role": "P",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 29780877,
+          "playerName": "Almari Niclas",
+          "playerJersey": "38",
+          "role": "P",
+          "value": 891.75,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 33490124,
+          "playerName": "Rautiainen Benjamin",
+          "playerJersey": "78",
+          "role": "H",
+          "value": 4193.13,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 40046575,
+          "playerName": "Kulonummi Kasper",
+          "playerJersey": "72",
+          "role": "P",
+          "value": 17,
+          "category": "shots"
+        }
+      ],
+      "933686567": [
+        {
+          "playerId": 61073564,
+          "playerName": "Fridrich Petr",
+          "playerJersey": "11",
+          "role": "H",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 60960420,
+          "playerName": "Kramer Brian",
+          "playerJersey": "14",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 29937251,
+          "playerName": "Siikanen Patrik",
+          "playerJersey": "75",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 60762062,
+          "playerName": "Trejbal Ondrej",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 6,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40055660,
+          "playerName": "Naukkarinen Janne",
+          "playerJersey": "70",
+          "role": "H",
+          "value": 916.3333333333334,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60954318,
+          "playerName": "Zezelj Anze",
+          "playerJersey": "92",
+          "role": "H",
+          "value": 4276.62,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 29937251,
+          "playerName": "Siikanen Patrik",
+          "playerJersey": "75",
+          "role": "H",
+          "value": 11,
+          "category": "shots"
+        }
+      ]
+    },
+    "defenders": {
+      "362185137": [
+        {
+          "playerId": 24501132,
+          "playerName": "Jokipakka Jyrki",
+          "playerJersey": "23",
+          "role": "P",
+          "value": 3,
+          "category": "points"
+        },
+        {
+          "playerId": 23517198,
+          "playerName": "Tuulola Joni",
+          "playerJersey": "63",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 24501132,
+          "playerName": "Jokipakka Jyrki",
+          "playerJersey": "23",
+          "role": "P",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 29780877,
+          "playerName": "Almari Niclas",
+          "playerJersey": "38",
+          "role": "P",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 29780877,
+          "playerName": "Almari Niclas",
+          "playerJersey": "38",
+          "role": "P",
+          "value": 891.75,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 24501132,
+          "playerName": "Jokipakka Jyrki",
+          "playerJersey": "23",
+          "role": "P",
+          "value": 3699.1220000000003,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 40046575,
+          "playerName": "Kulonummi Kasper",
+          "playerJersey": "72",
+          "role": "P",
+          "value": 17,
+          "category": "shots"
+        }
+      ],
+      "933686567": [
+        {
+          "playerId": 60960420,
+          "playerName": "Kramer Brian",
+          "playerJersey": "14",
+          "role": "P",
+          "value": 2,
+          "category": "points"
+        },
+        {
+          "playerId": 60960420,
+          "playerName": "Kramer Brian",
+          "playerJersey": "14",
+          "role": "P",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 40281297,
+          "playerName": "Svensk Vertti",
+          "playerJersey": "17",
+          "role": "P",
+          "value": 1,
+          "category": "goals"
+        },
+        {
+          "playerId": 60762062,
+          "playerName": "Trejbal Ondrej",
+          "playerJersey": "55",
+          "role": "P",
+          "value": 6,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40005621,
+          "playerName": "Airola Santeri",
+          "playerJersey": "6",
+          "role": "P",
+          "value": 751,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60960420,
+          "playerName": "Kramer Brian",
+          "playerJersey": "14",
+          "role": "P",
+          "value": 3878.178,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 28471734,
+          "playerName": "Niinisaari Samuli",
+          "playerJersey": "7",
+          "role": "P",
+          "value": 7,
+          "category": "shots"
+        }
+      ]
+    },
+    "forwards": {
+      "362185137": [
+        {
+          "playerId": 61081809,
+          "playerName": "Lindqvist Michael",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 33490124,
+          "playerName": "Rautiainen Benjamin",
+          "playerJersey": "78",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 31574013,
+          "playerName": "Simontaival Kasper",
+          "playerJersey": "11",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 29969041,
+          "playerName": "Räsänen Aapeli",
+          "playerJersey": "22",
+          "role": "H",
+          "value": 1,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 33490124,
+          "playerName": "Rautiainen Benjamin",
+          "playerJersey": "78",
+          "role": "H",
+          "value": 758.25,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 33490124,
+          "playerName": "Rautiainen Benjamin",
+          "playerJersey": "78",
+          "role": "H",
+          "value": 4193.13,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 61081809,
+          "playerName": "Lindqvist Michael",
+          "playerJersey": "21",
+          "role": "H",
+          "value": 15,
+          "category": "shots"
+        }
+      ],
+      "933686567": [
+        {
+          "playerId": 61073564,
+          "playerName": "Fridrich Petr",
+          "playerJersey": "11",
+          "role": "H",
+          "value": 4,
+          "category": "points"
+        },
+        {
+          "playerId": 40055660,
+          "playerName": "Naukkarinen Janne",
+          "playerJersey": "70",
+          "role": "H",
+          "value": 2,
+          "category": "assists"
+        },
+        {
+          "playerId": 29937251,
+          "playerName": "Siikanen Patrik",
+          "playerJersey": "75",
+          "role": "H",
+          "value": 2,
+          "category": "goals"
+        },
+        {
+          "playerId": 29937251,
+          "playerName": "Siikanen Patrik",
+          "playerJersey": "75",
+          "role": "H",
+          "value": 4,
+          "category": "plus_minus"
+        },
+        {
+          "playerId": 40055660,
+          "playerName": "Naukkarinen Janne",
+          "playerJersey": "70",
+          "role": "H",
+          "value": 916.3333333333334,
+          "category": "minutes_per_game"
+        },
+        {
+          "playerId": 60954318,
+          "playerName": "Zezelj Anze",
+          "playerJersey": "92",
+          "role": "H",
+          "value": 4276.62,
+          "category": "distances_per_game"
+        },
+        {
+          "playerId": 29937251,
+          "playerName": "Siikanen Patrik",
+          "playerJersey": "75",
+          "role": "H",
+          "value": 11,
+          "category": "shots"
+        }
+      ]
+    }
+  },
+  "goaliesToWatch": {
+    "362185137": [],
+    "933686567": []
+  }
+}

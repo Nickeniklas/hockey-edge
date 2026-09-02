@@ -167,11 +167,35 @@ def backfill_shotmap(
 
 def backfill_season(
     conn, season: int, *, force: bool = False, max_games: int | None = None,
-    force_endpoints: set[str] | None = None,
+    force_endpoints: set[str] | None = None, only_ended: bool = False,
 ) -> dict[str, int]:
     all_game_ids = backfill_games_and_standings(conn, season, force=force, force_endpoints=force_endpoints)
-    game_ids = all_game_ids if max_games is None else all_game_ids[:max_games]
+
+    game_ids = all_game_ids
+    if only_ended:
+        # A live season's schedule is mostly games that haven't happened yet.
+        # Fetching their per-game endpoints is not just wasted traffic: a
+        # not-yet-played game returns a pre-game shell (roster, no events),
+        # raw_cache records it status='success', and sync_state then skips
+        # that game's network fetch forever -- so the real post-game data
+        # would never land via this path again. Only resync.py (which forces
+        # past sync_state) could repair it, and only if it happens to run
+        # inside its --days window. Restricting per-game fetches to ended=1
+        # games avoids creating that debt in the first place.
+        ended = {
+            row[0] for row in conn.execute(
+                "SELECT game_id FROM games WHERE season = ? AND ended = 1", (season,)
+            )
+        }
+        game_ids = [gid for gid in all_game_ids if gid in ended]
+        logger.info(
+            "season=%s: --only-ended -> %d/%d games have ended=1; per-game endpoints "
+            "restricted to those (the rest are fetched once they've been played)",
+            season, len(game_ids), len(all_game_ids),
+        )
+
     if max_games is not None:
+        game_ids = game_ids[:max_games]
         logger.info(
             "season=%s: sampling %d/%d games for per-game endpoints (--max-games)",
             season, len(game_ids), len(all_game_ids),
@@ -210,6 +234,13 @@ def main() -> None:
         "targeting historical seasons -- see docs/RESYNC.md.",
     )
     parser.add_argument(
+        "--only-ended", action="store_true",
+        help="only fetch per-game endpoints for games with ended=1 (games_by_season + standings "
+        "are always fetched in full). Use this for a LIVE season: fetching a not-yet-played game "
+        "caches a pre-game shell as sync_state 'success', which this backfill then skips forever. "
+        "Omit for a historical season, where every game has already ended anyway.",
+    )
+    parser.add_argument(
         "--max-games", type=int, default=None,
         help="only fetch per-game endpoints (game_detail/game_stats/shotmap) for the first N games "
         "of the season — games_by_season + standings are always fetched in full. Useful for a fast "
@@ -228,7 +259,8 @@ def main() -> None:
     conn = db.get_connection()
     try:
         summary = backfill_season(
-            conn, args.season, force=args.force, max_games=args.max_games, force_endpoints=force_endpoints,
+            conn, args.season, force=args.force, max_games=args.max_games,
+            force_endpoints=force_endpoints, only_ended=args.only_ended,
         )
         logger.info("backfill complete: %s", summary)
         print(summary)

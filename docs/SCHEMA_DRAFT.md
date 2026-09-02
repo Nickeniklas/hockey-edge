@@ -182,7 +182,7 @@ assumes a field is universally present.
 CREATE TABLE games (
     game_id INTEGER NOT NULL, -- API's top-level "id"; NOT unique across seasons
     season INTEGER NOT NULL,
-    phase TEXT NOT NULL, -- from "serie": confirmed RUNKOSARJA/PLAYOFFS/PRACTICE so far; PLAYOUT/QUALIFICATIONS unconfirmed (see design principle 3)
+    phase TEXT NOT NULL, -- from "serie": RUNKOSARJA/PLAYOFFS/PRACTICE/PLAYOUT/QUALIFICATIONS all confirmed, plus PITSITURNAUS (found season 2027, 2026-09-01 -- a preseason tournament; the vocabulary is open-ended, do not treat any list as closed. See design principle 3)
     start_utc TEXT NOT NULL,
     end_utc TEXT,
     home_team_id TEXT NOT NULL,

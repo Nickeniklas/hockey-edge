@@ -1,10 +1,12 @@
 """Snapshot capture job — Layer 2 per docs/DATA_PIPELINE.md.
 
-Scheduler is dumb, job is smart: an external scheduler (Windows Task
-Scheduler on the desktop for now — see docs/snapshot_job_task_scheduler.xml,
-docs/snapshot_job_launchd.plist, docs/snapshot_job_cron.txt) fires this every
-15 minutes; the job itself decides whether anything is due. Run manually or
-via the scheduler:
+Scheduler is dumb, job is smart: an external scheduler fires this every 15
+minutes and the job itself decides whether anything is due. Registered as a
+Windows scheduled task on the desktop since 2026-09-02, running 11:00–23:00
+local (see docs/snapshot_job_task_scheduler.xml for the definition, the
+registration command, and why the window starts at 11:00 rather than 14:00).
+docs/snapshot_job_launchd.plist and docs/snapshot_job_cron.txt remain
+scaffolding for other hosts, not deployed. Run manually or via the scheduler:
 
     python -m hockey_edge.snapshot.job --once       # normal pass
     python -m hockey_edge.snapshot.job --dry-run     # zero HTTP requests
@@ -15,8 +17,15 @@ mark any windows that genuinely passed uncaptured as 'missed', work out which
 due and the monthly OddsPapi ceiling isn't hit — poll odds once (one poll
 covers the whole tournament board, so it can satisfy every currently-due
 window in a single request; see docs/DATA_PIPELINE.md's OddsPapi section).
-Lineup capture is stubbed (see lineups.py), pending the Phase 1b pre-puck-drop
-test.
+Lineup capture (see lineups.py) is wired: one game_detail(+game_preview)
+fetch per due (season, game_id), regardless of window -- opening/mid windows
+mostly return unassigned squads (line=null everywhere) and that's expected,
+captured anyway as evidence of when lineups actually post; the closing
+window (T-25min, closest to the T-30 test that unblocked this) is where a
+real confirmed lineup shows up. capture_lineups re-queries due windows
+itself rather than reusing the `due` list computed for odds above, so it
+stays correct regardless of whether odds capture already marked some of
+those windows satisfied this pass.
 
 The odds provider is currently NullOddsProvider — makes zero HTTP requests,
 always returns no snapshots. Wiring a real provider is a one-line change
@@ -39,7 +48,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from hockey_edge.snapshot import fixtures, storage
+from hockey_edge.snapshot import fixtures, lineups, storage
 from hockey_edge.snapshot.odds.base import OddsProvider
 from hockey_edge.snapshot.odds.null_provider import NullOddsProvider
 
@@ -125,11 +134,48 @@ def capture_odds(
 
 
 def capture_lineups(conn: sqlite3.Connection, logger: logging.Logger) -> int:
-    logger.info(
-        "lineup capture skipped — blocked on pre-game game_detail test, "
-        "see hockey_edge.snapshot.lineups module docstring"
-    )
-    return 0
+    """One game_detail(+game_preview) fetch per distinct due (season,
+    game_id), writing a LineupSnapshot per team-side and marking that game's
+    due windows satisfied. A single game's fetch failure is logged at
+    CRITICAL (missed capture is unrecoverable, same as odds) and does not
+    stop the other due games this pass. Returns the number of windows
+    marked satisfied."""
+    now_iso = _now_iso()
+    due = storage.get_due_windows(conn, now_iso=now_iso)
+    if not due:
+        logger.info("lineup capture: no windows currently due")
+        return 0
+
+    games: dict[tuple[int, int], list] = {}
+    for row in due:
+        games.setdefault((row["season"], row["game_id"]), []).append(row)
+
+    satisfied = 0
+    for (season, game_id), rows in games.items():
+        window_label = ",".join(sorted({row["window"] for row in rows}))
+        try:
+            snapshots = lineups.fetch_lineups(season, game_id, window=window_label)
+        except Exception:
+            logger.critical(
+                "lineup capture FAILED for season=%s game_id=%s (window=%s) — "
+                "this poll's lineup data is unrecoverable",
+                season, game_id, window_label, exc_info=True,
+            )
+            continue
+
+        for snapshot in snapshots:
+            storage.insert_lineup_snapshot(conn, snapshot)
+
+        window_ids = [row["id"] for row in rows]
+        storage.mark_windows_satisfied(conn, window_ids, now_iso=_now_iso())
+        satisfied += len(window_ids)
+        logger.info(
+            "lineup capture ok: season=%s game_id=%s (window=%s) — %d snapshot(s) "
+            "written, %d window(s) marked satisfied",
+            season, game_id, window_label, len(snapshots), len(window_ids),
+        )
+
+    return satisfied
 
 
 def run_dry_run(conn: sqlite3.Connection, logger: logging.Logger) -> None:
