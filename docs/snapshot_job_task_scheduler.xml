@@ -7,8 +7,19 @@
   directory nor its PATH, so <Command> must be the venv interpreter itself
   (NOT "python"), and every path here is spelled out in full.
 
-    repo root : C:\Users\Nikla_000\Documents\local-repo\hockey-edge
-    python    : C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\python.exe
+    repo root  : C:\Users\Nikla_000\Documents\local-repo\hockey-edge
+    interpreter: C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\pythonw.exe
+
+  pythonw.exe, not python.exe (changed 2026-09-03). python.exe allocates a
+  console, so every 15-minute tick popped a window that stole keyboard focus
+  from whatever was in front of it. <Hidden> does not help: for an Exec action
+  it governs whether the task is listed in the Task Scheduler UI, not whether
+  the process gets a console — the interpreter choice is the only thing that
+  decides that. The cost is that pythonw runs with no console at all, so
+  sys.stdout and sys.stderr are None and logs/snapshot_job.log is the sole
+  record of a run. job.py is written for that: its console handler is
+  installed only when sys.stderr exists, its log file is opened as UTF-8, and
+  main() logs any otherwise-unhandled exception before exiting non-zero.
 
   On paths: the job's data/log locations are NOT cwd-relative — job.py,
   storage.py and raw_cache.py all anchor to Path(__file__).resolve().
@@ -127,7 +138,7 @@
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\python.exe</Command>
+      <Command>C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\pythonw.exe</Command>
       <Arguments>-m hockey_edge.snapshot.job --once</Arguments>
       <WorkingDirectory>C:\Users\Nikla_000\Documents\local-repo\hockey-edge</WorkingDirectory>
     </Exec>

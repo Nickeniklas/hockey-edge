@@ -32,11 +32,14 @@ always returns no snapshots. Wiring a real provider is a one-line change
 below once one is chosen (see NullOddsProvider's docstring for why none is
 wired yet: docs/SNAPSHOT_FINDINGS.md's OddsPapi recon).
 
-Alerting: failures log at CRITICAL, to both console and logs/snapshot_job.log.
-There's no email/Slack hookup yet (open item) — until one exists, a CRITICAL
-line in the log is the signal to check in manually. A missed capture is gone
-forever, so this job must never silently swallow a failure, and --once exits
-non-zero on any failure so a scheduler can surface it.
+Alerting: failures log at CRITICAL to logs/snapshot_job.log, plus the console
+when run from a terminal. The scheduled task runs pythonw.exe, where
+sys.stdout/sys.stderr are None and the log file is the only record — main()
+therefore logs any otherwise-unhandled exception before letting it exit
+non-zero. There's no email/Slack hookup yet (open item) — until one exists, a
+CRITICAL line in the log is the signal to check in manually. A missed capture
+is gone forever, so this job must never silently swallow a failure, and --once
+exits non-zero on any failure so a scheduler can surface it.
 """
 
 import argparse
@@ -67,12 +70,21 @@ def _configure_logging() -> logging.Logger:
     logger.setLevel(logging.INFO)
     if not logger.handlers:
         fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-        file_handler = logging.FileHandler(LOG_DIR / "snapshot_job.log")
+        # encoding is explicit: the scheduled task runs under pythonw with no
+        # console, so the locale default would be cp1252 and a record carrying
+        # a name like Kärpät/Jyväskylä would raise inside emit and be dropped
+        # with nothing to surface it.
+        file_handler = logging.FileHandler(LOG_DIR / "snapshot_job.log", encoding="utf-8")
         file_handler.setFormatter(fmt)
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(fmt)
         logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
+        # Only when there is somewhere to write: under pythonw sys.stderr is
+        # None, and a StreamHandler holding a None stream raises (silently,
+        # swallowed by Handler.handleError) once per record. Run from a
+        # terminal, this still echoes as before.
+        if sys.stderr is not None:
+            console_handler = logging.StreamHandler(sys.stderr)
+            console_handler.setFormatter(fmt)
+            logger.addHandler(console_handler)
     return logger
 
 
@@ -274,27 +286,41 @@ def run_once(conn: sqlite3.Connection, logger: logging.Logger) -> bool:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--once", action="store_true", help="Run a normal single pass.")
-    mode.add_argument(
-        "--dry-run", action="store_true",
-        help="Zero HTTP requests, zero writes: report which windows are due.",
-    )
-    args = parser.parse_args()
-
-    load_dotenv()
+    # Logging is configured before anything that can fail, so that the window
+    # in which a failure cannot be recorded stays as small as it can be. That
+    # window is not empty: an error raised while importing this module, or
+    # inside _configure_logging itself (an unwritable logs/ directory, say),
+    # happens with no logger and — under pythonw — no stderr either, leaving
+    # only Task Scheduler's non-zero Last Run Result.
     logger = _configure_logging()
-    conn = storage.get_connection()
     try:
-        if args.dry_run:
-            run_dry_run(conn, logger)
-        else:
-            ok = run_once(conn, logger)
-            if not ok:
-                sys.exit(1)
-    finally:
-        conn.close()
+        parser = argparse.ArgumentParser()
+        mode = parser.add_mutually_exclusive_group(required=True)
+        mode.add_argument("--once", action="store_true", help="Run a normal single pass.")
+        mode.add_argument(
+            "--dry-run", action="store_true",
+            help="Zero HTTP requests, zero writes: report which windows are due.",
+        )
+        args = parser.parse_args()
+
+        load_dotenv()
+        conn = storage.get_connection()
+        try:
+            if args.dry_run:
+                run_dry_run(conn, logger)
+            else:
+                ok = run_once(conn, logger)
+                if not ok:
+                    sys.exit(1)
+        finally:
+            conn.close()
+    except SystemExit:
+        # --once's deliberate exit(1), and argparse's exit(2) on a bad
+        # invocation: both already said what they needed to.
+        raise
+    except BaseException:
+        logger.critical("snapshot job aborted with an unhandled exception", exc_info=True)
+        raise
 
 
 if __name__ == "__main__":

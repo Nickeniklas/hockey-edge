@@ -59,8 +59,10 @@ game_id, window)`, not inferred from timestamp proximity — verified against
 a simulated missed-tick scenario), an `api_usage` table with a monthly
 ceiling, and `job.py --dry-run` / `--once` modes. It is registered as a
 Windows scheduled task (2026-09-02), running every 15 minutes 11:00–23:00
-local — see `docs/snapshot_job_task_scheduler.xml`, which carries the
-working registration command and why the window starts at 11:00.
+local under `pythonw.exe`, so a tick raises no console window and
+`logs/snapshot_job.log` is the record of a run — see
+`docs/snapshot_job_task_scheduler.xml`, which carries the working
+registration command and why the window starts at 11:00.
 
 **Lineup capture is live** (`snapshot/lineups.py`, previously stubbed).
 liiga.fi publishes a confirmed 22-player lineup per team roughly half an

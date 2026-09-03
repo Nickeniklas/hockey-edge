@@ -45,9 +45,12 @@ Usage (from repo root, venv active):
     python scripts/nightly_sync.py --season 2027 --days 7
     python scripts/nightly_sync.py --dry-run
 
-Logs to `logs/nightly_sync.log` (and stdout). Exits non-zero if either pass
-fails, so a scheduler can surface it. NOT scheduled by this repo — see
-docs/RESYNC.md for the note on running it daily once the season is underway.
+Logs to `logs/nightly_sync.log`, plus stdout when run from a terminal. The
+scheduled task runs pythonw.exe, where sys.stdout/sys.stderr are None and the
+log file is the only record — main() therefore logs any otherwise-unhandled
+exception before letting it exit non-zero. Exits non-zero if either pass
+fails, so a scheduler can surface it. Registered with schtasks rather than by
+this repo — see docs/RESYNC.md's nightly-sync section.
 """
 
 import argparse
@@ -91,13 +94,37 @@ def _configure_logging() -> None:
         fmt = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
         file_handler = logging.FileHandler(LOG_DIR / "nightly_sync.log", encoding="utf-8")
         file_handler.setFormatter(fmt)
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(fmt)
         root.addHandler(file_handler)
-        root.addHandler(console_handler)
+        # Only when there is somewhere to write: the scheduled task runs under
+        # pythonw, where sys.stdout is None and a StreamHandler holding it
+        # raises (silently, swallowed by Handler.handleError) once per record.
+        # Run from a terminal, this still echoes as before.
+        if sys.stdout is not None:
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setFormatter(fmt)
+            root.addHandler(console_handler)
 
 
 def main() -> None:
+    # Logging is configured before anything that can fail, so that the window
+    # in which a failure cannot be recorded stays as small as it can be. That
+    # window is not empty: an error raised while importing this module, or
+    # inside _configure_logging itself (an unwritable logs/ directory, say),
+    # happens with no logger and -- under pythonw -- no stderr either, leaving
+    # only Task Scheduler's non-zero Last Run Result.
+    _configure_logging()
+    try:
+        _main()
+    except SystemExit:
+        # _main's deliberate exit(1), and argparse's exit(2) on a bad
+        # invocation: both already said what they needed to.
+        raise
+    except BaseException:
+        logger.critical("nightly sync aborted with an unhandled exception", exc_info=True)
+        raise
+
+
+def _main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -117,7 +144,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    _configure_logging()
     logger.info(
         "nightly sync starting: season=%s days=%s dry_run=%s", args.season, args.days, args.dry_run
     )

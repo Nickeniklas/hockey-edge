@@ -548,6 +548,17 @@ below) are explicitly deferred, not done. What did ship:
   `mark_missed_windows`) is still what makes a late wake-up correct, not the
   scheduler — never replace that with a naive "is now ≈ the window time"
   check. launchd/cron variants are scaffolding only, not deployed.
+- **Both scheduled tasks run `pythonw.exe`, not `python.exe`** (changed
+  2026-09-03, so a tick stops popping a console window that steals focus;
+  `<Hidden>` would not have done it — for an Exec action that setting governs
+  UI listing, not whether the process gets a console). Under pythonw
+  `sys.stdout`/`sys.stderr` are None, so a failure outside the logger — an
+  import error, or anything before `_configure_logging()` finishes — leaves no
+  record anywhere except Task Scheduler's non-zero Last Run Result. Check it
+  with `Get-ScheduledTaskInfo -TaskName "hockey-edge snapshot job"`. Editing
+  the snapshot task via `Set-ScheduledTask` needs an elevated PowerShell (its
+  XML carries an explicit `<Principal>`); the schtasks-registered nightly sync
+  does not.
 - OddsPapi returns HTTP 404 with `code: "FIXTURE_NOT_FOUND"` for a tournament
   with no fixtures currently posted, not `HTTP 200` with `[]` — the snapshot job
   handles this explicitly as "no odds yet," not a failure; don't reintroduce a

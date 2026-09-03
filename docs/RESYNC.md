@@ -241,7 +241,7 @@ schedule and the two paths need substituting.
 Register (runs daily at 23:30 local):
 
 ```
-schtasks /Create /TN "hockey-edge nightly sync" /TR "C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\python.exe C:\Users\Nikla_000\Documents\local-repo\hockey-edge\scripts\nightly_sync.py" /SC DAILY /ST 23:30
+schtasks /Create /TN "hockey-edge nightly sync" /TR "C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\pythonw.exe C:\Users\Nikla_000\Documents\local-repo\hockey-edge\scripts\nightly_sync.py" /SC DAILY /ST 23:30
 ```
 
 Then set the working directory, which the above cannot do:
@@ -251,6 +251,20 @@ $t = Get-ScheduledTask -TaskName "hockey-edge nightly sync"
 $t.Actions[0].WorkingDirectory = "C:\Users\Nikla_000\Documents\local-repo\hockey-edge"
 Set-ScheduledTask -TaskName "hockey-edge nightly sync" -Action $t.Actions
 ```
+
+Both scheduled tasks run `pythonw.exe` rather than `python.exe` (changed
+2026-09-03) so a run does not pop a console window and steal focus. Under
+pythonw `sys.stdout`/`sys.stderr` are None, which makes `logs/nightly_sync.log`
+the only record of a run; `nightly_sync.py` accounts for that by installing its
+console handler only when a stream exists and by logging any unhandled
+exception before exiting non-zero.
+
+**Editing the two tasks needs different privileges.** Changing the snapshot
+job with `Set-ScheduledTask` requires an elevated PowerShell: its XML
+registration carries an explicit `<Principal>` block, and re-registering a task
+that specifies a principal is a privileged operation. The nightly sync, created
+inline by `schtasks` with no principal of its own, was modifiable from an
+ordinary non-elevated prompt.
 
 **The second block is not optional.** `schtasks` has no inline way to set a
 working directory, and it matters: `job.py` calls python-dotenv's
