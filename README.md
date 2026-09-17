@@ -51,13 +51,16 @@ season 2025 — see `docs/SCHEMA_DRAFT.md` design principle 3. Season 2027
 added another, `PITSITURNAUS`, a preseason tournament: treat the `serie`
 vocabulary as open-ended, not a closed set.)
 
-**Build-order step 2 (snapshot capture job) is deployed and capturing
-lineups; odds are still not being captured.** `src/hockey_edge/snapshot/`
-has live fixture discovery (`fixtures.py`), a sleep-safe capture-window
-scheduler (a game's opening/mid/closing windows are tracked per `(season,
-game_id, window)`, not inferred from timestamp proximity — verified against
-a simulated missed-tick scenario), an `api_usage` table with a monthly
-ceiling, and `job.py --dry-run` / `--once` modes. It is registered as a
+**Build-order step 2 (snapshot capture job) is deployed and capturing both
+lineups and odds.** `src/hockey_edge/snapshot/` has live fixture discovery
+(`fixtures.py`), a sleep-safe capture-window scheduler (a game's
+opening/mid/closing windows are tracked per `(season, game_id, kind,
+window)`, not inferred from timestamp proximity — verified against a
+simulated missed-tick scenario), an `api_usage` table with a monthly
+ceiling, and `job.py --dry-run` / `--once` modes. Odds and lineups carry
+**separate** window status (`capture_windows.kind`): they succeed
+independently, and a shared status once let a successful odds poll hide
+windows from lineup capture. It is registered as a
 Windows scheduled task (2026-09-02), running every 15 minutes 11:00–23:00
 local under `pythonw.exe`, so a tick raises no console window and
 `logs/snapshot_job.log` is the record of a run — see
@@ -75,19 +78,32 @@ still marked as an inference (`starter_source`/`starter_confidence`) and
 `scripts/verify_starters.py` re-scores it against completed games so drift
 is monitored rather than assumed.
 
-The odds provider wired in is still `NullOddsProvider` (zero HTTP requests)
-rather than the existing `OddsPapiProvider` — a live OddsPapi call found
-`/odds-by-tournaments` returns no price data, contradicting its own docs, so
-which provider/cadence is viable remains **the open decision**. Full
-findings: **`docs/SNAPSHOT_FINDINGS.md`**.
+**Odds capture is live too, since 2026-09-17** (`OddsPapiProvider`, replacing
+`NullOddsProvider`). The earlier blocker — a live call finding no price data
+on `/odds-by-tournaments` — turned out to be the off-season board being too
+early, not a limit of the endpoint: in-season, one request returns every
+posted fixture with full prices for one bookmaker. The job polls **pinnacle
+(primary) + bet365** per due tick, parses the 3-way regulation 1X2 and the
+2-way moneyline incl. OT, and keeps the full payload either way so parsing
+can be redone without refetching. A fixture is tied to its liiga.fi game via
+the curated `snapshot/odds/oddspapi_teams.json` (OddsPapi team names are not
+unique) plus an exact home/away/start match — never a guess; an unmatched
+fixture is stored unresolved with a WARNING. An odds window counts as
+captured only for a game the primary book actually priced. Plan, per-phase
+record and the bookmaker comparison: **`docs/ODDS_PLAN.md`**.
 
 ```
 python -m hockey_edge.snapshot.job --once       # normal pass
-python -m hockey_edge.snapshot.job --dry-run    # zero HTTP requests, reports what's due
+python -m hockey_edge.snapshot.job --dry-run    # zero HTTP requests, reports what's due + projected requests
 
 python scripts/verify_starters.py               # read-only: score captured starters vs real results
 python scripts/lineup_probe.py --date 2026-09-01 --label T-30   # read-only ad-hoc lineup probe
 ```
+
+**Tests**: `python -m unittest discover -s tests` (stdlib unittest, no extra
+dependency — there is no pytest in `requirements.txt`). They run against real
+saved API responses in `fixtures/oddspapi/` rather than invented payloads, and
+make zero HTTP requests. Add new tests as `tests/test_*.py`.
 
 **A separate re-sync mechanism now exists for historical data**:
 `data/hockey.db`'s completed-game data isn't immutable on liiga.fi's side —
@@ -159,6 +175,6 @@ the source of truth for runtime dependencies (`pyproject.toml` declares no
 `[project.dependencies]` itself); run both `pip install` steps on setup.
 
 Put `ODDSPAPI_KEY=...` in an untracked `.env` at the repo root (never commit it) —
-needed for `scripts/oddspapi_probe.py` and for `OddsPapiProvider` itself, though
-`job.py` currently runs `NullOddsProvider` (zero HTTP requests) instead — see the
-Status section above for the snapshot job commands.
+**required**: `job.py` polls OddsPapi for real on every due tick, and
+`OddsPapiProvider` raises without it. `scripts/oddspapi_probe.py` needs it too.
+See the Status section above for the snapshot job commands.

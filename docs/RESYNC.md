@@ -269,10 +269,11 @@ ordinary non-elevated prompt.
 **The second block is not optional.** `schtasks` has no inline way to set a
 working directory, and it matters: `job.py` calls python-dotenv's
 `load_dotenv()`, whose `.env` discovery depends on where the process starts.
-That is currently harmless — `NullOddsProvider` needs no key — but it becomes
-a silent failure the moment a real odds provider replaces it and
-`ODDSPAPI_KEY` can't be found. Fixing it now means that swap doesn't come
-with a scheduling bug attached. Note the data/log paths themselves are *not*
+That mattered from the moment `OddsPapiProvider` replaced `NullOddsProvider`
+(2026-09-17): the job now needs `ODDSPAPI_KEY` on every due tick, and a
+working directory that hides `.env` would break odds capture outright.
+Setting it beforehand meant that swap didn't come with a scheduling bug
+attached. Note the data/log paths themselves are *not*
 cwd-dependent (they anchor to `Path(__file__).resolve().parents[3]`); `.env`
 discovery is the one thing that is.
 

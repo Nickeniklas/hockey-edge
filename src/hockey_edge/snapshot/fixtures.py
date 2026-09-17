@@ -142,10 +142,11 @@ def discover_fixtures(
         start_dt = datetime.fromisoformat(start_utc.replace("Z", "+00:00"))
         for window, offset in WINDOW_OFFSETS.items():
             due_at = _iso_utc(start_dt - offset)
-            storage.upsert_capture_window(
-                conn, league="liiga", season=season, game_id=game_id,
-                window=window, due_at=due_at,
-            )
+            for kind in storage.CAPTURE_KINDS:
+                storage.upsert_capture_window(
+                    conn, league="liiga", season=season, game_id=game_id,
+                    kind=kind, window=window, due_at=due_at,
+                )
 
     logger.info(
         "fixture discovery: %d distinct fixture(s) seen across %d date(s) x %d tournament(s)",

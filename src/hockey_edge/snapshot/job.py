@@ -13,10 +13,11 @@ scaffolding for other hosts, not deployed. Run manually or via the scheduler:
 
 Each --once pass: discover live fixtures (games_by_date -- see fixtures.py),
 mark any windows that genuinely passed uncaptured as 'missed', work out which
-(season, game_id, window) capture windows are due right now, and — if any are
-due and the monthly OddsPapi ceiling isn't hit — poll odds once (one poll
-covers the whole tournament board, so it can satisfy every currently-due
-window in a single request; see docs/DATA_PIPELINE.md's OddsPapi section).
+(season, game_id, kind, window) capture windows are due right now, and — if
+any odds window is due, eligible under ODDS_RETRY_GAP, and the monthly
+OddsPapi ceiling allows it — poll the board once per book in ODDS_BOOKS (one
+poll covers every posted fixture for one book; see docs/DATA_PIPELINE.md's
+OddsPapi section).
 Lineup capture (see lineups.py) is wired: one game_detail(+game_preview)
 fetch per due (season, game_id), regardless of window -- opening/mid windows
 mostly return unassigned squads (line=null everywhere) and that's expected,
@@ -27,10 +28,15 @@ itself rather than reusing the `due` list computed for odds above, so it
 stays correct regardless of whether odds capture already marked some of
 those windows satisfied this pass.
 
-The odds provider is currently NullOddsProvider — makes zero HTTP requests,
-always returns no snapshots. Wiring a real provider is a one-line change
-below once one is chosen (see NullOddsProvider's docstring for why none is
-wired yet: docs/SNAPSHOT_FINDINGS.md's OddsPapi recon).
+Odds capture runs OddsPapiProvider against ODDS_BOOKS (wired 2026-09-17,
+docs/ODDS_PLAN.md — it replaced NullOddsProvider, which is kept in
+odds/null_provider.py as the zero-request stand-in). An odds window is only
+satisfied for a game that PRIMARY_ODDS_BOOK actually priced and that resolved
+to a liiga.fi game; a game absent from the board stays pending and is retried
+no sooner than ODDS_RETRY_GAP, so one unposted fixture can't drain the
+monthly budget. Odds and lineup windows are tracked separately
+(capture_windows.kind): they succeed independently, and a shared status used
+to let a successful odds poll hide windows from lineup capture.
 
 Alerting: failures log at CRITICAL to logs/snapshot_job.log, plus the console
 when run from a terminal. The scheduled task runs pythonw.exe, where
@@ -46,14 +52,16 @@ import argparse
 import logging
 import sqlite3
 import sys
-from datetime import datetime, timezone
+import time
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 from hockey_edge.snapshot import fixtures, lineups, storage
-from hockey_edge.snapshot.odds.base import OddsProvider
-from hockey_edge.snapshot.odds.null_provider import NullOddsProvider
+from hockey_edge.snapshot.odds.base import OddsProvider, OddsSnapshot
+from hockey_edge.snapshot.odds.oddspapi import OddsPapiProvider, load_team_map
 
 LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
 
@@ -62,6 +70,35 @@ LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
 # real requests ever recorded) but enforced regardless so it's already
 # correct once a real provider is wired.
 ODDS_MONTHLY_CEILING = 200
+
+# One poll per book per tick. Pinnacle is primary: it's the sharpest of the
+# books checked and the one whose coverage decides a window is done; bet365 is
+# the second opinion (docs/ODDS_PLAN.md Phase 0 — Betsson failed those checks).
+ODDS_BOOKS = ("pinnacle", "bet365")
+PRIMARY_ODDS_BOOK = "pinnacle"
+
+# A board poll covers every fixture posted, so any successful poll is an
+# attempt on every window due at that moment. A window still due afterwards
+# is one whose fixture isn't posted yet, and re-polling for it every 15
+# minutes would burn ~80 requests on a single unposted game between its
+# opening window (T-24h) and puck drop. Retry no sooner than this -- except
+# for the closing window, where a late-posted price is the whole point and a
+# missed capture is unrecoverable.
+ODDS_RETRY_GAP = timedelta(minutes=60)
+
+# Gap between the per-book polls of a single tick. OddsPapi rate-limits bursts
+# independently of the monthly quota: on the first live run (2026-09-17 21:30
+# local) two calls ~1s apart got the second one HTTP 429'd (pinnacle 200,
+# bet365 429), while Phase 0's two calls 1.5s apart both returned 200 -- so the
+# threshold sits near a second. A 429 still bills as a request while returning
+# nothing, so this is deliberately far clear of that line rather than
+# minimal: the job ticks every 15 minutes, so the wait costs nothing real, and
+# a retry is not an option (it would be another billed request).
+# If a 429 ever recurs anyway, the next steps are: raise this; then stagger the
+# books across consecutive ticks (same request count, no burst, at the cost of
+# the two books' prices being 15 min apart); then drop to PRIMARY_ODDS_BOOK
+# alone (halves the monthly spend, loses the second opinion).
+ODDS_BOOK_DELAY_SECONDS = 20.0
 
 
 def _configure_logging() -> logging.Logger:
@@ -99,6 +136,87 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# A board fixture may resolve to a discovered game whose start differs by at
+# most this much -- enough for a reschedule within the day, small enough that
+# a back-to-back with home/away swapped (KooKoo–SaiPa 2026-09-18/19) can never
+# match the wrong game, since the home/away pair must match too.
+RESOLVE_MAX_START_DIFF = timedelta(hours=24)
+
+
+def windows_eligible_for_poll(
+    due: list, *, last_poll_iso: str | None, now_iso: str
+) -> list:
+    """Of the due odds windows, those worth spending a poll on right now: a
+    window whose fixture was already looked for on a successful poll less
+    than ODDS_RETRY_GAP ago waits. 'Looked for' means the poll happened at or
+    after the window came due -- an earlier poll says nothing about it.
+    Closing windows are always eligible (see ODDS_RETRY_GAP)."""
+    if last_poll_iso is None:
+        return list(due)
+    retry_from = _parse_utc(now_iso) - ODDS_RETRY_GAP
+    recent = _parse_utc(last_poll_iso) > retry_from
+    return [
+        row for row in due
+        if row["window"] == "closing" or not (recent and last_poll_iso >= row["due_at"])
+    ]
+
+
+def resolve_snapshots(
+    conn: sqlite3.Connection,
+    snapshots: list[OddsSnapshot],
+    team_map: dict[int, str],
+    logger: logging.Logger,
+) -> list[OddsSnapshot]:
+    """Attach (season, game_id) to each snapshot whose fixture maps to exactly
+    one discovered liiga.fi game: both participants known in the curated team
+    map, same home/away teamIds, start within RESOLVE_MAX_START_DIFF.
+    Anything else stays unresolved (NULL) with the reason logged -- never
+    guessed. Resolved once per fixture, not per market row."""
+    resolved_by_fixture: dict[str, tuple[int, int] | None] = {}
+    out = []
+    for snapshot in snapshots:
+        if snapshot.fixture_ref not in resolved_by_fixture:
+            resolved_by_fixture[snapshot.fixture_ref] = _resolve_fixture(conn, snapshot, team_map, logger)
+        match = resolved_by_fixture[snapshot.fixture_ref]
+        if match is not None:
+            snapshot = replace(snapshot, season=match[0], game_id=match[1])
+        out.append(snapshot)
+    return out
+
+
+def _resolve_fixture(conn, snapshot: OddsSnapshot, team_map: dict[int, str], logger) -> tuple[int, int] | None:
+    home = team_map.get(snapshot.home_participant_id)
+    away = team_map.get(snapshot.away_participant_id)
+    if home is None or away is None:
+        logger.warning(
+            "odds resolve: fixture %s has participant(s) not in the curated team map "
+            "(home=%s away=%s) — left unresolved; add them to oddspapi_teams.json with evidence",
+            snapshot.fixture_ref,
+            snapshot.home_participant_id if home is None else "ok",
+            snapshot.away_participant_id if away is None else "ok",
+        )
+        return None
+    if snapshot.start_utc is None:
+        logger.warning("odds resolve: fixture %s has no startTime — left unresolved", snapshot.fixture_ref)
+        return None
+    start = _parse_utc(snapshot.start_utc)
+    candidates = [
+        row for row in storage.find_liiga_games(conn, home_team_id=home, away_team_id=away)
+        if abs(_parse_utc(row["start_utc"]) - start) <= RESOLVE_MAX_START_DIFF
+    ]
+    if len(candidates) == 1:
+        return candidates[0]["season"], candidates[0]["game_id"]
+    logger.warning(
+        "odds resolve: fixture %s (%s v %s, %s) matched %d discovered game(s) — left unresolved",
+        snapshot.fixture_ref, home, away, snapshot.start_utc, len(candidates),
+    )
+    return None
+
+
+def _parse_utc(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
 def capture_odds(
     provider: OddsProvider,
     conn: sqlite3.Connection,
@@ -107,8 +225,9 @@ def capture_odds(
     book: str = "pinnacle",
 ) -> list:
     """Call the provider once, record an api_usage row (skipped for a stub
-    provider — see OddsProvider.is_stub), and write any snapshots. Returns
-    the snapshots so the caller can decide which due windows they satisfy."""
+    provider — see OddsProvider.is_stub), resolve and write any snapshots.
+    Returns the snapshots so the caller can decide which due windows they
+    satisfy."""
     from hockey_edge.snapshot.odds.oddspapi import LIIGA_TOURNAMENT_ID
 
     requested_at = _now_iso()
@@ -134,6 +253,8 @@ def capture_odds(
             outcome="success_content" if snapshots else "success_empty",
         )
 
+    if snapshots:
+        snapshots = resolve_snapshots(conn, snapshots, load_team_map(), logger)
     for snapshot in snapshots:
         storage.insert_odds_snapshot(conn, snapshot)
 
@@ -145,6 +266,63 @@ def capture_odds(
     return snapshots
 
 
+def capture_odds_for_due_windows(
+    conn: sqlite3.Connection, logger: logging.Logger, *, due: list, now_iso: str
+) -> int:
+    """Poll every book once (ODDS_BOOKS) if any due window is eligible and the
+    monthly ceiling allows it, then mark satisfied only those windows whose
+    game got a parsed, resolved row from PRIMARY_ODDS_BOOK. A game that isn't
+    on the board stays pending — it is not a capture. Returns the number of
+    windows marked satisfied."""
+    eligible = windows_eligible_for_poll(
+        due,
+        last_poll_iso=storage.last_successful_odds_poll(conn, provider="oddspapi"),
+        now_iso=now_iso,
+    )
+    if not eligible:
+        logger.info(
+            "%d odds window(s) due but all polled within the last %d min and still "
+            "unposted — waiting (see ODDS_RETRY_GAP)",
+            len(due), int(ODDS_RETRY_GAP.total_seconds() // 60),
+        )
+        return 0
+
+    used = storage.count_api_usage_this_month(conn, provider="oddspapi", now_iso=now_iso)
+    if used + len(ODDS_BOOKS) > ODDS_MONTHLY_CEILING:
+        logger.critical(
+            "oddspapi monthly ceiling would be exceeded (%d used + %d books > %d) — "
+            "skipping odds capture for %d due window(s) this pass",
+            used, len(ODDS_BOOKS), ODDS_MONTHLY_CEILING, len(due),
+        )
+        return 0
+
+    provider = OddsPapiProvider()
+    covered: set[tuple[int, int]] = set()
+    for index, book in enumerate(ODDS_BOOKS):
+        if index:
+            time.sleep(ODDS_BOOK_DELAY_SECONDS)
+        snapshots = capture_odds(provider, conn, logger, book=book)
+        if book == PRIMARY_ODDS_BOOK:
+            covered = {
+                (s.season, s.game_id)
+                for s in snapshots
+                if s.parsed and s.game_id is not None
+            }
+
+    satisfied = [row["id"] for row in due if (row["season"], row["game_id"]) in covered]
+    storage.mark_windows_satisfied(conn, satisfied, now_iso=_now_iso())
+    uncovered = [row for row in due if row["id"] not in set(satisfied)]
+    logger.info(
+        "odds capture: %d/%d due window(s) satisfied by %s; %d left pending%s",
+        len(satisfied), len(due), PRIMARY_ODDS_BOOK, len(uncovered),
+        "".join(
+            f" (season={r['season']} game_id={r['game_id']} window={r['window']})"
+            for r in uncovered
+        ),
+    )
+    return len(satisfied)
+
+
 def capture_lineups(conn: sqlite3.Connection, logger: logging.Logger) -> int:
     """One game_detail(+game_preview) fetch per distinct due (season,
     game_id), writing a LineupSnapshot per team-side and marking that game's
@@ -153,7 +331,7 @@ def capture_lineups(conn: sqlite3.Connection, logger: logging.Logger) -> int:
     stop the other due games this pass. Returns the number of windows
     marked satisfied."""
     now_iso = _now_iso()
-    due = storage.get_due_windows(conn, now_iso=now_iso)
+    due = storage.get_due_windows(conn, kind="lineups", now_iso=now_iso)
     if not due:
         logger.info("lineup capture: no windows currently due")
         return 0
@@ -198,16 +376,18 @@ def run_dry_run(conn: sqlite3.Connection, logger: logging.Logger) -> None:
     now_iso = _now_iso()
     logger.info("dry-run: evaluating capture schedule as of %s (no HTTP, no writes)", now_iso)
 
-    due = storage.get_due_windows(conn, now_iso=now_iso)
-    if due:
-        logger.info("dry-run: %d window(s) currently due:", len(due))
-        for row in due:
-            logger.info(
-                "  would attempt: season=%s game_id=%s window=%s due_at=%s game_start=%s",
-                row["season"], row["game_id"], row["window"], row["due_at"], row["game_start_utc"],
-            )
-    else:
-        logger.info("dry-run: no windows currently due")
+    for kind in storage.CAPTURE_KINDS:
+        due = storage.get_due_windows(conn, kind=kind, now_iso=now_iso)
+        if due:
+            logger.info("dry-run: %d %s window(s) currently due:", len(due), kind)
+            for row in due:
+                logger.info(
+                    "  would attempt: kind=%s season=%s game_id=%s window=%s due_at=%s game_start=%s",
+                    kind, row["season"], row["game_id"], row["window"], row["due_at"],
+                    row["game_start_utc"],
+                )
+        else:
+            logger.info("dry-run: no %s windows currently due", kind)
 
     conn.row_factory = sqlite3.Row
     would_miss = conn.execute(
@@ -226,11 +406,24 @@ def run_dry_run(conn: sqlite3.Connection, logger: logging.Logger) -> None:
         logger.info("dry-run: %d window(s) would be recorded MISSED on the next --once pass:", len(would_miss))
         for row in would_miss:
             logger.info(
-                "  would miss: season=%s game_id=%s window=%s due_at=%s game_start=%s",
-                row["season"], row["game_id"], row["window"], row["due_at"], row["game_start_utc"],
+                "  would miss: kind=%s season=%s game_id=%s window=%s due_at=%s game_start=%s",
+                row["kind"], row["season"], row["game_id"], row["window"], row["due_at"],
+                row["game_start_utc"],
             )
 
+    due_odds = storage.get_due_windows(conn, kind="odds", now_iso=now_iso)
+    eligible = windows_eligible_for_poll(
+        due_odds,
+        last_poll_iso=storage.last_successful_odds_poll(conn, provider="oddspapi"),
+        now_iso=now_iso,
+    )
     used = storage.count_api_usage_this_month(conn, provider="oddspapi", now_iso=now_iso)
+    projected = len(ODDS_BOOKS) if eligible else 0
+    logger.info(
+        "dry-run: %d odds window(s) due, %d eligible to poll now — a --once pass would "
+        "make %d request(s) (%s)",
+        len(due_odds), len(eligible), projected, ", ".join(ODDS_BOOKS) if projected else "none",
+    )
     logger.info("dry-run: oddspapi usage this month: %d / %d ceiling", used, ODDS_MONTHLY_CEILING)
 
 
@@ -250,31 +443,20 @@ def run_once(conn: sqlite3.Connection, logger: logging.Logger) -> bool:
     for row in missed:
         logger.warning(
             "capture window MISSED (genuinely passed uncaptured): "
-            "season=%s game_id=%s window=%s due_at=%s game_start=%s",
-            row["season"], row["game_id"], row["window"], row["due_at"], row["game_start_utc"],
+            "kind=%s season=%s game_id=%s window=%s due_at=%s game_start=%s",
+            row["kind"], row["season"], row["game_id"], row["window"], row["due_at"],
+            row["game_start_utc"],
         )
 
-    due = storage.get_due_windows(conn, now_iso=now_iso)
+    due = storage.get_due_windows(conn, kind="odds", now_iso=now_iso)
     if due:
-        used = storage.count_api_usage_this_month(conn, provider="oddspapi", now_iso=now_iso)
-        if used >= ODDS_MONTHLY_CEILING:
-            logger.critical(
-                "oddspapi monthly ceiling reached (%d/%d) — skipping odds capture for "
-                "%d due window(s) this pass", used, ODDS_MONTHLY_CEILING, len(due),
-            )
-        else:
-            provider = NullOddsProvider()
-            snapshots = capture_odds(provider, conn, logger)
-            if snapshots:
-                storage.mark_windows_satisfied(conn, [row["id"] for row in due], now_iso=now_iso)
-                logger.info("marked %d window(s) satisfied by this poll", len(due))
-            else:
-                logger.info(
-                    "%d window(s) due but no odds captured this poll (provider=%s) — "
-                    "left pending", len(due), provider.name,
-                )
+        try:
+            capture_odds_for_due_windows(conn, logger, due=due, now_iso=now_iso)
+        except Exception:
+            logger.critical("odds capture FAILED", exc_info=True)
+            ok = False
     else:
-        logger.info("no capture windows due this pass")
+        logger.info("no odds capture windows due this pass")
 
     try:
         capture_lineups(conn, logger)

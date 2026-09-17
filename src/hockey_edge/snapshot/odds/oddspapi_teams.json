@@ -1,0 +1,163 @@
+{
+  "_about": "Curated OddsPapi participant id -> liiga.fi teamId map (docs/ODDS_PLAN.md Phase 2). Every entry is backed by at least one saved board fixture whose home/away pair matched exactly one hockey.db game at that start time. Add a team only with the same kind of evidence. HIFK 3839 and Karpat 3835 were confirmed 2026-09-17 when they first appeared on a board, the same way. Still absent until seen: HPK (3837?) -- OddsPapi lists 2-3 ids per name for each, so a guess could silently map a junior/women's side.",
+  "teams": [
+    {
+      "participant_id": 3822,
+      "oddspapi_name": "KooKoo",
+      "liiga_team_id": "461765763:kookoo",
+      "liiga_team_name": "KooKoo",
+      "evidence": [
+        "bet365 board 2026-09-17: fixture id1500013472116228 = season 2027 game 2701311 (home)",
+        "bet365 board 2026-09-17: fixture id1500013472116240 = season 2027 game 2701315 (away)",
+        "betsson board 2026-09-17: fixture id1500013472116228 = season 2027 game 2701311 (home)",
+        "pinnacle board 2026-09-17: fixture id1500013472116240 = season 2027 game 2701315 (away)"
+      ]
+    },
+    {
+      "participant_id": 3823,
+      "oddspapi_name": "Vaasan Sport",
+      "liiga_team_id": "626537494:sport",
+      "liiga_team_name": "Sport",
+      "evidence": [
+        "pinnacle board 2026-09-17: fixture id1500013472116220 = season 2027 game 2701306 (away)"
+      ]
+    },
+    {
+      "participant_id": 3824,
+      "oddspapi_name": "Jukurit Mikkeli",
+      "liiga_team_id": "292293444:jukurit",
+      "liiga_team_name": "Jukurit",
+      "evidence": [
+        "bet365 board 2026-09-17: fixture id1500013472116224 = season 2027 game 2701309 (home)",
+        "pinnacle board 2026-09-17: fixture id1500013472116224 = season 2027 game 2701309 (home)"
+      ]
+    },
+    {
+      "participant_id": 3834,
+      "oddspapi_name": "Tappara Tampere",
+      "liiga_team_id": "362185137:tappara",
+      "liiga_team_name": "Tappara",
+      "evidence": [
+        "pinnacle board 2026-09-17: fixture id1500013472116222 = season 2027 game 2701307 (away)"
+      ]
+    },
+    {
+      "participant_id": 3835,
+      "oddspapi_name": "Karpat Oulu",
+      "liiga_team_id": "495643563:kärpät",
+      "liiga_team_name": "Kärpät",
+      "evidence": [
+        "pinnacle board 2026-09-17 (captured by the job): fixture id1500013472116236 = season 2027 game 2701313 (home)"
+      ]
+    },
+    {
+      "participant_id": 3836,
+      "oddspapi_name": "TPS Turku",
+      "liiga_team_id": "651304385:tps",
+      "liiga_team_name": "TPS",
+      "evidence": [
+        "pinnacle board 2026-09-17: fixture id1500013472116222 = season 2027 game 2701307 (home)"
+      ]
+    },
+    {
+      "participant_id": 3839,
+      "oddspapi_name": "HIFK Helsinki",
+      "liiga_team_id": "168761288:hifk",
+      "liiga_team_name": "HIFK",
+      "evidence": [
+        "pinnacle board 2026-09-17 (captured by the job): fixture id1500013472116230 = season 2027 game 2701316 (home)"
+      ]
+    },
+    {
+      "participant_id": 3840,
+      "oddspapi_name": "Jokerit Helsinki",
+      "liiga_team_id": "238306801:jokerit",
+      "liiga_team_name": "Jokerit",
+      "evidence": [
+        "pinnacle board 2026-09-17: fixture id1500013472116218 = season 2027 game 2701308 (home)"
+      ]
+    },
+    {
+      "participant_id": 3841,
+      "oddspapi_name": "Ilves Tampere",
+      "liiga_team_id": "951626834:ilves",
+      "liiga_team_name": "Ilves",
+      "evidence": [
+        "bet365 board 2026-09-17: fixture id1500013472116226 = season 2027 game 2701310 (away)",
+        "pinnacle board 2026-09-17: fixture id1500013472116226 = season 2027 game 2701310 (away)"
+      ]
+    },
+    {
+      "participant_id": 3842,
+      "oddspapi_name": "JYP Jyvaskyla",
+      "liiga_team_id": "219244634:jyp",
+      "liiga_team_name": "JYP",
+      "evidence": [
+        "pinnacle board 2026-09-17: fixture id1500013472116218 = season 2027 game 2701308 (away)"
+      ]
+    },
+    {
+      "participant_id": 3843,
+      "oddspapi_name": "Lukko Rauma",
+      "liiga_team_id": "624554857:lukko",
+      "liiga_team_name": "Lukko",
+      "evidence": [
+        "pinnacle board 2026-09-17: fixture id1500013472116220 = season 2027 game 2701306 (home)"
+      ]
+    },
+    {
+      "participant_id": 3844,
+      "oddspapi_name": "Pelicans Lahti",
+      "liiga_team_id": "875886777:pelicans",
+      "liiga_team_name": "Pelicans",
+      "evidence": [
+        "bet365 board 2026-09-17: fixture id1500013472116224 = season 2027 game 2701309 (away)",
+        "pinnacle board 2026-09-17: fixture id1500013472116224 = season 2027 game 2701309 (away)"
+      ]
+    },
+    {
+      "participant_id": 3845,
+      "oddspapi_name": "SaiPa Lappeenranta",
+      "liiga_team_id": "933686567:saipa",
+      "liiga_team_name": "SaiPa",
+      "evidence": [
+        "bet365 board 2026-09-17: fixture id1500013472116228 = season 2027 game 2701311 (away)",
+        "bet365 board 2026-09-17: fixture id1500013472116240 = season 2027 game 2701315 (home)",
+        "betsson board 2026-09-17: fixture id1500013472116228 = season 2027 game 2701311 (away)",
+        "pinnacle board 2026-09-17: fixture id1500013472116240 = season 2027 game 2701315 (home)"
+      ]
+    },
+    {
+      "participant_id": 3846,
+      "oddspapi_name": "Assat Pori",
+      "liiga_team_id": "679171680:ässät",
+      "liiga_team_name": "Ässät",
+      "evidence": [
+        "bet365 board 2026-09-17: fixture id1500013472116242 = season 2027 game 2701317 (home)",
+        "betsson board 2026-09-17: fixture id1500013472116242 = season 2027 game 2701317 (home)",
+        "pinnacle board 2026-09-17: fixture id1500013472116242 = season 2027 game 2701317 (home)"
+      ]
+    },
+    {
+      "participant_id": 5568,
+      "oddspapi_name": "KalPa Hockey",
+      "liiga_team_id": "859884935:kalpa",
+      "liiga_team_name": "KalPa",
+      "evidence": [
+        "bet365 board 2026-09-17: fixture id1500013472116226 = season 2027 game 2701310 (home)",
+        "pinnacle board 2026-09-17: fixture id1500013472116226 = season 2027 game 2701310 (home)"
+      ]
+    },
+    {
+      "participant_id": 552575,
+      "oddspapi_name": "Kiekko-Espoo",
+      "liiga_team_id": "1368624751:k-espoo",
+      "liiga_team_name": "K-Espoo",
+      "evidence": [
+        "bet365 board 2026-09-17: fixture id1500013472116242 = season 2027 game 2701317 (away)",
+        "betsson board 2026-09-17: fixture id1500013472116242 = season 2027 game 2701317 (away)",
+        "pinnacle board 2026-09-17: fixture id1500013472116242 = season 2027 game 2701317 (away)"
+      ]
+    }
+  ]
+}

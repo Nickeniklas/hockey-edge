@@ -1,5 +1,11 @@
 """Null odds provider -- makes zero HTTP requests, always returns no snapshots.
 
+NOT WIRED since 2026-09-17: job.py runs OddsPapiProvider for real (see
+docs/ODDS_PLAN.md). Kept as the zero-request stand-in for testing the window
+machinery without spending budget. The Phase 1 reasoning below is preserved
+as history but its premise was wrong: /odds-by-tournaments does return prices
+in-season -- the recon simply ran too early in the off-season to see any.
+
 Exists so Phase 2 (fixture discovery, the scheduler, window logic, the
 satisfaction table, api_usage, --dry-run) can ship and run for real against
 this season's live preseason games without wiring a real odds source.

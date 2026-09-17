@@ -1,5 +1,16 @@
 # SNAPSHOT_FINDINGS — Phase 1 recon (2026-08-23)
 
+> **SUPERSEDED IN PART, 2026-09-17.** This document's central OddsPapi
+> conclusion — that `/odds-by-tournaments` carries no prices and that real
+> pricing needs a per-fixture endpoint — was **wrong, for a defensible
+> reason**: it was tested on 2026-08-23, when the board was too early in the
+> off-season to have prices. Re-tested in-season, the same endpoint returned
+> full `bookmakerOdds.<book>.markets` for every posted fixture, and parsing
+> is now implemented against it. The Shape A/B budget analysis below is
+> therefore moot (Shape A — the "docs are right" case — is what's real). The
+> rest of this document (liiga.fi lineups, fixtures, participants) stands.
+> Current odds facts: `docs/ODDS_PLAN.md` and `docs/DATA_PIPELINE.md`.
+
 Recon only. No parsing/capture code written. Read `data/hockey.db`; wrote nothing
 to it. Live liiga.fi calls: read-only, 1.5s delay, normal UA, no writes to
 `sync_state`/`raw_responses` (so as not to touch `data/hockey.db` outside its

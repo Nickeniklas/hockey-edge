@@ -15,7 +15,13 @@ from hockey_edge.snapshot.odds.base import OddsSnapshot
 
 DB_PATH = Path(__file__).resolve().parents[3] / "data" / "snapshots.db"
 
+CAPTURE_KINDS = ("odds", "lineups")
+
 SCHEMA = """
+-- season/game_id are the liiga.fi game this odds row was resolved to at
+-- capture time (NULL = unresolved: unknown participant, or no single
+-- matching discovered fixture). home/away_participant_id and start_utc are
+-- the provider's own view of the fixture, kept so resolution can be redone.
 CREATE TABLE IF NOT EXISTS odds_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     league TEXT NOT NULL,
@@ -27,8 +33,15 @@ CREATE TABLE IF NOT EXISTS odds_snapshots (
     draw_odds REAL,
     away_odds REAL,
     parsed INTEGER NOT NULL,
-    raw_payload TEXT NOT NULL
+    raw_payload TEXT NOT NULL,
+    season INTEGER,
+    game_id INTEGER,
+    home_participant_id INTEGER,
+    away_participant_id INTEGER,
+    start_utc TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_odds_snapshots_game
+    ON odds_snapshots (league, season, game_id);
 
 -- One row per (league, season, game_id, team_role) per capture poll --
 -- append-only, same as odds_snapshots: a later poll writes a fresh row, it
@@ -88,27 +101,32 @@ CREATE TABLE IF NOT EXISTS discovered_fixtures (
 CREATE INDEX IF NOT EXISTS idx_discovered_fixtures_game
     ON discovered_fixtures (league, season, game_id);
 
--- One row per (league, season, game_id, window). 'pending' until either the
--- window is satisfied by a successful capture poll, or the game's start_utc
--- passes with it still unsatisfied, at which point it becomes 'missed' --
--- never left as an absent row. due_at is recomputed from the latest known
--- start_utc on each discovery pass, but only while status='pending' (a
--- resolved window's due_at is a historical fact, not something a later
--- schedule change should rewrite).
+-- One row per (league, season, game_id, kind, window). 'pending' until either
+-- the window is satisfied by a successful capture poll of that kind, or the
+-- game's start_utc passes with it still unsatisfied, at which point it
+-- becomes 'missed' -- never left as an absent row. due_at is recomputed from
+-- the latest known start_utc on each discovery pass, but only while
+-- status='pending' (a resolved window's due_at is a historical fact, not
+-- something a later schedule change should rewrite). `kind` exists because
+-- odds and lineups succeed independently: with one shared status, a
+-- successful odds poll used to mark a window satisfied and hide it from
+-- lineup capture (docs/ODDS_PLAN.md). Rows from before 2026-09-17 are all
+-- kind='lineups' -- odds capture didn't exist when they resolved.
 CREATE TABLE IF NOT EXISTS capture_windows (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     league TEXT NOT NULL DEFAULT 'liiga',
     season INTEGER NOT NULL,
     game_id INTEGER NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('odds', 'lineups')),
     window TEXT NOT NULL CHECK (window IN ('opening', 'mid', 'closing')),
     due_at TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('pending', 'satisfied', 'missed')),
     satisfied_at TEXT,
     missed_recorded_at TEXT,
-    UNIQUE (league, season, game_id, window)
+    UNIQUE (league, season, game_id, kind, window)
 );
 CREATE INDEX IF NOT EXISTS idx_capture_windows_due
-    ON capture_windows (status, due_at);
+    ON capture_windows (kind, status, due_at);
 
 -- Append-only log of every outbound odds-provider HTTP request. outcome
 -- distinguishes hard failure / 200-with-content / 200-but-empty per
@@ -128,9 +146,95 @@ CREATE INDEX IF NOT EXISTS idx_api_usage_provider_time
 """
 
 
+MIGRATION_BACKUP_NAME = "snapshots.pre-kind-migration.db"
+
+_ODDS_SNAPSHOT_NEW_COLUMNS = (
+    ("season", "INTEGER"),
+    ("game_id", "INTEGER"),
+    ("home_participant_id", "INTEGER"),
+    ("away_participant_id", "INTEGER"),
+    ("start_utc", "TEXT"),
+)
+
+
+def _columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    return {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+
+
+def _migrate(conn: sqlite3.Connection, db_path: Path) -> None:
+    """2026-09-17 (docs/ODDS_PLAN.md Phase 2): per-kind capture_windows and
+    odds_snapshots resolution columns. Runs before SCHEMA so SCHEMA's new
+    indexes don't hit old-shape tables. No-op on a fresh or already-migrated
+    DB. Backs the file up first (never overwriting an existing backup: if one
+    exists, an earlier attempt already captured the true pre-migration state),
+    then does everything in one transaction.
+
+    Existing capture_windows rows all become kind='lineups' with ids and
+    statuses kept -- NullOddsProvider never satisfied anything, so every
+    status there is a lineup outcome. Each still-pending window also gets a
+    pending kind='odds' twin; resolved windows get none (no odds capture
+    existed for them)."""
+    cw_cols = _columns(conn, "capture_windows")
+    odds_cols = _columns(conn, "odds_snapshots")
+    needs_cw = bool(cw_cols) and "kind" not in cw_cols
+    missing_odds = [c for c in _ODDS_SNAPSHOT_NEW_COLUMNS if odds_cols and c[0] not in odds_cols]
+    if not needs_cw and not missing_odds:
+        return
+
+    backup_path = db_path.parent / MIGRATION_BACKUP_NAME
+    if not backup_path.exists():
+        backup = sqlite3.connect(backup_path)
+        try:
+            conn.backup(backup)
+        finally:
+            backup.close()
+
+    previous_isolation = conn.isolation_level
+    conn.isolation_level = None
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        for name, sql_type in missing_odds:
+            conn.execute(f"ALTER TABLE odds_snapshots ADD COLUMN {name} {sql_type}")
+        if needs_cw:
+            conn.execute("""
+                CREATE TABLE capture_windows_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    league TEXT NOT NULL DEFAULT 'liiga',
+                    season INTEGER NOT NULL,
+                    game_id INTEGER NOT NULL,
+                    kind TEXT NOT NULL CHECK (kind IN ('odds', 'lineups')),
+                    window TEXT NOT NULL CHECK (window IN ('opening', 'mid', 'closing')),
+                    due_at TEXT NOT NULL,
+                    status TEXT NOT NULL CHECK (status IN ('pending', 'satisfied', 'missed')),
+                    satisfied_at TEXT,
+                    missed_recorded_at TEXT,
+                    UNIQUE (league, season, game_id, kind, window)
+                )""")
+            conn.execute("""
+                INSERT INTO capture_windows_new
+                    (id, league, season, game_id, kind, window, due_at, status,
+                     satisfied_at, missed_recorded_at)
+                SELECT id, league, season, game_id, 'lineups', window, due_at, status,
+                       satisfied_at, missed_recorded_at
+                FROM capture_windows""")
+            conn.execute("""
+                INSERT INTO capture_windows_new (league, season, game_id, kind, window, due_at, status)
+                SELECT league, season, game_id, 'odds', window, due_at, 'pending'
+                FROM capture_windows WHERE status = 'pending'""")
+            conn.execute("DROP TABLE capture_windows")
+            conn.execute("ALTER TABLE capture_windows_new RENAME TO capture_windows")
+        conn.execute("COMMIT")
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.isolation_level = previous_isolation
+
+
 def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
+    _migrate(conn, db_path)
     conn.executescript(SCHEMA)
     return conn
 
@@ -139,7 +243,9 @@ def insert_odds_snapshot(conn: sqlite3.Connection, snapshot: OddsSnapshot) -> No
     conn.execute(
         "INSERT INTO odds_snapshots "
         "(league, book, market, fixture_ref, captured_at, home_odds, draw_odds, "
-        "away_odds, parsed, raw_payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "away_odds, parsed, raw_payload, season, game_id, home_participant_id, "
+        "away_participant_id, start_utc) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             snapshot.league,
             snapshot.book,
@@ -151,6 +257,11 @@ def insert_odds_snapshot(conn: sqlite3.Connection, snapshot: OddsSnapshot) -> No
             snapshot.away_odds,
             int(snapshot.parsed),
             snapshot.raw_payload,
+            snapshot.season,
+            snapshot.game_id,
+            snapshot.home_participant_id,
+            snapshot.away_participant_id,
+            snapshot.start_utc,
         ),
     )
     conn.commit()
@@ -222,30 +333,33 @@ def upsert_capture_window(
     league: str,
     season: int,
     game_id: int,
+    kind: str,
     window: str,
     due_at: str,
 ) -> None:
-    """Ensure a (league, season, game_id, window) row exists with this due_at.
-    Only rewrites due_at while the window is still 'pending' -- a window that
-    has already resolved (satisfied/missed) keeps the due_at that was true
-    when it resolved, even if a later discovery poll sees a changed
+    """Ensure a (league, season, game_id, kind, window) row exists with this
+    due_at. Only rewrites due_at while the window is still 'pending' -- a
+    window that has already resolved (satisfied/missed) keeps the due_at that
+    was true when it resolved, even if a later discovery poll sees a changed
     start_utc."""
     conn.execute(
-        "INSERT INTO capture_windows (league, season, game_id, window, due_at, status) "
-        "VALUES (?, ?, ?, ?, ?, 'pending') "
-        "ON CONFLICT (league, season, game_id, window) DO UPDATE SET "
+        "INSERT INTO capture_windows (league, season, game_id, kind, window, due_at, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, 'pending') "
+        "ON CONFLICT (league, season, game_id, kind, window) DO UPDATE SET "
         "due_at = excluded.due_at WHERE capture_windows.status = 'pending'",
-        (league, season, game_id, window, due_at),
+        (league, season, game_id, kind, window, due_at),
     )
     conn.commit()
 
 
 def get_due_windows(
-    conn: sqlite3.Connection, *, now_iso: str, league: str = "liiga"
+    conn: sqlite3.Connection, *, kind: str, now_iso: str, league: str = "liiga"
 ) -> list[sqlite3.Row]:
-    """Windows that are due, still unsatisfied, and whose game has not yet
-    started -- never a timestamp-proximity match. Joins against the latest
-    known start_utc per (season, game_id) from discovered_fixtures."""
+    """Windows of one capture kind that are due, still unsatisfied, and whose
+    game has not yet started -- never a timestamp-proximity match. Joins
+    against the latest known start_utc per (season, game_id) from
+    discovered_fixtures. `kind` is required so no caller can see (and
+    satisfy) another kind's windows."""
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         """
@@ -258,12 +372,13 @@ def get_due_windows(
             GROUP BY season, game_id
         ) latest ON latest.season = cw.season AND latest.game_id = cw.game_id
         WHERE cw.league = ?
+          AND cw.kind = ?
           AND cw.status = 'pending'
           AND cw.due_at <= ?
           AND latest.start_utc > ?
         ORDER BY cw.due_at
         """,
-        (league, league, now_iso, now_iso),
+        (league, league, kind, now_iso, now_iso),
     ).fetchall()
     return rows
 
@@ -313,6 +428,29 @@ def mark_windows_satisfied(
     conn.commit()
 
 
+def find_liiga_games(
+    conn: sqlite3.Connection, *, home_team_id: str, away_team_id: str, league: str = "liiga"
+) -> list[sqlite3.Row]:
+    """Latest discovered_fixtures row per (season, game_id) whose liiga.fi
+    home/away teamId match exactly. teamId is read from raw_payload rather
+    than the home_team/away_team display-name columns: it's liiga.fi's stable
+    key. The caller narrows by start time."""
+    conn.row_factory = sqlite3.Row
+    return conn.execute(
+        """
+        SELECT df.season, df.game_id, df.start_utc
+        FROM discovered_fixtures df
+        JOIN (
+            SELECT MAX(id) AS id FROM discovered_fixtures
+            WHERE league = ? GROUP BY season, game_id
+        ) latest ON latest.id = df.id
+        WHERE json_extract(df.raw_payload, '$.homeTeam.teamId') = ?
+          AND json_extract(df.raw_payload, '$.awayTeam.teamId') = ?
+        """,
+        (league, home_team_id, away_team_id),
+    ).fetchall()
+
+
 def insert_api_usage(
     conn: sqlite3.Connection,
     *,
@@ -328,6 +466,21 @@ def insert_api_usage(
         (provider, endpoint, requested_at, http_status, outcome),
     )
     conn.commit()
+
+
+def last_successful_odds_poll(
+    conn: sqlite3.Connection, *, provider: str, endpoint: str = "odds-by-tournaments"
+) -> str | None:
+    """requested_at of the most recent poll that actually reached the board
+    (content or empty), or None. A failed request is not an attempt: it tells
+    us nothing about whether a fixture is posted, so it must not hold off a
+    retry."""
+    row = conn.execute(
+        "SELECT MAX(requested_at) FROM api_usage WHERE provider = ? AND endpoint = ? "
+        "AND outcome IN ('success_content', 'success_empty')",
+        (provider, endpoint),
+    ).fetchone()
+    return row[0]
 
 
 def count_api_usage_this_month(

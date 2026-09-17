@@ -112,8 +112,15 @@ odds (OddsPapi /    │
 - **OddsPapi billing confirmed (2026-07-12)**: per HTTP request, verified against
   the dashboard usage counter (9/250 used across all manual tests + the probe
   script) — see `docs/DATA_PIPELINE.md` for detail, including Liiga's
-  tournamentId (134). Liiga book depth / how early lines post still can only be
-  verified in-season. Veikkaus scrape fallback stays in reserve either way.
+  tournamentId (134). **Resolved in-season 2026-09-17**: Liiga book depth is
+  fine (213 bookmakers carry the league; pinnacle + bet365 are polled, both
+  clean), lines post ~2.5 days ahead, and odds capture is live — see
+  `docs/ODDS_PLAN.md`. Two corrections to the budget model: `bookmaker` is
+  single-valued, so a poll costs **one request per book**, and OddsPapi
+  rate-limits bursts separately from the monthly quota (two calls ~1s apart
+  got the second one 429'd). **Veikkaus is not among OddsPapi's bookmakers**,
+  so the scrape fallback remains the only route to the book actually bettable
+  in Finland — still in reserve, still unbuilt.
 - **Snapshot job scheduler decided 2026-08-24**: Windows Task Scheduler on the
   main desktop, not an always-on host — deliberate for preseason, since a
   missed capture now costs nothing. See `CLAUDE.md` Gotchas for the

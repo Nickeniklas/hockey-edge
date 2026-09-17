@@ -91,10 +91,28 @@ Captures, per upcoming game, polled at increasing frequency as puck drop approac
        request during a multi-game Liiga night captures odds for every game that
        night at once. This makes 250 req/mo far less tight than the per-game
        framing suggests; see the request-pattern note below.
-     - **Open tripwire**: odds snapshots are written with `parsed=False` until
-       the first real Liiga fixtures with odds appear — at that point, confirm
-       the market/outcome shape against a live payload and implement parsing in
-       `OddsPapiProvider` (currently a TODO in `snapshot/odds/oddspapi.py`).
+     - **RESOLVED 2026-09-17 — `/odds-by-tournaments` does carry prices
+       in-season, and parsing is implemented.** The 2026-08-23 conclusion that
+       the endpoint returns fixture metadata only (no `bookmakerOdds`) was the
+       board being too early in the off-season, not a limit of the endpoint:
+       an in-season call returned every posted fixture with a full
+       `bookmakerOdds.<book>.markets` block. `bookmaker` is required and takes
+       exactly one book, so a poll costs one request *per book*. Prices live at
+       `markets.<marketId>.outcomes.<outcomeId>.players["0"].price` (decimal).
+       Market `153` = 3-way regulation 1X2 (outcomes 153/154/155 =
+       home/draw/away), market `151` = 2-way moneyline incl. OT (151/152 =
+       home/away); `participant1Id` is the home side. `OddsPapiProvider` now
+       parses both into `odds_snapshots`, keeping the full per-fixture JSON in
+       `raw_payload` either way — see `docs/ODDS_PLAN.md` for the checks a row
+       must pass to count as parsed, and the books compared (pinnacle +
+       bet365 in use; betsson and coolbet failed, paf/unibet look mismapped).
+     - **Join key**: `GET /v4/participants?sportId=15` resolves participant ids
+       to names, but names are not unique (2–3 ids per Finnish club), so the
+       job does not string-match. `snapshot/odds/oddspapi_teams.json` is a
+       curated participant id → liiga.fi `teamId` map, each entry backed by a
+       saved board fixture that matched exactly one real game; an unmapped
+       participant leaves the row unresolved with a WARNING rather than
+       guessing.
    - Multiple captures per game give open→close movement; if budget forces
      rationing, the **last capture before puck drop (≈ closing line) is the one
      non-negotiable poll** — it's the validation benchmark (Pinnacle preferred,
@@ -143,9 +161,23 @@ Guideline shapes — final DDL decided in implementation, but keep these separat
   goalie_confirmed?, payload) — superseded, and `goalie_confirmed` in
   particular was a boolean that would have hidden exactly the provenance the
   shipped columns expose.
-- `odds_snapshots` (game_id, book, market, captured_at, home_odds, away_odds, draw_odds)
-  — Liiga/European books price regulation 1X2 three-way; NHL moneyline is two-way
-  incl. OT. Store market type explicitly.
+- `odds_snapshots` (league, book, market, fixture_ref, captured_at, home_odds,
+  draw_odds, away_odds, parsed, raw_payload, season, game_id,
+  home/away_participant_id, start_utc) — append-only, as shipped 2026-09-17.
+  Liiga/European books price regulation 1X2 three-way (`market='1x2_regulation'`);
+  NHL moneyline is two-way incl. OT (`'moneyline_incl_ot'`, draw NULL) — market
+  type is always explicit. Notes on the columns beyond the original guideline
+  shape: `raw_payload` keeps the provider's full per-fixture JSON so parsing can
+  be redone without refetching, and `parsed` says whether the price columns can
+  be trusted (a row failing any check is stored unparsed rather than dropped).
+  `season`/`game_id` are the resolved liiga.fi game and are **nullable on
+  purpose** — a fixture that doesn't match exactly one discovered game stays
+  unresolved rather than being guessed at, and the provider's own
+  `participant_id`s/`start_utc` are kept so resolution can be redone later.
+- `capture_windows` (league, season, game_id, **kind**, window, due_at, status,
+  …) — job bookkeeping, not observational data, so it is updated in place.
+  `kind` is 'odds' or 'lineups': the two capture independently, and one shared
+  status let a successful odds poll hide a window from lineup capture.
 - `sync_state` (see above)
 - `raw_responses` (url, fetched_at, content_hash, file_path) — metadata only; body
   lives under `data/raw/`

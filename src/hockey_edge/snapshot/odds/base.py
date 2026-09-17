@@ -31,6 +31,13 @@ class OddsSnapshot:
     draw_odds: float | None = None
     away_odds: float | None = None
     parsed: bool = False
+    # The provider's own view of the fixture (filled by the provider) ...
+    home_participant_id: int | None = None
+    away_participant_id: int | None = None
+    start_utc: str | None = None
+    # ... and the liiga.fi game it resolved to (filled by job.py, None if unresolved).
+    season: int | None = None
+    game_id: int | None = None
 
 
 class OddsProvider(ABC):

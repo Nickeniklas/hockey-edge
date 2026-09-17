@@ -22,14 +22,21 @@ actually bettable in Finland) · odds capture behind a swappable provider
 interface (scaffolded in `src/hockey_edge/snapshot/odds/`) · Elo baseline +
 LightGBM blend · local compute only.
 
-**Re-opened, not still decided, as of 2026-08-25: which odds provider is
-primary for the live snapshot job.** OddsPapi's per-request billing and
-tournament id are still correct facts above, but whether `/odds-by-
-tournaments` actually returns usable prices at all is now in doubt (see the
-Gotchas entry on this) — `job.py` currently runs `NullOddsProvider`, not
-`OddsPapiProvider`. Don't treat "Liiga via OddsPapi" as settled until that's
-resolved; this is the user's call to make, not something to re-decide
-unilaterally either way.
+**Settled again 2026-09-17: OddsPapi is primary for Liiga, polling
+`pinnacle` + `bet365`.** The 2026-08-25 doubt — whether `/odds-by-tournaments`
+returns usable prices at all — is resolved: it does, in-season; August's
+metadata-only response was the board being too early, not the endpoint. The
+budget math this design rested on therefore holds, with one correction: the
+`bookmaker` param is single-valued, so a poll costs **one request per book**,
+not one per tick. `job.py` runs `OddsPapiProvider` (no longer
+`NullOddsProvider`). See `docs/ODDS_PLAN.md`.
+
+Tests (added 2026-09-17): `tests/`, **stdlib `unittest`, no pytest** — run
+`python -m unittest discover -s tests`. New tests go in `tests/test_*.py`.
+They assert against **real saved API responses** (`fixtures/oddspapi/`,
+`fixtures/liiga/`), never invented payloads, and make zero HTTP requests; a
+test needing a DB builds a temp one via `storage.get_connection(tmp_path)`
+and never touches `data/*.db`.
 
 Tooling (decided session 1): plain venv + requirements.txt (no uv/poetry) ·
 src/hockey_edge/ package layout · raw JSON cached as files under data/raw/
@@ -63,12 +70,51 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 1. Liiga ingest (endpoint discovery → schema → ~10-season backfill, resumable)
    — **done** for 2015–2027; live season kept current by `scripts/nightly_sync.py`
 2. Snapshot capture job (lineups/goalies/odds) — deploy EARLY; missed data is gone forever
-   — **deployed 2026-09-02**; lineups capturing, odds still `NullOddsProvider`
+   — **deployed 2026-09-02**; lineups capturing, **odds capturing for real since
+   2026-09-17** (OddsPapi, pinnacle + bet365)
 3. NHL ingest
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-09-17)
+
+**Liiga odds capture is live.** Plan and per-phase record: `docs/ODDS_PLAN.md`.
+Phases 0–3 done; Phase 4 (watch a full game night) is the only open item.
+
+- **`/odds-by-tournaments` does carry prices in-season** — the 2026-08-23
+  "metadata only" finding was the off-season board being too early, not the
+  endpoint. `docs/SNAPSHOT_FINDINGS.md` now carries a superseded banner; its
+  Shape A/B budget analysis is moot.
+- **Books: `pinnacle` (primary) + `bet365`.** Phase 0 spent exactly 2 requests
+  comparing candidates: bet365 clean on every board fixture (overround
+  1.059–1.079), **betsson rejected** (2 fixtures, one with no odds, one
+  suspended). Boards for all three are in `fixtures/oddspapi/`. A window is
+  satisfied only for a game **pinnacle** priced and that resolved to a
+  liiga.fi game; an unposted game stays pending.
+- **`capture_windows` now has a `kind` column** ('odds'/'lineups') — a shared
+  status meant a successful odds poll would have silently stopped lineup
+  capture. Migration ran on `data/snapshots.db` (backup:
+  `data/snapshots.pre-kind-migration.db`); all 117 pre-existing rows are
+  lineup rows, unchanged. `get_due_windows` requires `kind=`.
+- **`odds_snapshots` gained `season`/`game_id`/participant ids/`start_utc`.**
+  Games are matched by liiga.fi home+away `teamId` (read from
+  `discovered_fixtures.raw_payload`) plus a start within 24h, and only when
+  exactly one game matches — never guessed. The map is curated in
+  `snapshot/odds/oddspapi_teams.json`: **16 of 17 teams**, each entry backed
+  by a real board fixture. **HPK (3837?) is deliberately unmapped** until it
+  appears on a board — OddsPapi lists 2–3 ids per Finnish club name, so a
+  guess could map a junior/women's side.
+- **First live capture (2026-09-17 21:30 local): 6 fixtures, 12 rows, all
+  parsed**, 4 resolved (the 2 unresolved were HIFK/Kärpät, mapped right after
+  from those very payloads; their already-written rows keep `game_id` NULL —
+  the table is append-only).
+- **Tests exist now: `tests/`, 29 of them, stdlib unittest, no new dependency.**
+  Run `python -m unittest discover -s tests`. They run against the saved real
+  board responses.
+- **Open**: HPK's participant id; a full game night watched end to end; the
+  `docs/RECOVERY_BACKLOG.md` 1,164-game recovery (untouched, unrelated).
 
 ## Status (as of 2026-09-02)
 
@@ -563,18 +609,31 @@ below) are explicitly deferred, not done. What did ship:
   with no fixtures currently posted, not `HTTP 200` with `[]` — the snapshot job
   handles this explicitly as "no odds yet," not a failure; don't reintroduce a
   bare `raise_for_status()` that would misclassify it.
-- **`GET /v4/odds-by-tournaments` does not carry price/market data** —
-  confirmed live 2026-08-23 (2 separate calls, `fixtures/oddspapi/`): a
-  fixture with `hasOdds: true` still has no `bookmakerOdds` key at all, only
-  metadata (participant ids, tournament id, `startTime`). This contradicts
-  OddsPapi's own published docs, which describe a full `bookmakerOdds`/
-  `markets`/`outcomes` block on that same endpoint — unresolved which is
-  right; not re-tested with a real fixture board yet. Real per-fixture
-  pricing likely needs `GET /v4/odds` (confirmed single-`fixtureId`-only, no
-  bulk form) — see `docs/SNAPSHOT_FINDINGS.md`'s Shape A/B cost analysis
-  before assuming the original "one poll/night covers everything" budget
-  math still holds. This is why `OddsPapiProvider` is built but not wired
-  into `job.py` — see the 2026-08-25 Status entry.
+- **`GET /v4/odds-by-tournaments` DOES carry prices — when the board is
+  in-season.** Corrects the 2026-08-23 entry that said it never does (that
+  test ran in the off-season, weeks before any book had posted a price; the
+  `hasOdds: true`-but-no-`bookmakerOdds` shape is what an early board looks
+  like). Live 2026-09-17: every posted fixture came back with a full
+  `bookmakerOdds.<book>.markets` block. **`bookmaker` is required and takes
+  one book per request**, so cost scales with books, not fixtures. `GET
+  /v4/odds` (per-fixture, all 213 bookmakers, 11.6 MB) is not for polling,
+  and **Veikkaus is not among those bookmakers**.
+- **OddsPapi rate-limits bursts separately from the monthly quota: two
+  back-to-back board calls got the second one HTTP 429** (first live run,
+  2026-09-17 21:30 — pinnacle 200, bet365 429). A 429 still bills as a
+  request and returns nothing, so it's a lost capture *and* spent budget.
+  `job.py` sleeps `ODDS_BOOK_DELAY_SECONDS` between books; don't remove that
+  spacing, and don't add a blind retry (a retry is another billed request).
+- **Odds market/outcome ids (ice hockey, both books checked):** market `153`
+  = 3-way regulation 1X2 with outcomes `153`/`154`/`155` = home/draw/away;
+  market `151` = 2-way moneyline incl. OT with `151`/`152` = home/away;
+  price at `...outcomes.<oid>.players["0"].price` (decimal). `participant1Id`
+  is home. Pinnacle labels outcomes literally `home`/`draw`/`away`; bet365's
+  labels are opaque numbers, so its mapping rests on the shared outcome ids
+  plus favourite direction — the parser rejects any row whose text label
+  contradicts its slot. OddsPapi participant names are **not unique** (2–3
+  ids per Finnish club), so never string-match teams: use the curated
+  `snapshot/odds/oddspapi_teams.json`.
 - `GET /v4/participants?sportId=<id>` resolves OddsPapi's bare numeric
   participant ids (e.g. `3836`) to team names in one call, no
   fixture/tournament scoping, cacheable for a season — solves half of the
