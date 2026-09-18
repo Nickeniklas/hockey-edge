@@ -78,6 +78,38 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 6. LightGBM + blend
 7. Prediction log + local dashboard
 
+## Status (as of 2026-09-18)
+
+Odds capture has now run live through one evening and one morning. **Phase 4
+(a full game night end to end) is still open**: 2026-09-18 is the first, with
+3 games (18:30/19:30 local, closing windows 18:05/19:05).
+
+- **Both books have returned 200 on every poll since the 20 s book spacing
+  went in** (22:30, and 11:00 the next day). The 429 was the burst, not
+  bet365.
+- **The retry gap works live**: the 22:45 and 23:00 ticks held off a
+  still-unposted game without spending a request.
+- **Books post independently, and Pinnacle can be late**: Pinnacle listed no
+  KooKoo–SaiPa on either 2026-09-17 poll while bet365 did, then posted it at
+  11:00 the next day. Hence the any-book satisfaction change
+  (`capture_windows.satisfied_by`); that window ended up `pinnacle,bet365`.
+- **Pinnacle can mark its whole book inactive on a fixture**
+  (`bookmakerIsActive: false`, prices still present): 5 of 8 fixtures at the
+  11:00 poll. Those rows are stored unparsed with the reason logged and the
+  raw payload kept — deliberate, since an inactive book's prices aren't live.
+  Expect ~10 WARNING lines per poll when it happens; bet365 still satisfies
+  the window. Not yet known whether it's time-of-day, pre-lineup, or random —
+  tonight's closing windows are the thing to check.
+- **All 17 teams mapped** (HPK 3837 appeared on the 22:30 board).
+- **Two request counts — don't conflate them.** `api_usage` (the job's own
+  ceiling counter) read 6 at noon on 2026-09-18. The OddsPapi account had
+  ~11 for September: 3 planning recon + 2 Phase 0 + 6 job. The 50 between
+  the job's 200 ceiling and the 250 tier is what absorbs manual calls.
+- **Next**: check tonight's `odds capture:` log lines (satisfied, not
+  MISSED) and how often Pinnacle comes back inactive near puck drop. Then
+  the build order resumes at step 3 (NHL ingest) or step 4 (feature store);
+  `docs/RECOVERY_BACKLOG.md` is still unrun.
+
 ## Status (as of 2026-09-17)
 
 **Liiga odds capture is live.** Plan and per-phase record: `docs/ODDS_PLAN.md`.
@@ -94,9 +126,10 @@ Phases 0–3 done; Phase 4 (watch a full game night) is the only open item.
   satisfied when **any** book priced the game and it resolved to a liiga.fi
   game, and `capture_windows.satisfied_by` records which (`pinnacle,bet365`,
   or `bet365` alone). Changed 2026-09-18 from pinnacle-only: books post
-  fixtures independently, and Pinnacle simply never listed KooKoo–SaiPa while
-  bet365 did — pinnacle-only would have recorded a game we had good odds for
-  as missed. A bet365-only capture logs a WARNING, since it lacks the
+  fixtures independently, and Pinnacle had no KooKoo–SaiPa on the
+  2026-09-17 polls while bet365 did (it posted it only the next morning) —
+  pinnacle-only would record a game we had good odds for as missed whenever
+  Pinnacle posts late or never. A bet365-only capture logs a WARNING, since it lacks the
   benchmark line. A game on no board stays pending.
 - **`capture_windows` now has a `kind` column** ('odds'/'lineups') — a shared
   status meant a successful odds poll would have silently stopped lineup
@@ -630,8 +663,15 @@ below) are explicitly deferred, not done. What did ship:
   back-to-back board calls got the second one HTTP 429** (first live run,
   2026-09-17 21:30 — pinnacle 200, bet365 429). A 429 still bills as a
   request and returns nothing, so it's a lost capture *and* spent budget.
-  `job.py` sleeps `ODDS_BOOK_DELAY_SECONDS` between books; don't remove that
-  spacing, and don't add a blind retry (a retry is another billed request).
+  `job.py` sleeps `ODDS_BOOK_DELAY_SECONDS` (20 s) between books; don't
+  remove that spacing, and don't add a blind retry (a retry is another billed
+  request). Verified: every poll since the spacing went in returned 200 on
+  both books.
+- **A parsed odds row needs `bookmakerIsActive: true`, and Pinnacle turns it
+  off per fixture** (5 of 8 fixtures on 2026-09-18 11:00, prices still in the
+  payload). Those rows land `parsed=0` with the payload kept, so a later
+  reparse can decide differently if inactive prices turn out to matter. Not
+  a failure; the other book normally covers the window.
 - **Odds market/outcome ids (ice hockey, both books checked):** market `153`
   = 3-way regulation 1X2 with outcomes `153`/`154`/`155` = home/draw/away;
   market `151` = 2-way moneyline incl. OT with `151`/`152` = home/away;

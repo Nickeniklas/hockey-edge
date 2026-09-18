@@ -1,7 +1,11 @@
 # ODDS_PLAN — Liiga odds capture via OddsPapi (drafted 2026-09-17)
 
-> **Status 2026-09-17: Phases 0–3 built; Phase 4 (watch a live game night) is
-> the only one open.** Phase 0 spent exactly 2 requests: **bet365 passed and is
+> **Status 2026-09-18: Phases 0–3 built; Phase 4 (watch a live game night) is
+> the only one open** — first full game night is 2026-09-18. Live so far:
+> every poll 200 on both books since the 20 s spacing, retry gap working,
+> 0 odds windows missed. See CLAUDE.md's 2026-09-18 Status entry.
+>
+> **Record from 2026-09-17:** Phase 0 spent exactly 2 requests: **bet365 passed and is
 > the second book** (all 5 board fixtures had market 153 with 3 active prices,
 > overround 1.059–1.079, home/away and start matching `hockey.db`); **betsson
 > failed** (2 fixtures only, one with no odds at all, the other suspended with
@@ -14,10 +18,10 @@
 > mapped from the first board it appeared on, never from the participants
 > list. Phase 3 wired `OddsPapiProvider` into
 > `job.py` for `["pinnacle", "bet365"]`. Tests: `python -m unittest discover
-> -s tests` (27).
+> -s tests` (31 as of 2026-09-18).
 >
 > **One addition to Phase 3 not in the original plan: `ODDS_RETRY_GAP`.** A
-> window is only satisfied when the primary book prices its game, so an
+> window stays pending until a book prices its game, so an
 > unposted fixture would otherwise be re-polled every 15 min from T-24h to
 > puck drop (~80 requests on one game). A due window whose fixture was already
 > looked for by a successful poll less than 60 min ago is skipped; **closing
@@ -28,9 +32,10 @@
 >
 > **Changed 2026-09-18: a window is satisfied by ANY book, not Pinnacle
 > only.** Phase 3 as written satisfied a window only on a Pinnacle price. The
-> first live evening showed why that's wrong: Pinnacle never listed
-> KooKoo–SaiPa (2026-09-18) while bet365 did, so pinnacle-only would have
-> recorded a game we held good odds for as missed. Now either book satisfies
+> first live evening showed why that's wrong: Pinnacle had no
+> KooKoo–SaiPa (2026-09-18) on either 2026-09-17 poll while bet365 did — it
+> only posted it at 11:00 the next day — so pinnacle-only would have left a
+> game we held good odds for pending, and missed had Pinnacle never posted. Now either book satisfies
 > it, `capture_windows.satisfied_by` records which (`pinnacle,bet365` or
 > `bet365`), and a fallback-only capture logs a WARNING because it lacks the
 > benchmark line. The `ODDS_RETRY_GAP` rationale above still holds for a game
