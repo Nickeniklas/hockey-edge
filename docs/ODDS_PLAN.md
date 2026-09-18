@@ -25,6 +25,16 @@
 > non-negotiable capture. This needed no extra schema: a board poll covers
 > every posted fixture, so `api_usage.requested_at` at or after a window's
 > `due_at` already records an attempt on it.
+>
+> **Changed 2026-09-18: a window is satisfied by ANY book, not Pinnacle
+> only.** Phase 3 as written satisfied a window only on a Pinnacle price. The
+> first live evening showed why that's wrong: Pinnacle never listed
+> KooKoo–SaiPa (2026-09-18) while bet365 did, so pinnacle-only would have
+> recorded a game we held good odds for as missed. Now either book satisfies
+> it, `capture_windows.satisfied_by` records which (`pinnacle,bet365` or
+> `bet365`), and a fallback-only capture logs a WARNING because it lacks the
+> benchmark line. The `ODDS_RETRY_GAP` rationale above still holds for a game
+> on no board at all.
 
 Implementation plan for replacing `NullOddsProvider` with real Liiga odds.
 Liiga only — NHL (The Odds API) is a separate, later session.

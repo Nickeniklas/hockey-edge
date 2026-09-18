@@ -77,6 +77,7 @@ class MigrationTest(TempDbTest):
             (3, 2, "lineups", "mid", "pending", None, None),
             (4, 2, "odds", "mid", "pending", None, None),
         ])
+        self.assertIn("satisfied_by", {r[1] for r in conn.execute("PRAGMA table_info(capture_windows)")})
         odds_cols = {r[1] for r in conn.execute("PRAGMA table_info(odds_snapshots)")}
         self.assertLessEqual({"season", "game_id", "home_participant_id", "away_participant_id", "start_utc"}, odds_cols)
         self.assertTrue((self.db_path.parent / storage.MIGRATION_BACKUP_NAME).exists())
@@ -85,6 +86,30 @@ class MigrationTest(TempDbTest):
         # Idempotent: a second connection changes nothing.
         conn = storage.get_connection(self.db_path)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM capture_windows").fetchone()[0], 4)
+        conn.close()
+
+    def test_adds_satisfied_by_to_kind_migrated_db(self):
+        """The live DB's shape on 2026-09-18: kind already migrated, no
+        satisfied_by. Column is added in place; rows untouched; no backup."""
+        conn = sqlite3.connect(self.db_path)
+        conn.executescript(OLD_SCHEMA.replace(
+            "    window TEXT NOT NULL", "    kind TEXT NOT NULL,\n    window TEXT NOT NULL"
+        ).replace("UNIQUE (league, season, game_id, window)", "UNIQUE (league, season, game_id, kind, window)"))
+        for name, sql_type in storage._ODDS_SNAPSHOT_NEW_COLUMNS:
+            conn.execute(f"ALTER TABLE odds_snapshots ADD COLUMN {name} {sql_type}")
+        conn.execute(
+            "INSERT INTO capture_windows (season, game_id, kind, window, due_at, status, satisfied_at) "
+            "VALUES (2027, 1, 'odds', 'opening', '2026-09-17T15:30:00Z', 'satisfied', '2026-09-17T18:30:14Z')"
+        )
+        conn.commit()
+        conn.close()
+
+        conn = storage.get_connection(self.db_path)
+        self.assertEqual(
+            conn.execute("SELECT kind, status, satisfied_at, satisfied_by FROM capture_windows").fetchall(),
+            [("odds", "satisfied", "2026-09-17T18:30:14Z", None)],
+        )
+        self.assertFalse((self.db_path.parent / storage.MIGRATION_BACKUP_NAME).exists())
         conn.close()
 
     def test_fresh_db_needs_no_migration(self):

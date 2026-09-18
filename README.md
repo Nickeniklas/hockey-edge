@@ -89,8 +89,10 @@ can be redone without refetching. A fixture is tied to its liiga.fi game via
 the curated `snapshot/odds/oddspapi_teams.json` (OddsPapi team names are not
 unique) plus an exact home/away/start match — never a guess; an unmatched
 fixture is stored unresolved with a WARNING. An odds window counts as
-captured only for a game the primary book actually priced. Plan, per-phase
-record and the bookmaker comparison: **`docs/ODDS_PLAN.md`**.
+captured when any polled book priced the game, and the window records which
+books did — Pinnacle sometimes doesn't list a game bet365 does, and such a
+capture is kept but flagged, since it lacks the Pinnacle benchmark line.
+Plan, per-phase record and the bookmaker comparison: **`docs/ODDS_PLAN.md`**.
 
 ```
 python -m hockey_edge.snapshot.job --once       # normal pass

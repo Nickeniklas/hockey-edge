@@ -112,6 +112,12 @@ CREATE INDEX IF NOT EXISTS idx_discovered_fixtures_game
 -- successful odds poll used to mark a window satisfied and hide it from
 -- lineup capture (docs/ODDS_PLAN.md). Rows from before 2026-09-17 are all
 -- kind='lineups' -- odds capture didn't exist when they resolved.
+-- satisfied_by (odds only, added 2026-09-18): comma-joined books that priced
+-- the game on the poll that satisfied the window, in ODDS_BOOKS order, e.g.
+-- 'pinnacle,bet365' or 'bet365'. A window is satisfied by ANY book, so this
+-- is what tells a benchmark (pinnacle) capture from a fallback one. NULL on
+-- lineup rows, and on the two odds windows satisfied before it existed
+-- (both pinnacle-only by construction then).
 CREATE TABLE IF NOT EXISTS capture_windows (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     league TEXT NOT NULL DEFAULT 'liiga',
@@ -123,6 +129,7 @@ CREATE TABLE IF NOT EXISTS capture_windows (
     status TEXT NOT NULL CHECK (status IN ('pending', 'satisfied', 'missed')),
     satisfied_at TEXT,
     missed_recorded_at TEXT,
+    satisfied_by TEXT,
     UNIQUE (league, season, game_id, kind, window)
 );
 CREATE INDEX IF NOT EXISTS idx_capture_windows_due
@@ -173,16 +180,22 @@ def _migrate(conn: sqlite3.Connection, db_path: Path) -> None:
     statuses kept -- NullOddsProvider never satisfied anything, so every
     status there is a lineup outcome. Each still-pending window also gets a
     pending kind='odds' twin; resolved windows get none (no odds capture
-    existed for them)."""
+    existed for them).
+
+    2026-09-18: capture_windows.satisfied_by, a nullable column added with
+    ALTER TABLE -- no rebuild, no existing row touched, so no backup is taken
+    when it is the only change (the structural 2026-09-17 migration above is
+    what the backup guards)."""
     cw_cols = _columns(conn, "capture_windows")
     odds_cols = _columns(conn, "odds_snapshots")
     needs_cw = bool(cw_cols) and "kind" not in cw_cols
+    needs_satisfied_by = bool(cw_cols) and "satisfied_by" not in cw_cols
     missing_odds = [c for c in _ODDS_SNAPSHOT_NEW_COLUMNS if odds_cols and c[0] not in odds_cols]
-    if not needs_cw and not missing_odds:
+    if not needs_cw and not missing_odds and not needs_satisfied_by:
         return
 
     backup_path = db_path.parent / MIGRATION_BACKUP_NAME
-    if not backup_path.exists():
+    if (needs_cw or missing_odds) and not backup_path.exists():
         backup = sqlite3.connect(backup_path)
         try:
             conn.backup(backup)
@@ -223,6 +236,8 @@ def _migrate(conn: sqlite3.Connection, db_path: Path) -> None:
                 FROM capture_windows WHERE status = 'pending'""")
             conn.execute("DROP TABLE capture_windows")
             conn.execute("ALTER TABLE capture_windows_new RENAME TO capture_windows")
+        if needs_satisfied_by:
+            conn.execute("ALTER TABLE capture_windows ADD COLUMN satisfied_by TEXT")
         conn.execute("COMMIT")
     except BaseException:
         conn.execute("ROLLBACK")
@@ -417,13 +432,17 @@ def mark_missed_windows(
 
 
 def mark_windows_satisfied(
-    conn: sqlite3.Connection, window_ids: list[int], *, now_iso: str
+    conn: sqlite3.Connection,
+    window_ids: list[int],
+    *,
+    now_iso: str,
+    satisfied_by: str | None = None,
 ) -> None:
     for window_id in window_ids:
         conn.execute(
-            "UPDATE capture_windows SET status = 'satisfied', satisfied_at = ? "
+            "UPDATE capture_windows SET status = 'satisfied', satisfied_at = ?, satisfied_by = ? "
             "WHERE id = ? AND status = 'pending'",
-            (now_iso, window_id),
+            (now_iso, satisfied_by, window_id),
         )
     conn.commit()
 

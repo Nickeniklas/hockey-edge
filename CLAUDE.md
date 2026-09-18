@@ -91,8 +91,13 @@ Phases 0–3 done; Phase 4 (watch a full game night) is the only open item.
   comparing candidates: bet365 clean on every board fixture (overround
   1.059–1.079), **betsson rejected** (2 fixtures, one with no odds, one
   suspended). Boards for all three are in `fixtures/oddspapi/`. A window is
-  satisfied only for a game **pinnacle** priced and that resolved to a
-  liiga.fi game; an unposted game stays pending.
+  satisfied when **any** book priced the game and it resolved to a liiga.fi
+  game, and `capture_windows.satisfied_by` records which (`pinnacle,bet365`,
+  or `bet365` alone). Changed 2026-09-18 from pinnacle-only: books post
+  fixtures independently, and Pinnacle simply never listed KooKoo–SaiPa while
+  bet365 did — pinnacle-only would have recorded a game we had good odds for
+  as missed. A bet365-only capture logs a WARNING, since it lacks the
+  benchmark line. A game on no board stays pending.
 - **`capture_windows` now has a `kind` column** ('odds'/'lineups') — a shared
   status meant a successful odds poll would have silently stopped lineup
   capture. Migration ran on `data/snapshots.db` (backup:
@@ -113,7 +118,7 @@ Phases 0–3 done; Phase 4 (watch a full game night) is the only open item.
   parsed**, 4 resolved (the 2 unresolved were HIFK/Kärpät, mapped right after
   from those very payloads; their already-written rows keep `game_id` NULL —
   the table is append-only).
-- **Tests exist now: `tests/`, 29 of them, stdlib unittest, no new dependency.**
+- **Tests exist now: `tests/`, 31 of them, stdlib unittest, no new dependency.**
   Run `python -m unittest discover -s tests`. They run against the saved real
   board responses.
 - **Open**: a full game night watched end to end; the

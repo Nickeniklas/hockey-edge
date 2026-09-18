@@ -30,13 +30,16 @@ those windows satisfied this pass.
 
 Odds capture runs OddsPapiProvider against ODDS_BOOKS (wired 2026-09-17,
 docs/ODDS_PLAN.md — it replaced NullOddsProvider, which is kept in
-odds/null_provider.py as the zero-request stand-in). An odds window is only
-satisfied for a game that PRIMARY_ODDS_BOOK actually priced and that resolved
-to a liiga.fi game; a game absent from the board stays pending and is retried
-no sooner than ODDS_RETRY_GAP, so one unposted fixture can't drain the
-monthly budget. Odds and lineup windows are tracked separately
-(capture_windows.kind): they succeed independently, and a shared status used
-to let a successful odds poll hide windows from lineup capture.
+odds/null_provider.py as the zero-request stand-in). An odds window is
+satisfied for a game that any book in ODDS_BOOKS priced and that resolved to
+a liiga.fi game, with the books recorded in capture_windows.satisfied_by —
+books post fixtures independently, and PRIMARY_ODDS_BOOK is sometimes late
+or absent on a game another book already prices (KooKoo–SaiPa, 2026-09-18).
+A game on no board stays pending and is retried no sooner than
+ODDS_RETRY_GAP, so one unposted fixture can't drain the monthly budget.
+Odds and lineup windows are tracked separately (capture_windows.kind): they
+succeed independently, and a shared status used to let a successful odds
+poll hide windows from lineup capture.
 
 Alerting: failures log at CRITICAL to logs/snapshot_job.log, plus the console
 when run from a terminal. The scheduled task runs pythonw.exe, where
@@ -71,9 +74,11 @@ LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
 # correct once a real provider is wired.
 ODDS_MONTHLY_CEILING = 200
 
-# One poll per book per tick. Pinnacle is primary: it's the sharpest of the
-# books checked and the one whose coverage decides a window is done; bet365 is
-# the second opinion (docs/ODDS_PLAN.md Phase 0 — Betsson failed those checks).
+# One poll per book per tick. Pinnacle is primary: the sharpest of the books
+# checked, and the benchmark line validation is meant to use. bet365 is the
+# second opinion (docs/ODDS_PLAN.md Phase 0 — Betsson failed those checks) and
+# the fallback: either book pricing a game satisfies its window, and
+# capture_windows.satisfied_by records which did.
 ODDS_BOOKS = ("pinnacle", "bet365")
 PRIMARY_ODDS_BOOK = "pinnacle"
 
@@ -270,10 +275,12 @@ def capture_odds_for_due_windows(
     conn: sqlite3.Connection, logger: logging.Logger, *, due: list, now_iso: str
 ) -> int:
     """Poll every book once (ODDS_BOOKS) if any due window is eligible and the
-    monthly ceiling allows it, then mark satisfied only those windows whose
-    game got a parsed, resolved row from PRIMARY_ODDS_BOOK. A game that isn't
-    on the board stays pending — it is not a capture. Returns the number of
-    windows marked satisfied."""
+    monthly ceiling allows it, then mark satisfied the windows whose game got
+    a parsed, resolved row from ANY book, recording which books in
+    capture_windows.satisfied_by. A game on no board stays pending — it is not
+    a capture. A game only a fallback book priced is captured, but logged at
+    WARNING, since it has no benchmark (PRIMARY_ODDS_BOOK) line. Returns the
+    number of windows marked satisfied."""
     eligible = windows_eligible_for_poll(
         due,
         last_poll_iso=storage.last_successful_odds_poll(conn, provider="oddspapi"),
@@ -297,29 +304,54 @@ def capture_odds_for_due_windows(
         return 0
 
     provider = OddsPapiProvider()
-    covered: set[tuple[int, int]] = set()
+    # (season, game_id) -> books that priced it this poll, in ODDS_BOOKS order.
+    covered: dict[tuple[int, int], list[str]] = {}
     for index, book in enumerate(ODDS_BOOKS):
         if index:
             time.sleep(ODDS_BOOK_DELAY_SECONDS)
-        snapshots = capture_odds(provider, conn, logger, book=book)
-        if book == PRIMARY_ODDS_BOOK:
-            covered = {
-                (s.season, s.game_id)
-                for s in snapshots
-                if s.parsed and s.game_id is not None
-            }
+        for s in capture_odds(provider, conn, logger, book=book):
+            if s.parsed and s.game_id is not None:
+                books = covered.setdefault((s.season, s.game_id), [])
+                if book not in books:
+                    books.append(book)
 
-    satisfied = [row["id"] for row in due if (row["season"], row["game_id"]) in covered]
-    storage.mark_windows_satisfied(conn, satisfied, now_iso=_now_iso())
-    uncovered = [row for row in due if row["id"] not in set(satisfied)]
+    satisfied_by: dict[str, list] = {}
+    for row in due:
+        books = covered.get((row["season"], row["game_id"]))
+        if books:
+            satisfied_by.setdefault(",".join(books), []).append(row)
+    now = _now_iso()
+    for books, rows in satisfied_by.items():
+        storage.mark_windows_satisfied(conn, [r["id"] for r in rows], now_iso=now, satisfied_by=books)
+
+    satisfied = [row for rows in satisfied_by.values() for row in rows]
+    without_primary = [
+        row for books, rows in satisfied_by.items()
+        if PRIMARY_ODDS_BOOK not in books.split(",") for row in rows
+    ]
+    satisfied_ids = {row["id"] for row in satisfied}
+    uncovered = [row for row in due if row["id"] not in satisfied_ids]
     logger.info(
-        "odds capture: %d/%d due window(s) satisfied by %s; %d left pending%s",
-        len(satisfied), len(due), PRIMARY_ODDS_BOOK, len(uncovered),
+        "odds capture: %d/%d due window(s) satisfied (%s); %d left pending%s",
+        len(satisfied), len(due),
+        ", ".join(f"{books}: {len(rows)}" for books, rows in satisfied_by.items()) or "none",
+        len(uncovered),
         "".join(
             f" (season={r['season']} game_id={r['game_id']} window={r['window']})"
             for r in uncovered
         ),
     )
+    if without_primary:
+        # Not a failure -- the window is captured -- but the benchmark line
+        # is missing for these games, which validation will want to know.
+        logger.warning(
+            "odds capture: %d window(s) satisfied WITHOUT %s (fallback book only):%s",
+            len(without_primary), PRIMARY_ODDS_BOOK,
+            "".join(
+                f" (season={r['season']} game_id={r['game_id']} window={r['window']})"
+                for r in without_primary
+            ),
+        )
     return len(satisfied)
 
 

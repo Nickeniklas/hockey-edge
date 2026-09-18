@@ -114,10 +114,30 @@ class CaptureTest(unittest.TestCase):
         self._run()
         self.assertEqual(self.sleeps, [])
 
-    def test_only_priced_game_is_satisfied(self):
+    def test_game_on_both_boards_records_both_books(self):
         self.assertEqual(self._run(), 1)
-        statuses = dict(self.conn.execute("SELECT game_id, status FROM capture_windows"))
-        self.assertEqual(statuses, {2701309: "satisfied", 999: "pending"})
+        rows = {r[0]: r[1:] for r in self.conn.execute(
+            "SELECT game_id, status, satisfied_by FROM capture_windows")}
+        self.assertEqual(rows, {2701309: ("satisfied", "pinnacle,bet365"), 999: ("pending", None)})
+
+    def test_fallback_book_alone_satisfies_and_is_recorded(self):
+        """Real case: KooKoo–SaiPa (2026-09-18) was on bet365's board but not
+        Pinnacle's. It must be captured, and recorded as bet365-only."""
+        team_map = load_team_map()
+        storage.insert_discovered_fixture(
+            self.conn, league="liiga", season=2027, game_id=2701311, serie="RUNKOSARJA",
+            start_utc="2026-09-18T16:30:00Z", home_team="KooKoo", away_team="SaiPa",
+            started=False, ended=False, captured_at=NOW, source="test",
+            raw_payload=json.dumps({"homeTeam": {"teamId": team_map[3822]},
+                                    "awayTeam": {"teamId": team_map[3845]}}),
+        )
+        storage.upsert_capture_window(self.conn, league="liiga", season=2027, game_id=2701311,
+                                      kind="odds", window="opening", due_at="2026-09-17T16:30:00Z")
+        self.due = storage.get_due_windows(self.conn, kind="odds", now_iso=NOW)
+        self.assertEqual(self._run(), 2)
+        satisfied_by = dict(self.conn.execute(
+            "SELECT game_id, satisfied_by FROM capture_windows WHERE status = 'satisfied'"))
+        self.assertEqual(satisfied_by, {2701309: "pinnacle,bet365", 2701311: "bet365"})
 
     def test_one_request_per_book_and_rows_written(self):
         self._run()

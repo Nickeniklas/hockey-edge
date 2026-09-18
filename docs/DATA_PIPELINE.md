@@ -178,6 +178,10 @@ Guideline shapes — final DDL decided in implementation, but keep these separat
   …) — job bookkeeping, not observational data, so it is updated in place.
   `kind` is 'odds' or 'lineups': the two capture independently, and one shared
   status let a successful odds poll hide a window from lineup capture.
+  `satisfied_by` (odds only, added 2026-09-18) lists the books that priced the
+  game on the satisfying poll, e.g. `pinnacle,bet365` or `bet365` — any book
+  satisfies a window, so this is how a benchmark (Pinnacle) capture is told
+  apart from a fallback-only one.
 - `sync_state` (see above)
 - `raw_responses` (url, fetched_at, content_hash, file_path) — metadata only; body
   lives under `data/raw/`
