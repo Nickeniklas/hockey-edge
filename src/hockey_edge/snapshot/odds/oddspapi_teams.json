@@ -1,5 +1,5 @@
 {
-  "_about": "Curated OddsPapi participant id -> liiga.fi teamId map (docs/ODDS_PLAN.md Phase 2). Every entry is backed by at least one saved board fixture whose home/away pair matched exactly one hockey.db game at that start time. Add a team only with the same kind of evidence. HIFK 3839 and Karpat 3835 were confirmed 2026-09-17 when they first appeared on a board, the same way. Still absent until seen: HPK (3837?) -- OddsPapi lists 2-3 ids per name for each, so a guess could silently map a junior/women's side.",
+  "_about": "Curated OddsPapi participant id -> liiga.fi teamId map (docs/ODDS_PLAN.md Phase 2). Every entry is backed by at least one saved board fixture whose home/away pair matched exactly one hockey.db game at that start time -- OddsPapi lists 2-3 ids per club name, so a guess could silently map a junior/women's side. Add a team only with that same kind of evidence. All 17 Liiga teams are now mapped: the original 14 on 2026-09-17 from saved boards, then HIFK 3839, Karpat 3835 and HPK 3837 the same day as each first appeared on a board the job polled.",
   "teams": [
     {
       "participant_id": 3822,
@@ -57,6 +57,15 @@
       "liiga_team_name": "TPS",
       "evidence": [
         "pinnacle board 2026-09-17: fixture id1500013472116222 = season 2027 game 2701307 (home)"
+      ]
+    },
+    {
+      "participant_id": 3837,
+      "oddspapi_name": "HPK Hameenlinna",
+      "liiga_team_id": "55786244:hpk",
+      "liiga_team_name": "HPK",
+      "evidence": [
+        "pinnacle board 2026-09-17 (captured by the job): fixture id1500013472116232 = season 2027 game 2701312 (home)"
       ]
     },
     {

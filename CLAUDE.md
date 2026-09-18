@@ -102,10 +102,13 @@ Phases 0–3 done; Phase 4 (watch a full game night) is the only open item.
   Games are matched by liiga.fi home+away `teamId` (read from
   `discovered_fixtures.raw_payload`) plus a start within 24h, and only when
   exactly one game matches — never guessed. The map is curated in
-  `snapshot/odds/oddspapi_teams.json`: **16 of 17 teams**, each entry backed
-  by a real board fixture. **HPK (3837?) is deliberately unmapped** until it
-  appears on a board — OddsPapi lists 2–3 ids per Finnish club name, so a
-  guess could map a junior/women's side.
+  `snapshot/odds/oddspapi_teams.json`: **all 17 teams**, each entry backed
+  by a real board fixture. The last three (HIFK 3839, Kärpät 3835, HPK 3837)
+  were deliberately left unmapped until each appeared on a board the job
+  polled — OddsPapi lists 2–3 ids per Finnish club name, so a guess could map
+  a junior/women's side. All three showed up the same evening and matched
+  exactly one real game each. **Any new team (promotion) follows the same
+  rule**: wait for its first board, never guess from the participants list.
 - **First live capture (2026-09-17 21:30 local): 6 fixtures, 12 rows, all
   parsed**, 4 resolved (the 2 unresolved were HIFK/Kärpät, mapped right after
   from those very payloads; their already-written rows keep `game_id` NULL —
@@ -113,7 +116,7 @@ Phases 0–3 done; Phase 4 (watch a full game night) is the only open item.
 - **Tests exist now: `tests/`, 29 of them, stdlib unittest, no new dependency.**
   Run `python -m unittest discover -s tests`. They run against the saved real
   board responses.
-- **Open**: HPK's participant id; a full game night watched end to end; the
+- **Open**: a full game night watched end to end; the
   `docs/RECOVERY_BACKLOG.md` 1,164-game recovery (untouched, unrelated).
 
 ## Status (as of 2026-09-02)

@@ -9,8 +9,10 @@
 > in `snapshot/odds/oddspapi.py`; Phase 2's `capture_windows.kind` migration
 > ran on `data/snapshots.db` (backup: `data/snapshots.pre-kind-migration.db`,
 > 117 lineup rows unchanged, 27 odds twins added) and the curated team map is
-> `snapshot/odds/oddspapi_teams.json` (14 teams; HIFK/Kärpät/HPK deliberately
-> absent until seen on a board). Phase 3 wired `OddsPapiProvider` into
+> `snapshot/odds/oddspapi_teams.json` — all 17 teams: 14 from the saved
+> boards, then HIFK 3839, Kärpät 3835 and HPK 3837 the same evening, each
+> mapped from the first board it appeared on, never from the participants
+> list. Phase 3 wired `OddsPapiProvider` into
 > `job.py` for `["pinnacle", "bet365"]`. Tests: `python -m unittest discover
 > -s tests` (27).
 >
