@@ -1,7 +1,7 @@
 # PROJECT_CONTEXT — hockey-edge (Liiga + NHL prediction & edge tool)
 
 Paste-ready summary for Claude project memory. Crystallized 2026-07-06; rewritten
-2026-09-03.
+2026-09-03; rewritten 2026-09-20.
 
 Owned by the design chat. Emitted whole and replaced wholesale at session close. Not
 edited by Human or by Claude Code sessions.
@@ -17,11 +17,12 @@ probabilities → compare vs odds to surface edges → immutable, timestamped pr
 log.
 
 It's an **edge finder** (model probability vs bookmaker odds), not a stats site and
-not bare predictions. **Primary user is Niklas himself, and the public/commercial
-angle is leaning toward being dropped entirely** — he doesn't follow much sport,
-doesn't gamble, and the selling motivation was always weak. That decision has its own
-session (see Open decisions); until it's made, don't let "someday public" quietly
-shape build choices.
+not bare predictions. **Primary user is Niklas himself; the public/commercial angle is
+effectively dropped** — he doesn't follow much sport, doesn't gamble, and the selling
+motivation was always weak. Treat personal-use as the operating assumption and don't
+let "someday public" quietly shape build choices. The only thing the public option
+still buys is a reason to keep the prediction log clean, which the invariants already
+require anyway.
 
 ## Decided stack (don't re-open)
 
@@ -34,11 +35,16 @@ endpoints confirmed, catalog and `verified_seasons` in
 `src/hockey_edge/ingest/liiga/endpoints.py` (source of truth). NHL from the official
 free NHL API; NHL xG bootstrapped from MoneyPuck/Natural Stat Trick.
 
+**Liiga odds: OddsPapi, polling `pinnacle` (primary/benchmark) + `bet365` (fallback).
+Settled 2026-09-17, proven over two live game nights 2026-09-18/19 — do not re-open.**
+NHL odds via The Odds API remain a separate, later session.
+
 Models: Elo-style baseline + LightGBM, blended. Targets: NHL binary moneyline; Liiga
 three-way regulation 1X2. Metrics: log loss + calibration, never accuracy; benchmark is
 odds-implied probabilities (vig removed) from the last pre-game snapshot.
 
-**Odds sourcing is NOT settled — see Open decisions.**
+Tests: `tests/`, stdlib `unittest`, no pytest — `python -m unittest discover -s tests`.
+They assert against real saved API responses and make zero HTTP requests.
 
 ## Hard invariants
 
@@ -47,183 +53,118 @@ Pre-puck-drop information only (append-only snapshots with `captured_at` UTC);
 as new rows under a new `model_version`, because a log that can be rewritten can't
 evidence what was predicted before a game); strict walk-forward validation; resumable
 sync (`sync_state`, raw JSON cached as files under `data/raw/`, SQLite metadata only);
-polite scraping (1.5s, normal UA); no autonomous git commits; no affiliate
-integrations.
+capture-before-parse (the raw payload is kept whether or not parsing succeeds); polite
+scraping (1.5s, normal UA); no autonomous git commits; no affiliate integrations.
+
+Composite `(season, game_id)` is the primary key everywhere. `game_id` is a per-season
+counter on liiga.fi's side and gets reused; assuming global uniqueness already caused
+one live corruption incident.
 
 Databases, `data/raw/`, `logs/` and `.env` are gitignored. Code, docs, and small
-verification fixtures are tracked — including `fixtures/liiga/lineup_probe/`, which is
-evidence rather than cache and cannot be regenerated.
+verification fixtures are tracked — including `fixtures/liiga/lineup_probe/` and
+`fixtures/oddspapi/`, which are evidence rather than cache and cannot be regenerated.
 
 ## Season numbering — CONFIRMED
 
-liiga.fi uses the **ending-year convention**: `season=2024` is the 2023–24 season. This
-was the source of a real gap — the original backfill omitted two completed seasons.
+liiga.fi uses the **ending-year convention**: `season=2024` is the 2023–24 season, and
+`season=2027` is the live 2026–27 season.
 
-## Status (2026-09-03)
+## Where the pipeline actually stands (2026-09-20)
 
-**Step 1 (Liiga ingest): COMPLETE, seasons 2015–2027.** `data/hockey.db`, composite
-`(season, game_id)` primary key — `game_id` is a per-season counter that resets
-annually and is NOT globally unique.
+**Step 1 (Liiga ingest): done** for seasons 2015–2027. `data/hockey.db` holds 12
+historical seasons (6,736 games) plus season 2027's 595 fixtures, ingested 2026-09-01
+with zero failures. `scripts/nightly_sync.py` keeps the live season current, scheduled
+daily at 23:30.
 
-Season 2027 ingested 2026-09-02 with zero failures: 595 games (544 RUNKOSARJA, 41
-PRACTICE, 10 PITSITURNAUS), 58 ended. All 7 completed openers came through with full
-per-game data — rosters, goal/penalty/goalkeeper events, team/player/goalie period
-stats, shot events, xG. `game_puck_control` thin at 1–3 rows/game, which is the
-mutation gap the nightly resync exists to close.
+**Step 2 (snapshot capture job): done and proven.** Phase 4 — watching a full game
+night end to end — is closed, and it was two nights, not one:
 
-**Step 2 (snapshot capture): DEPLOYED AND RUNNING.**
+- **2026-09-18 and 2026-09-19: complete 11:00–23:00 coverage, every 15 minutes, zero
+  gaps on both days.** No ERROR or CRITICAL in `logs/snapshot_job.log` since the
+  2026-09-17 429, which remains the only one ever. Both scheduled tasks report
+  `LastTaskResult 0`; nightly sync ran clean at 23:30 both nights.
+- **Odds: 30 windows satisfied, 0 missed, 9 pending** (all for the 2026-09-22 slate).
+  Every closing window landed roughly 10 minutes after due — tick granularity, i.e.
+  ~T-15 before puck drop. 09-18: 3 closing windows, all `pinnacle,bet365`. 09-19: 7
+  closing windows, 6 `pinnacle,bet365`, 1 (`2701316`, the noon HIFK–Lukko) bet365 only.
+- **Prices are sane**: 26 parsed rows at the 09-19 close, overrounds 1.047–1.086, no
+  NULL prices, every row resolved to a liiga.fi `game_id` — zero unresolved since
+  09-18.
+- **Budget: 26 lifetime OddsPapi requests** against the job's 200 ceiling, at 2 per
+  poll. Not a constraint at current cadence.
 
-Lineup capture is live. `snapshot/lineups.py` fetches `game_detail` (+`game_preview`,
-best-effort) and returns one `LineupSnapshot` per team-side: the 22 confirmed
-line-assigned players, goalie count, and the inferred starter. Append-only into
-`snapshots.db` keyed `(league, season, game_id, team_role)`, full raw payload retained
-regardless of parse outcome. Wired into `job.py`, which marks windows satisfied
-independently of the dormant odds path.
+**Step 3 (NHL ingest): not started.** **Step 4 (feature store): not started, and
+unblocked on data.** The build order is genuinely free to resume at either.
 
-Odds capture is **not** live — `NullOddsProvider` is wired, zero HTTP. The mechanism
-is complete; only the provider is missing.
+Repo state: working tree clean, `origin/main` at `e19ed8e`, all commits pushed.
+GitHub knowledge sync ran 2026-09-20 and is current with that HEAD.
 
-Scheduling is deployed on the Windows desktop:
-- **Snapshot job** — registered task, every 15 min, 11:00–23:00 local, `WakeToRun=true`
-  (wake timers confirmed enabled in the power plan), `StartWhenAvailable=true`,
-  `IgnoreNew` overlap policy, no execution time limit. Definition committed at
-  `docs/snapshot_job_task_scheduler.xml`.
-- **Nightly sync** — `scripts/nightly_sync.py` daily at 23:30, registered inline, so
-  recovery commands are documented in `docs/RESYNC.md` rather than an XML file. No
-  wake timer, so a sleeping machine skips the night — harmless, since both passes are
-  resumable and `--days 7` bounds the recovery window.
+## Two findings from the live nights — both worth carrying
 
-`lineup_snapshots` is still empty. First rows arrive when the job hits a real slate.
-**Next games are Friday 2026-09-04** — the openers were 09-01, then a three-day gap.
+**1. Pinnacle's inactive flag is distance from puck drop, not randomness.** The open
+question from 09-18 (is `bookmakerIsActive: false` time-of-day, pre-lineup, or random?)
+is answered. Bucketing every Pinnacle row since 09-18 by hours-to-start:
 
-**Step 3 (NHL ingest): not started.**
+| Pinnacle | >12h | 4–12h | 1–4h | <1h |
+|---|---|---|---|---|
+| unparsed (inactive) | 15 | 1 | 2 | 2 |
+| parsed | 20 | 9 | 23 | 9 |
 
-## The starting-goalie finding — and the near-miss
+43% inactive more than 12h out, ~8% in the 1–4h band, and the only two `<1h` cases are
+the single bet365-only fixture above. bet365 had 8 unparsed too (4 suspended, 4
+bookmaker inactive), never at `<1h`. **The closing capture — the one that matters — is
+reliably live on both books.** Early-window captures should be treated as best-effort;
+the closing one is the benchmark.
 
-Resolved 2026-09-01 by probing all 7 openers at T-30: `line` was populated for exactly
-22 players on all 14 team-sides, so liiga.fi does publish confirmed lineups pre-game.
-At T-4d the same probe showed zero line assignments and up to 8 goalies per squad, so
-the signal genuinely appears close to puck drop.
+**2. First starter-inference disagreement: 58/59 (98.3%), and it isn't a code bug.**
+`scripts/verify_starters.py` flags `season=2027 game_id=2701312`, away/TPS: the captured
+lineup had Markus Ruusu (#30, `line=1`) at both the mid and closing windows, but
+`game_goalie_period_stats` shows #36 (`30117507`) played all three periods and Ruusu
+faced zero shots. Either liiga.fi's published `line=1` was itself wrong, or TPS changed
+starter inside the last 15 minutes. **This is exactly what
+`starter_confidence='inferred_structural'` exists for** — but it means the field is
+~98% accurate, not 100%, and feature code must not treat it as ground truth. Keep
+running `verify_starters.py` as games accumulate; one disagreement in 59 is a rate to
+monitor, not yet a pattern.
 
-Starter is identified by **`line==1`**, recorded with
-`starter_source='goalie_line_value'` and `starter_confidence='inferred_structural'`.
-Ambiguous cases (0 or 2+ goalies at `line==1`) store `starter_player_id=None` rather
-than guessing.
-
-**The near-miss worth remembering:** the working hypothesis had been *array order* —
-manual cross-referencing against Flashscore matched the first-listed goalie in 7 of 7
-games. Scored properly against ground truth, **`line==1` got 14/14 and array order got
-7/14, exactly chance.** The manual check had landed on the subset where the two
-coincide. Shipping array order would have made half of all goalie features describe
-backups, silently, all season. Same shape as the `game_id` collision and the
-enrichment framing: an apparent confirmation on a sample that couldn't discriminate.
-
-**`game_goalkeeper_events` cannot establish who started** — zero `begin_time=0` rows
-exist anywhere, and 36% of season-2026 games have no rows at all. Ground truth is
-`game_goalie_period_stats` period-1 `shots_on_goal > 0`, cross-checked against
-`game_goalkeeper_events` to flag early-substitution edge cases rather than silently
-resolve them. This also downgrades the goalkeeper-event recovery in the backlog: no
-feature family depends on that table.
-
-`scripts/verify_starters.py` (read-only, both DBs opened `mode=ro`) scores captured
-starters against that ground truth. Run it periodically once games accumulate — it
-converts a structural inference into a monitored one.
-
-## CRITICAL FINDING — liiga.fi responses mutate in BOTH directions
-
-**Corrects the earlier "retroactive enrichment" framing, which was wrong and
-misleading.** The first observed case (a `game_stats` response gaining `puckStats`
-periods) was enrichment, and naming the phenomenon after one instance baked a
-directional assumption into every downstream decision.
-
-Refetching `game_detail` for season 2024 `game_id=1` returned **fewer** goalkeeper
-events than the stored response (7 rows → 1). Across four samples: shrink, grow,
-no-change, no-change. The right term is **non-monotonic mutation**.
-
-**The fix, in `resync.py`: a universal no-shrink guard.** A refetched response is
-reparsed into curated tables only if no curated table it feeds would end up with fewer
-rows. If any would shrink: skip the reparse, keep existing curated rows, still write
-the new raw response to disk (append-only), log WARNING with per-table before/after
-counts. Comparison is per-table totals, not per-team — a penalty event legitimately
-reassigned between home and away arrays must not trip it. Applied to all three
-endpoints.
-
-**Variation is temporal, not per-request.** Three back-to-back fetches returned
-identical hashes, so refetching isn't a coin flip.
-
-**Rate limiting ruled out.** Across 20,280 `sync_state` and 20,122 `raw_responses`
-rows: zero non-200 statuses, zero nulls, zero `failed_retryable`. Never throttled or
-blocked. The 160 `failed_permanent` rows are all HTTP 200 with an error-placeholder
-body.
-
-## The 2026-07-19/21 bad-response window — ~1,164 damaged games
-
-**1,164 of 6,736 games have zero `game_penalty_events` despite a `success` sync_state
-row.** Hockey games always have penalties, so this is source damage. Season 2023 is 92%
-affected (517/562); baseline elsewhere is 2–39%.
-
-All damage clusters in one ~34-hour window, **2026-07-19T19:55Z to 2026-07-21T05:54Z**
-— the original 10-season backfill. Zero damaged files outside it. Two symptom classes:
-
-1. **483 files lack a top-level `game` key entirely** — rosters present, everything
-   else missing.
-2. **`game` key present but `penaltyEvents` empty for both teams** — season 2023's 450
-   RUNKOSARJA games are all this type.
-
-**Both classes are recoverable**, confirmed by live refetch. `goalKeeperEvents`
-recovery is unreliable (1 of 2 test games), but that now matters less given the
-`game_goalie_period_stats` finding above.
-
-**Unexplained, logged, not theorised about:** 45 PLAYOFFS games fetched in the exact
-same 78-minute window that broke 450 RUNKOSARJA games came through 100% clean.
-
-Recovery is scoped and ready but **not run** — see `docs/RECOVERY_BACKLOG.md`.
-
-## OddsPapi — Shape B CONFIRMED, budget maths broken
-
-`/v4/odds-by-tournaments` is a **fixture-board listing, not a prices endpoint**. Live
-responses carry `fixtureId`, participant ids, `startTime`, and a `hasOdds` flag — no
-`bookmakerOdds`, no markets, no prices, despite `hasOdds: true`. OddsPapi's own
-documentation describes the full-markets shape; the live API disagrees with its docs.
-Confirmed twice.
-
-- Real pricing needs one `/v4/odds` call **per fixture**. At ~100 Liiga games/month
-  across three windows that's ~225–300 requests against a 250/month free tier. The
-  "one poll covers the whole board" premise the design rested on is dead.
-- `bookmaker` is **required**, not a filter (400 without it).
-- `/v4/participants?sportId=15` returns the whole sport's id→name map in one cacheable
-  call, so the join is a one-time lookup.
-- OddsPapi gives bare numeric participant ids with no names, and `startTime` alone
-  can't disambiguate — five liiga.fi games share one 2026-09-05T14:00:00Z kickoff. Join
-  must be participant-id → name → liiga.fi team, `startTime` as tie-breaker only.
+**A bonus data point, not a finding:** on 09-19, game `2701317` (Ässät–K-Espoo) bet365
+had the home side at 1.52 ML / 1.82 in the 1X2 against Pinnacle's 1.787 / 2.32. A
+home/away swap in the parse was checked and ruled out — swapping makes the gap worse,
+so the mapping is right and it's a genuine soft line. Ässät won 2–1. That spread
+between a sharp and a soft book is the thing this project exists to detect, arriving
+before there's a model to act on it.
 
 ## Open decisions (mine, not Claude Code's)
 
-1. **Odds provider — the only thing blocking a complete pipeline.** Options: drop to
-   closing-only OddsPapi/Pinnacle as a sharp benchmark (~100 req/month, fits the tier),
-   or make **Veikkaus** primary via scraping. Veikkaus is the book actually bettable in
-   Finland, so a Veikkaus edge is the actionable one. **Nothing about Veikkaus has been
-   tested** — unknown: server-rendered vs JSON-behind-the-page, bot protection, market
-   shape, how far ahead lines post. Their ToS almost certainly prohibits automated
-   access: low-stakes for a personal tool at low rate, a real blocker for anything
-   public. **Its own session.**
-2. **Public vs personal.** Own session, leaning toward dropping. A public version
-   wouldn't need to republish anyone's odds — publishing the model's own timestamped
-   probabilities is the track record; the edge calculation stays private. Dropping
-   public removes roughly half the deferred list.
-3. **Whether to inject the 2026-09-01 probe fixtures into `lineup_snapshots`.**
-   Currently no — the table's value is that every row came from the production capture
-   path at a real window, and a row claiming provenance it doesn't have corrupts that.
-   The fixtures are on disk and cited in the docs regardless.
+1. **Veikkaus as an additional source.** Not a blocker any more — OddsPapi covers the
+   benchmark. The remaining case for Veikkaus is that it's the book actually bettable
+   in Finland, so a Veikkaus edge is the actionable one, and liiga.fi's own games API
+   exposes Veikkaus odds (already used in another of my projects), which may be a
+   cheaper route than scraping veikkaus.fi. Veikkaus is **not** among OddsPapi's 213
+   bookmakers. Still untested, still its own session, now genuinely optional.
+2. **Whether to inject the 2026-09-01 probe fixtures into `lineup_snapshots`.**
+   Still no, and now more firmly: the table's value is that every row came from the
+   production capture path at a real window, and with two clean nights of real rows the
+   probe data adds nothing worth the provenance damage. The fixtures stay on disk and
+   cited in the docs.
+3. **When to move scheduling to the i5 Linux box.** Wake timers have worked for two
+   nights, so this is no longer urgent — but the current setup depends on the desktop
+   sleeping rather than hibernating, which is a silent single point of failure.
 
 ## Immediate next steps, in order
 
-1. **Verify the first real capture.** Friday 2026-09-04 is the next slate. Check
-   `logs/snapshot_job.log` for `lineup capture ok`, then confirm `lineup_snapshots` has
-   rows, then run `scripts/verify_starters.py` once those games finish.
-2. **Odds provider decision** (Open decision 1) → then Phase 3's odds parsing.
-3. NHL ingest, feature store, Elo baseline + walk-forward validation, LightGBM blend.
-4. Migrate scheduling to the i5 Linux box, removing the wake-timer dependency.
+1. **Record the two findings above in `docs/SNAPSHOT_FINDINGS.md` and a new CLAUDE.md
+   Status entry** — Claude Code has offered and is waiting on the go-ahead. Do this
+   before starting new work; it's the last piece of Phase 4.
+2. **Pick the next build-order step: 3 (NHL ingest) or 4 (feature store).** Both are
+   unblocked. NHL is mostly plumbing against a documented API and widens the dataset;
+   the feature store is the step that turns the existing Liiga data into something a
+   model can use, and it's where leakage discipline gets tested for real. Feature store
+   first is the stronger case — it exercises the invariants while the capture path is
+   fresh, and it can be built and validated on Liiga alone.
+3. `docs/RECOVERY_BACKLOG.md`'s 1,137-game recovery — still unrun, still not blocking
+   anything, worth doing before the feature store depends on penalty events.
+4. NHL ingest, Elo baseline + walk-forward validation, LightGBM blend, prediction log.
 
 ## Deferred (explicitly, with reasons)
 
@@ -234,10 +175,13 @@ Confirmed twice.
   likely genuine than broken.
 - **`game_stats`/`shotmap` refetch for ~11,000 missing `game_puck_control` rows** — no
   feature family depends on puck control.
+- **Goalkeeper-event recovery** — downgraded permanently. `game_goalkeeper_events`
+  cannot establish who started (zero `begin_time=0` rows exist anywhere), so no feature
+  family depends on it.
 - `player_info`/`player_list`/`team_info`/`teams_stats`/`milestones` — cataloged, no
   parser.
 - Totals market, news-article injury parsing, football, payments.
-- Public site (pending Open decision 2).
+- Public site (see Open decisions).
 
 ## Gotchas that cost real time
 
@@ -248,19 +192,40 @@ Confirmed twice.
 - **`nightly_sync.py` must force the season-level endpoints.** Otherwise `sync_state`
   serves `games_by_season`/`standings` from cache indefinitely and the job never learns
   that new games have ended.
+- **OddsPapi rate-limits bursts separately from the monthly quota.** Two back-to-back
+  board calls got the second one 429'd (2026-09-17). `job.py` sleeps
+  `ODDS_BOOK_DELAY_SECONDS` (20s) between books — don't remove that spacing, and don't
+  add a blind retry, since a retry is another billed request. Every poll since has
+  returned 200 on both books.
+- **OddsPapi returns 404 `FIXTURE_NOT_FOUND` for a tournament with no posted fixtures**,
+  not 200 with an empty array. The job treats it as "no odds yet"; don't reintroduce a
+  bare `raise_for_status()`.
+- **`bookmaker` is required and single-valued** — a poll costs one request per book, so
+  cost scales with books, not fixtures. `/v4/odds` (per-fixture, all 213 bookmakers,
+  11.6 MB) is not for polling.
+- **A new team's OddsPapi id is never guessed.** Names aren't unique (2–3 ids per
+  Finnish club, junior/women's sides among them); each of the 17 is mapped from the
+  first board it actually appeared on. Any promoted team follows the same rule.
 - **Task Scheduler XML import is encoding-fragile.** `schtasks /XML` failed on a
   UTF-16 declaration over UTF-8 bytes; `Register-ScheduledTask -Xml` then failed
   because PowerShell holds the string as UTF-16, making any declaration a
-  contradiction. Working path is to strip the declaration:
+  contradiction. Working path strips the declaration:
   `$xml = (Get-Content -Raw ...) -replace '<\?xml[^>]*\?>', ''`.
 - **`schtasks` inline can't set a working directory.** Matters for `load_dotenv()`'s
-  `.env` discovery once a real odds provider needs `ODDSPAPI_KEY`. Data and log paths
-  are not cwd-dependent — they anchor to `Path(__file__).resolve().parents[3]`.
+  `.env` discovery, which the job needs for `ODDSPAPI_KEY` on every due tick. Data and
+  log paths are not cwd-dependent — they anchor to `Path(__file__).resolve().parents[3]`.
+- **Editing the snapshot task needs an elevated PowerShell** (its XML carries an
+  explicit `<Principal>`); the schtasks-registered nightly sync does not.
+- **Both tasks run `pythonw.exe`**, so `sys.stdout`/`sys.stderr` are None and the log
+  file is the only record. A failure before `_configure_logging()` finishes leaves no
+  trace except a non-zero `LastTaskResult` — check with `Get-ScheduledTaskInfo`.
 - **Snapshot window is 11:00–23:00, not 14:00.** Three 2026-27 fixtures start at or
   before 14:00 local, and their T-25min closing window would be permanently missed.
+- **`capture_windows.kind` splits odds from lineups.** A shared status once let a
+  successful odds poll hide windows from lineup capture.
 - `game_preview` requires a full ISO datetime for `gameDate`; a bare date 500s.
-- `games_by_date` 502s intermittently — retry, not fatal.
-- `games_by_date` silently ignores the `season` param.
+- `games_by_date` 502s intermittently — retry, not fatal — and silently ignores the
+  `season` param.
 - `tournament=playoffs` returns a superset including PLAYOUT and QUALIFICATIONS.
 - `serie` vocabulary is **open-ended** — `PITSITURNAUS` appeared in 2027 and was in no
   prior catalog. `roleCode` vocabulary also varies (`P/H/MV/KP` pre-game vs
@@ -281,7 +246,14 @@ Confirmed twice.
   noted in `endpoints.py` — unresolved.
 - Goal-event surplus variance (+2 on the 2027 openers, in line with the known pattern)
   — unexplained.
-- Failure alerting beyond CRITICAL log lines — not built.
+- The `2701312` starter disagreement: liiga.fi's published `line=1` being wrong versus
+  a genuine late change is undistinguished, and there may be no way to tell from stored
+  data alone.
+- Whether season-2027 opening-night post-game data is fully ingested — an earlier
+  `nightly_sync.py` issue was noted against the openers and never confirmed resolved.
+  Worth one read-only check before the feature store trusts early-season rows.
+- Failure alerting beyond CRITICAL log lines — not built. Two clean nights is not
+  monitoring; nothing currently tells anyone the job stopped.
 - Review liiga.fi (and, if used, Veikkaus) ToS before anything public.
 
 ## Meta — the pattern worth remembering
@@ -290,8 +262,12 @@ Every significant problem in this project has been an **unverified assumption th
 failed silently rather than loudly**: `game_id` uniqueness, ending-year season
 numbering, the NTFS colon bug, `sync_state` blindness to empty-but-200, the API key in
 `raise_for_status()` text, OddsPapi's docs vs its live behaviour, the
-enrichment-vs-mutation framing, and array-order-vs-`line==1` for starting goalies.
-None surfaced as an error. All surfaced because someone checked a claim that read like
-a fact. The stop-and-report gates in Claude Code prompts exist for exactly this reason
-and have caught something every time they've fired — including twice this session,
-where running the instruction literally would have caused damage.
+enrichment-vs-mutation framing, array-order-vs-`line==1` for starting goalies, and
+"`/odds-by-tournaments` has no prices" (which was the off-season board, not the
+endpoint). None surfaced as an error. All surfaced because someone checked a claim that
+read like a fact.
+
+The 09-19 session adds two of the good kind: the Pinnacle inactive flag was bucketed
+rather than guessed at, and the book disagreement on `2701317` was tested for a
+home/away swap before being accepted as real. That's the habit — when a number looks
+like a finding, try to break it first.
