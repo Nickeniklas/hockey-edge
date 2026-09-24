@@ -118,8 +118,10 @@ def load_outcomes(path: Path) -> dict[tuple[str, str], str]:
 def classify_targets(before: dict, after: dict, outcomes: dict[tuple[str, str], str]) -> dict[str, dict[str, dict[str, int]]]:
     """endpoint -> season -> class -> count. Classes: recovered (reparsed and
     the endpoint's recovery table grew), changed_no_gain (reparsed, it did
-    not), refused (shrink guard), unchanged_hash, fetch_failed, and
-    not_attempted (a target with no outcome row)."""
+    not), refused (shrink guard), recovered_by_salvage / salvage_no_gain (a
+    refused game later run through --salvage-from-raw; its last outcome
+    wins), unchanged_hash, fetch_failed, and not_attempted (a target with
+    no outcome row)."""
     result: dict[str, dict[str, dict[str, int]]] = {}
     endpoints = sorted({ep for _, ep in outcomes})
     for endpoint in endpoints:
@@ -128,9 +130,12 @@ def classify_targets(before: dict, after: dict, outcomes: dict[tuple[str, str], 
             outcome = outcomes.get((entity, endpoint))
             if outcome is None:
                 cls = "not_attempted"
-            elif outcome == "reparsed":
+            elif outcome in ("reparsed", "salvaged"):
                 grew = table is not None and after.get("targets", {}).get(entity, {}).get(table, 0) > before_counts.get(table, 0)
-                cls = "recovered" if grew else "changed_no_gain"
+                if outcome == "reparsed":
+                    cls = "recovered" if grew else "changed_no_gain"
+                else:
+                    cls = "recovered_by_salvage" if grew else "salvage_no_gain"
             else:
                 cls = {"shrink_guarded": "refused", "unchanged": "unchanged_hash"}.get(outcome, outcome)
             season = entity.split(":")[0]

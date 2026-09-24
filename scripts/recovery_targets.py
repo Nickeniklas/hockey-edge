@@ -12,6 +12,11 @@ Usage (from repo root, venv active):
 
     python scripts/recovery_targets.py
     python scripts/recovery_targets.py --out-dir data/recovery
+    python scripts/recovery_targets.py --salvage-from data/recovery/game_detail_outcomes.csv
+
+`--salvage-from` instead writes salvage_targets.csv for R5: games whose last
+game_detail outcome was shrink_guarded, that still have zero penalty events,
+and whose saved raw response contains some. Reads raw files, no HTTP.
 
 2025/2026 are deliberately out of scope: fetched 2026-08-22 in a clean run,
 their zero-penalty games are more likely genuine (RECOVERY_BACKLOG section 1).
@@ -21,6 +26,9 @@ import argparse
 import csv
 import sqlite3
 from pathlib import Path
+
+from hockey_edge.ingest.liiga import parsers
+from hockey_edge.ingest.liiga.resync import load_latest_raw
 
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_DB = REPO / "data" / "hockey.db"
@@ -55,6 +63,25 @@ def select_targets(conn: sqlite3.Connection) -> dict[str, list[tuple[int, int]]]
     }
 
 
+def select_salvage_targets(conn: sqlite3.Connection, outcomes_path: Path) -> list[tuple[int, int]]:
+    last: dict[tuple[int, int], str] = {}
+    with open(outcomes_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row["endpoint"] == "game_detail" and row["outcome"] != "skipped_not_due":
+                last[(int(row["season"]), int(row["game_id"]))] = row["outcome"]
+    targets = []
+    for season, game_id in sorted(k for k, outcome in last.items() if outcome == "shrink_guarded"):
+        has_penalties = conn.execute(
+            "SELECT 1 FROM game_penalty_events WHERE season = ? AND game_id = ? LIMIT 1", (season, game_id)
+        ).fetchone()
+        if has_penalties:
+            continue
+        data, _ = load_latest_raw(conn, "game_detail", season, game_id)
+        if parsers.parse_game_detail(data, game_id, season)["penalties"]:
+            targets.append((season, game_id))
+    return targets
+
+
 def write_targets(path: Path, rows: list[tuple[int, int]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -67,11 +94,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    parser.add_argument("--salvage-from", type=Path, help="resync --outcomes CSV: write salvage_targets.csv only")
     args = parser.parse_args()
 
     conn = connect_ro(args.db)
     try:
-        selections = select_targets(conn)
+        if args.salvage_from:
+            selections = {"salvage_targets.csv": select_salvage_targets(conn, args.salvage_from)}
+        else:
+            selections = select_targets(conn)
     finally:
         conn.close()
 

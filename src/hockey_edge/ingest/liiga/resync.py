@@ -33,6 +33,11 @@ not ended are logged at WARNING and skipped, never fatal. `--outcomes`
 appends one `season,game_id,endpoint,outcome` row per checked pair, so a
 resumed run adds to the record rather than overwriting it.
 
+`--salvage-from-raw` (with `--targets`, `--endpoints game_detail`) makes zero
+HTTP requests: it reparses each game's saved raw response and keeps a
+guarded table's new rows only where that table had none before -- the
+approved exception for games the guard refused (salvage_grow_from_zero).
+
 Staleness is derived from `sync_state.fetched_at` vs. `games.start_utc` —
 two columns that already exist — rather than a new `last_verified_at`
 column, so this needed no DDL change.
@@ -40,6 +45,7 @@ column, so this needed no DDL change.
 
 import argparse
 import csv
+import json
 import logging
 import sqlite3
 import sys
@@ -241,6 +247,110 @@ def reparse_with_shrink_guard(conn: sqlite3.Connection, *, game_id: int, season:
     return True
 
 
+def salvage_grow_from_zero(conn: sqlite3.Connection, *, game_id: int, season: int, endpoint_name: str, do_upsert) -> dict[str, tuple[int, int]]:
+    """The one exception to the uniform guard (approved 2026-09-24, R5 in
+    docs/RECOVERY_BACKLOG.md). The guard is all-or-nothing per game, so a
+    refetch that recovers penalties 0->9 but carries one fewer roster row is
+    reverted whole. This runs do_upsert() like the guard does, then keeps a
+    guarded table's new rows only if the table had ZERO rows for this game
+    before and has some now; every other guarded table is restored exactly.
+    Returns {table: (before, after)} for the accepted tables."""
+    tables = GUARDED_TABLES[endpoint_name]
+    before = {t: _count(conn, t, game_id, season) for t in tables}
+    backups = {t: _snapshot_table(conn, t, game_id, season) for t in tables}
+
+    do_upsert()
+
+    after = {t: _count(conn, t, game_id, season) for t in tables}
+    accepted = {t: (before[t], after[t]) for t in tables if before[t] == 0 and after[t] > 0}
+    for t in tables:
+        if t not in accepted:
+            _restore_table(conn, t, game_id, season, backups[t])
+    logger.info(
+        "season=%s game_id=%s endpoint=%s: salvage accepted %s, kept old rows for %s",
+        season, game_id, endpoint_name, accepted or "nothing", [t for t in tables if t not in accepted],
+    )
+    return accepted
+
+
+def load_latest_raw(conn: sqlite3.Connection, endpoint_name: str, season: int, game_id: int) -> tuple[dict, Path]:
+    """The most recently saved raw response for this game, read from disk.
+    No HTTP."""
+    found = raw_cache._last_raw_response(conn, "liiga", endpoint_name, f"{season}:{game_id}")
+    if found is None:
+        raise LookupError(f"no saved raw {endpoint_name} response for season={season} game_id={game_id}")
+    path = found[1]
+    return json.loads(path.read_text(encoding="utf-8")), path
+
+
+def penalty_players_missing_from_roster(conn: sqlite3.Connection, game_id: int, season: int) -> list[tuple]:
+    """(team_id, event_id, player_id) for every penalty whose player_id is
+    not in this game's game_rosters. player_id 0 is how liiga.fi marks a
+    penalty with no individual player (mostly 'Joukkuerangaistus', team
+    penalty) -- 2,152 such rows in hockey.db, no player 0 exists -- so it
+    is not checked, nor is NULL."""
+    return conn.execute(
+        "SELECT p.team_id, p.event_id, p.player_id FROM game_penalty_events p "
+        "WHERE p.game_id = ? AND p.season = ? AND p.player_id IS NOT NULL AND p.player_id <> 0 AND NOT EXISTS ("
+        "  SELECT 1 FROM game_rosters r WHERE r.game_id = p.game_id AND r.season = p.season "
+        "  AND r.player_id = p.player_id) ORDER BY p.event_id",
+        (game_id, season),
+    ).fetchall()
+
+
+def salvage_game_detail(conn: sqlite3.Connection, season: int, game_id: int, *, dry_run: bool) -> dict:
+    """Grow-from-zero salvage of one game from its saved raw game_detail.
+    Returns {'outcome', 'accepted', 'raw', 'missing_roster_players'}; outcome
+    is 'salvaged' or 'salvage_no_gain' ('would_salvage'/'would_not_gain' in
+    a dry run, which writes nothing)."""
+    data, path = load_latest_raw(conn, "game_detail", season, game_id)
+    parsed = parsers.parse_game_detail(data, game_id, season)
+
+    if dry_run:
+        table_key = {"game_rosters": "rosters", "game_penalty_events": "penalties", "game_goalkeeper_events": "goalkeeper_events"}
+        accepted = {
+            t: (0, len(parsed[k])) for t, k in table_key.items()
+            if _count(conn, t, game_id, season) == 0 and parsed[k]
+        }
+        return {"outcome": "would_salvage" if accepted else "would_not_gain", "accepted": accepted, "raw": str(path), "missing_roster_players": []}
+
+    accepted = salvage_grow_from_zero(
+        conn, game_id=game_id, season=season, endpoint_name="game_detail",
+        do_upsert=lambda: parsers.upsert_game_detail(conn, game_id, season, parsed),
+    )
+    missing = penalty_players_missing_from_roster(conn, game_id, season) if "game_penalty_events" in accepted else []
+    for team_id, event_id, player_id in missing:
+        logger.warning(
+            "season=%s game_id=%s: salvaged penalty event_id=%s (team %s) has player_id=%s, not in game_rosters",
+            season, game_id, event_id, team_id, player_id,
+        )
+    return {"outcome": "salvaged" if accepted else "salvage_no_gain", "accepted": accepted, "raw": str(path), "missing_roster_players": missing}
+
+
+def run_salvage(conn: sqlite3.Connection, *, targets: list[tuple[int, int]], dry_run: bool, outcomes_path: Path | None = None) -> dict:
+    candidates = find_target_candidates(conn, targets)
+    logger.info("salvage: %d of %d target game(s) are ended, dry_run=%s", len(candidates), len(targets), dry_run)
+    games = []
+    for game_id, season in candidates:
+        result = salvage_game_detail(conn, season, game_id, dry_run=dry_run)
+        games.append({"season": season, "game_id": game_id, **result})
+        if outcomes_path is not None and not dry_run:
+            new_file = not outcomes_path.exists()
+            with open(outcomes_path, "a", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                if new_file:
+                    writer.writerow(["season", "game_id", "endpoint", "outcome", "checked_at"])
+                writer.writerow([season, game_id, "game_detail", result["outcome"], _iso_utc(_now())])
+    outcomes: dict[str, int] = {}
+    for g in games:
+        outcomes[g["outcome"]] = outcomes.get(g["outcome"], 0) + 1
+    return {
+        "targets": len(targets), "candidates": len(candidates), "dry_run": dry_run, "outcomes": outcomes,
+        "missing_roster_players": {f"{g['season']}:{g['game_id']}": g["missing_roster_players"] for g in games if g["missing_roster_players"]},
+        "games": [{k: g[k] for k in ("season", "game_id", "outcome", "accepted")} for g in games],
+    }
+
+
 def resync_game_endpoint(
     conn: sqlite3.Connection, season: int, game_id: int, endpoint_name: str, *, min_hours_since_fetch: float
 ) -> str:
@@ -374,12 +484,20 @@ def main() -> None:
         "sane refetch rate per game across the whole --days window",
     )
     parser.add_argument("--dry-run", action="store_true", help="report what would be checked, zero HTTP requests")
+    parser.add_argument(
+        "--salvage-from-raw", action="store_true",
+        help="with --targets and --endpoints game_detail: grow-from-zero reparse of each game's saved raw "
+        "response, zero HTTP (see salvage_grow_from_zero)",
+    )
     args = parser.parse_args()
 
     endpoints = [e.strip() for e in args.endpoints.split(",") if e.strip()]
     unknown = set(endpoints) - set(RESYNC_ENDPOINTS)
     if unknown:
         parser.error(f"unknown endpoint(s): {sorted(unknown)}, must be from {RESYNC_ENDPOINTS}")
+
+    if args.salvage_from_raw and (args.targets is None or endpoints != ["game_detail"]):
+        parser.error("--salvage-from-raw needs --targets and --endpoints game_detail")
 
     _configure_logging()
     try:
@@ -389,6 +507,11 @@ def main() -> None:
     days = None if targets is not None else (args.days if args.days is not None else DEFAULT_DAYS)
     conn = db.get_connection()
     try:
+        if args.salvage_from_raw:
+            summary = run_salvage(conn, targets=targets, dry_run=args.dry_run, outcomes_path=args.outcomes)
+            logger.info("salvage complete: %s", summary)
+            print(summary)
+            return
         summary = run_resync(
             conn, days=days, targets=targets, endpoints=endpoints,
             min_hours_since_fetch=args.min_hours_since_fetch, dry_run=args.dry_run,
