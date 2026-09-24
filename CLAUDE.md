@@ -103,10 +103,11 @@ and the Liiga feature store (plan: design chat, 2026-09-24).
   RUNKOSARJA plus 2022:49298 PLAYOFFS). 2021:480 is damaged at source (a
   0–1 final with no goal events). **The feature store treats zero-penalty
   competitive games as missing data.**
-- **Open: 2015 looks partially damaged.** Recovered 2015 games average 10.5
-  penalties per game against 8.0 for games that were never at zero, and the
-  gap holds in every month. Confirming it needs a refetch of 259 games,
-  which is the user's call.
+- **2015 is not partially damaged (checked 2026-09-24).** A guarded
+  refetch of all 793 never-zero 2015/2016 games returned identical penalty
+  counts. The 10.5-vs-8.0 per-game gap comes from liiga.fi recording some
+  games with extra misconduct and untyped penalty entries. **Count minors,
+  not raw penalty events, for power-play features.**
 - **Still deferred: the `game_stats` puck-control pass.** Its filter selects
   5,512 of 5,515 games, so it's effectively the full ≈2.3 h sweep.
 - Tests: 48, `python -m unittest discover -s tests`.

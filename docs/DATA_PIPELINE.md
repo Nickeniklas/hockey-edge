@@ -219,10 +219,12 @@ Details and per-game lists are in `docs/RECOVERY_BACKLOG.md`.
   games. Special-teams features skip these games.
 - **2021:480 is damaged at source.** The final is 0–1, but it has no goal
   events and no goalkeeper events.
-- **2015 penalties look partially damaged.** Games that were never at zero
-  average 8.0 penalties per game, against 10.5 for games recovered in the
-  same season. Treat 2015 special-teams data as suspect until a refetch
-  settles it.
+- **Raw penalty-event counts are not power-play opportunities.** Some games
+  (heavily 2015) list misconduct (`VKV`) and untyped entries as separate
+  events: 36 vs 16 PIM per game, and 83% vs 98% two-minute minors. A
+  2026-09-24 refetch confirmed this comes from the source, not from damage.
+  Count minors (`penalty_minutes = 2`) or derive power plays from penalty
+  timing.
 - `game_puck_control` for 2015–2024 is still thin (~1 row per game against
   ~3). The `game_stats` recovery (RECOVERY_BACKLOG section 2) has not run.
 - A penalty `player_id` of 0 means no individual player, mostly the team

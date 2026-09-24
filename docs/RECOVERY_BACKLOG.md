@@ -117,16 +117,69 @@ as missing data, not as zero penalties.** Special-teams features must skip
 it, not count it as a clean game. No zero-penalty RUNKOSARJA game exists in
 960 clean 2025/2026 games.
 
-### Open finding: 2015 looks partially damaged beyond the zero-count selector
-2015 RUNKOSARJA games recovered this run average **10.5 penalties/game
-(median 10)**. The 259 that were never zero average **8.0 (median 8)**. The
-gap holds in every month of the season (+1.4 to +4.1 per game). All 259
-were fetched inside the bad window (2026-07-20 15:18 to 07-21 05:54 UTC), so
-they probably lost *some* penalties, not all of them. The zero-count
-selector can't see that. 2016 shows a weaker version: 8.75 vs 7.70, n=28
-recovered. Only a refetch can confirm it: 259 games ≈ 6.5 min through
-`resync.py --targets`. **Not done; the user decides.** Until then, treat 2015
-special-teams data as suspect.
+### Partial-damage check, 2015/2016 (run 2026-09-24): no damage; the gap comes from the source
+**The question.** 2015 RUNKOSARJA games recovered above average **10.5
+penalties/game (median 10)**. The 259 that were never at zero average **8.0
+(median 8)**, and the gap holds in every month (+1.4 to +4.1 per game). All
+259 were fetched inside the bad window, so partial loss was the suspicion.
+2016 showed a weaker version (9.1 vs 7.7).
+
+**The check.** Every ended 2015 and 2016 game not in the section 1 targets
+was refetched, any phase: 793 games (`data/recovery/partial_2015_2016_targets.csv`).
+The command was the same as R3: `resync.py --targets … --endpoints game_detail
+--min-hours-since-fetch 168 --outcomes data/recovery/partial_2015_2016_outcomes.csv`.
+Backup: `data/backups/hockey_pre_partial_2015_2016.db`. A PC restart
+interrupted the run after 82 games, cleanly: no shrink, and no game fetched
+without an outcome row. Rerunning the same command resumed it, skipping the
+82 already done. Reports: `before_partial.json`, `after_partial.json`,
+`diff_partial.txt`.
+
+**Result: 699 reparsed, 94 refused, 0 fetch failures. Penalties changed for
+none of them.**
+
+| season × phase | games | penalties/game before → after |
+|---|---|---|
+| 2015 RUNKOSARJA | 259 | 8.03 → 8.03 |
+| 2015 PLAYOFFS | 31 | 7.19 → 7.19 |
+| 2015 PRACTICE | 18 | 7.72 → 7.72 |
+| 2016 RUNKOSARJA | 422 | 7.70 → 7.70 |
+| 2016 PLAYOFFS | 47 | 8.00 → 8.00 |
+| 2016 PRACTICE | 16 | 7.62 → 7.62 |
+
+- **Refusals.** 83 were over `game_goalkeeper_events`: liiga.fi now returns
+  fewer goalkeeper events than the July copy, e.g. 8→0 or 7→1, the same
+  pattern as the 2024:1 regression. The other 11 were over `game_rosters`
+  (−1 to −4). By group: 2015 RUNKOSARJA 54, 2015 PLAYOFFS 26, 2016
+  RUNKOSARJA 13, 2016 PLAYOFFS 1. **None cost a penalty.** The refetch's
+  penalty count equals the DB's in all 94, so there is nothing to salvage.
+  The guard kept the richer July goalkeeper events, which is the right call.
+- Invariants hold: no shrink anywhere, and `game_goal_events` is identical.
+  `game_rosters` grew by +30 in 2015 and +38 in 2016 through ordinary
+  reparses.
+- **The 2015 gap did not close (still 10.5 vs 8.0).** The never-zero games
+  are not partially damaged. liiga.fi returns the same penalties for them
+  today as in July.
+
+**Where the gap comes from: two recording styles in the source.** The
+recovered 2015 games list penalty types that the never-zero games almost
+never have:
+
+| 2015 RUNKOSARJA | penalties/game | PIM/game | share that are 2-min | top extra types |
+|---|---|---|---|---|
+| recovered (161) | 10.5 | 36.3 | 83% | `VKV` 1.28/game, `fault_type` NULL 1.42/game |
+| never-zero (259) | 8.0 | 15.8 | 98% | — |
+
+Counting only 2-minute penalties shrinks the gap from +2.5 to about +0.9 per
+game (8.8 vs 7.9). Which recording style a game got looks like a source-side
+data-entry difference, not anything in this pipeline. It holds in every
+month. Team mix hasn't been checked beyond per-team game counts, which are
+spread across all teams in both groups.
+
+**For the feature store:** don't use raw `game_penalty_events` counts as
+power-play opportunities for 2015 (or anywhere). Count minors
+(`penalty_minutes = 2`) or derive power plays from penalty timing, so
+misconduct-style entries and untyped entries don't inflate special-teams
+rates. 2015 is otherwise no longer suspect.
 
 ### Section 2 (`game_stats`), still deferred
 "Fewer than 3 `game_puck_control` rows" turned out not to narrow anything:
