@@ -463,3 +463,19 @@ was replaced (the old stub had never had a row written to it, so no
 migration was needed — see `storage.py`) with one row per
 (league, season, game_id, team_role) per capture, keeping the full raw
 `game_detail`(+`game_preview`) payload regardless of parse outcome.
+
+# Live-season check (2026-09-24)
+
+**`line==1` starter inference: 71/72 (98.6%)** on job-captured snapshots
+(`scripts/verify_starters.py`, 2 undetermined). The one miss —
+season=2027 game_id=2701312, TPS away — had Markus Ruusu at `line=1` in
+both the mid and closing (T-15) captures, but #36 (id 30117507) played all
+three periods and Ruusu faced zero shots. liiga.fi's published lineup was
+itself wrong or changed in the last 15 minutes; not a parser bug. Treat the
+starter as ~98%, not certain — which `starter_confidence='inferred_structural'`
+already signals.
+
+**Pinnacle's `bookmakerIsActive: false` scales with time to puck drop**
+(09-18/19, 1X2 rows): unparsed 15/35 at >12h, 1/10 at 4–12h, 2/25 at 1–4h,
+2/11 at <1h (a single fixture). The closing poll is reliably live;
+bet365 covered the one closing window Pinnacle missed.
