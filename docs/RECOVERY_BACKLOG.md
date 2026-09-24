@@ -1,4 +1,143 @@
-# RECOVERY_BACKLOG — deferred archaeology, ready-to-execute (2026-08-25)
+# RECOVERY_BACKLOG — historical recovery (planned 2026-08-25, section 1 run 2026-09-24)
+
+**Status: section 1 (`game_detail`) is DONE, including the R5 salvage.
+Section 2 (`game_stats`) is still deferred.** The results come first below.
+The original plan follows unchanged from "Both recoveries below…" onwards as
+history. Where it conflicts with the results, the results win: the target
+was 1,135, not 1,137, and the command used was `--targets`, not
+`--days 4380`.
+
+## Results — section 1, run 2026-09-24
+
+### How it was run
+- Targets: `python scripts/recovery_targets.py` →
+  `data/recovery/game_detail_targets.csv`, **1,135 games** (seasons
+  2015–2024, ended, zero `game_penalty_events`, any phase). That is 2 fewer
+  than the 1,137 below, because the count here didn't filter on `ended`.
+  2015:6570 and 2017:6763 are PRACTICE friendlies that never ended.
+- Fetch: `python -m hockey_edge.ingest.liiga.resync --targets
+  data/recovery/game_detail_targets.csv --endpoints game_detail
+  --min-hours-since-fetch 168 --outcomes data/recovery/game_detail_outcomes.csv`.
+  That was 1,135 requests through the no-shrink guard: **1,086 reparsed,
+  49 refused, 0 fetch failures.** Backup: `data/backups/hockey_pre_recovery.db`.
+- **The damage covered all 10 seasons, 2015–2024**, not the 8 an earlier note
+  listed. 2018 had 35 games and 2022 had 72.
+- Before/after: `scripts/recovery_report.py --out` (before.json,
+  after_detail.json, after_salvage.json) and `--diff`. All files are in
+  `data/recovery/`, which is gitignored.
+
+### The guard is all-or-nothing per game
+The guard reverts **every** guarded table for a game when any one of them
+would shrink. So a refetch that recovers penalties 0→9 but carries one fewer
+`game_rosters` row loses the penalty recovery too. That happened to all 49
+refused games:
+- 48 were refused over `game_rosters`. 2015/2016 competitive games lost 1–5
+  rows; foreign friendlies lost 2–26 (Sibir 31→8 and 30→4, Amur 34→24).
+- 1 was refused over `game_goalkeeper_events` (2021:9947, a friendly, 4→0).
+- 32 of the 49 saved new responses contained penalties: 29 competitive
+  games (2015 RUNKOSARJA 9, 2015 PLAYOFFS 3, 2016 RUNKOSARJA 17) and 3
+  friendlies (2020:1050, 2024:1395, 2024:1549). The other 17 were friendlies
+  with no penalties in either version, so there was nothing to salvage.
+
+### R5 salvage: grow-from-zero (approved 2026-09-24)
+This is a narrow exception to the uniform guard ruling of 2026-08-24:
+`resync.py --salvage-from-raw` (`salvage_grow_from_zero`). It makes **no
+HTTP requests**. It reparses each game's saved raw response and keeps a
+guarded table's new rows **only if that table had zero rows for the game
+before**. Every other guarded table is restored row for row.
+- Targets: `python scripts/recovery_targets.py --salvage-from
+  data/recovery/game_detail_outcomes.csv` → `salvage_targets.csv` (32 games).
+- Run: `python -m hockey_edge.ingest.liiga.resync --targets
+  data/recovery/salvage_targets.csv --endpoints game_detail --salvage-from-raw
+  --outcomes data/recovery/game_detail_outcomes.csv`. Backup:
+  `data/backups/hockey_pre_salvage.db`.
+- Result: **32/32 salvaged, adding 304 penalty events.** 21 of the 32 also
+  had zero goalkeeper events, and those 21 gained 37 goalkeeper events. No
+  roster row changed.
+- Roster check: every salvaged penalty's `player_id` is in that game's
+  `game_rosters`, with zero exceptions. `player_id = 0` is liiga.fi's marker
+  for a penalty with no individual player (mostly *Joukkuerangaistus*, the
+  team penalty; 2,152 rows in the DB) and is not checked. Before the
+  salvage, the DB already had 3 penalties whose player was missing from the
+  roster: 2016:7943 and 2016:7968 (player 25491335) and 2018:8235 (a
+  friendly). None of them came from this recovery.
+- Test: `tests/test_salvage.py`, against the real 2024:1 payloads in
+  `fixtures/liiga/game_detail/` (original, and the refetch whose goalkeeper
+  events fell 7→1).
+
+### Outcome per targeted game (final, after salvage)
+| season | recovered | recovered by salvage | changed, no gain | refused |
+|---|---|---|---|---|
+| 2015 | 184 | 12 | 2 | 0 |
+| 2016 | 16 | 17 | 36 | 0 |
+| 2017 | 2 | 0 | 2 | 8 |
+| 2018 | 0 | 0 | 35 | 0 |
+| 2019 | 12 | 0 | 43 | 0 |
+| 2020 | 37 | 1 | 55 | 1 |
+| 2021 | 10 | 0 | 6 | 1 |
+| 2022 | 0 | 0 | 72 | 0 |
+| 2023 | 459 | 0 | 51 | 7 |
+| 2024 | 52 | 2 | 12 | 0 |
+
+331 targets still have zero penalties: the 314 "changed, no gain" games and
+the 17 still refused. 324 of them are PRACTICE friendlies. The other 7 are
+the known gaps below: 6 RUNKOSARJA and 1 PLAYOFFS.
+
+### Acceptance (R4)
+1. Each targeted game has exactly one outcome (table above).
+2. No guarded table's total shrank for any season.
+3. `game_goal_events` counts are identical before and after for every season.
+4. **Zero-penalty RUNKOSARJA games in 2015–2024: 665 → 6.** The clean
+   2025/2026 reference is 0 of 960, so the 6 are listed below as known gaps.
+5. Penalties per game are in line with 2025/2026 (7.0–7.5) for 2016–2024,
+   at 7.0–8.6. **2015 is not: 8.99.** See the open finding below.
+6. Goalkeeper-event coverage, report only: 2015 RUNKOSARJA 41%→65% and
+   2023 0%→63%; other seasons moved by a few points.
+
+### Known gaps: the 6 zero-penalty RUNKOSARJA games left
+All six were reparsed. liiga.fi itself now returns zero penalties for them,
+so a refetch won't help.
+
+| game | teams | final | note |
+|---|---|---|---|
+| 2016:7862 | Sport–HIFK | 1–2 | goal events match score |
+| 2017:4409 | JYP–Tappara | 2–3 | goal events match score |
+| 2020:252 | Jukurit–KooKoo | 1–3 | goal events match score |
+| 2021:480 | HIFK–Kärpät | 0–1 | **damaged at source**: final 0–1 but zero goal events and zero goalkeeper events |
+| 2022:317 | Ässät–SaiPa | 5–6 | goal events match score |
+| 2022:332 | SaiPa–Kärpät | 0–5 | goal events match score |
+
+One more competitive game in the same state, outside the RUNKOSARJA
+count: **2022:49298, PLAYOFFS, KooKoo–Pelicans 1–0**. It was reparsed,
+liiga.fi still returns zero penalties, and its goal events match the score.
+These 7 are the only zero-penalty competitive games in seasons 2015–2026.
+
+**For the feature store: a competitive game with zero penalty events counts
+as missing data, not as zero penalties.** Special-teams features must skip
+it, not count it as a clean game. No zero-penalty RUNKOSARJA game exists in
+960 clean 2025/2026 games.
+
+### Open finding: 2015 looks partially damaged beyond the zero-count selector
+2015 RUNKOSARJA games recovered this run average **10.5 penalties/game
+(median 10)**. The 259 that were never zero average **8.0 (median 8)**. The
+gap holds in every month of the season (+1.4 to +4.1 per game). All 259
+were fetched inside the bad window (2026-07-20 15:18 to 07-21 05:54 UTC), so
+they probably lost *some* penalties, not all of them. The zero-count
+selector can't see that. 2016 shows a weaker version: 8.75 vs 7.70, n=28
+recovered. Only a refetch can confirm it: 259 games ≈ 6.5 min through
+`resync.py --targets`. **Not done; the user decides.** Until then, treat 2015
+special-teams data as suspect.
+
+### Section 2 (`game_stats`), still deferred
+"Fewer than 3 `game_puck_control` rows" turned out not to narrow anything:
+it selects 5,512 of the 5,515 ended 2015–2024 games
+(`data/recovery/game_stats_targets.csv`). So the pass is effectively the full
+sweep, ≈2.3 h. When it runs, use `resync.py --targets
+data/recovery/game_stats_targets.csv --endpoints game_stats
+--min-hours-since-fetch 168 --outcomes …`, split by season if needed, not
+`backfill.py --force`.
+
+---
 
 Both recoveries below are **not run this session** — this doc captures exact
 commands and cost estimates so they can be run later without re-deriving

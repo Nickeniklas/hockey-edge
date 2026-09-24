@@ -155,6 +155,16 @@ did to curated tables. **Compared per-table, not per-team** — an event
 moving between the home/away arrays (the `penaltyEvents` finding in 4a) is a
 legitimate correction and does not trip the guard.
 
+**The guard is all-or-nothing per game** (noted 2026-09-24). One shrinking
+table reverts *every* guarded table for that game. So a refetch that
+recovers `game_penalty_events` 0→9 while carrying one fewer `game_rosters`
+row throws the penalty recovery away. The raw response is still saved. The
+one approved exception is `--salvage-from-raw` (`salvage_grow_from_zero`):
+no HTTP, reparse the saved raw, accept a table only if it had zero rows for
+that game before, and restore everything else. It exists for the 2015–2024
+recovery (49 refusals, 32 salvaged). Results are in
+`docs/RECOVERY_BACKLOG.md`.
+
 Guarded tables per endpoint (all `(game_id, season)`-scoped
 delete-and-reinsert tables — see `resync.py`'s `GUARDED_TABLES`):
 `game_detail` → `game_rosters`, `game_penalty_events`,

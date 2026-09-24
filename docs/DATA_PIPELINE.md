@@ -210,6 +210,24 @@ strictly from data with timestamps **before that game's puck drop**. Feature fam
 Explicitly excluded: win/loss streaks, head-to-head history, player point streaks
 (noise / superstition).
 
+### Known data gaps the store must respect (after the 2026-09-24 recovery)
+Details and per-game lists are in `docs/RECOVERY_BACKLOG.md`.
+- **A competitive game with zero `game_penalty_events` is missing data, not
+  a clean game.** Seven remain in 2015–2026: six RUNKOSARJA (2016:7862,
+  2017:4409, 2020:252, 2021:480, 2022:317, 2022:332) and one PLAYOFFS
+  (2022:49298). None occurs in the 960 clean 2025/2026 regular-season
+  games. Special-teams features skip these games.
+- **2021:480 is damaged at source.** The final is 0–1, but it has no goal
+  events and no goalkeeper events.
+- **2015 penalties look partially damaged.** Games that were never at zero
+  average 8.0 penalties per game, against 10.5 for games recovered in the
+  same season. Treat 2015 special-teams data as suspect until a refetch
+  settles it.
+- `game_puck_control` for 2015–2024 is still thin (~1 row per game against
+  ~3). The `game_stats` recovery (RECOVERY_BACKLOG section 2) has not run.
+- A penalty `player_id` of 0 means no individual player, mostly the team
+  penalty. It is not a player.
+
 ## Gotchas
 - Leakage sneaks in via post-game box scores used to build "pre-game" features —
   the `captured_at` discipline exists to catch exactly this.

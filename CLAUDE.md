@@ -79,6 +79,38 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 6. LightGBM + blend
 7. Prediction log + local dashboard
 
+## Status (as of 2026-09-24)
+
+**The historical `game_detail` recovery is done**, including an approved
+grow-from-zero salvage. Results are in `docs/RECOVERY_BACKLOG.md`, and the
+data gaps the feature store must respect are in `docs/DATA_PIPELINE.md`.
+The build order has changed: NHL ingest is deferred behind the recovery
+and the Liiga feature store (plan: design chat, 2026-09-24).
+
+- **Zero-penalty RUNKOSARJA games in 2015–2024 went 665 → 6.** The fetch
+  was `resync.py --targets` (new; exact `season,game_id` lists from
+  `scripts/recovery_targets.py`): 1,135 requests, 1,086 reparsed, 49
+  refused by the guard, no failures. `game_goal_events` is unchanged
+  everywhere, and no guarded table shrank anywhere
+  (`scripts/recovery_report.py --diff`).
+- **The guard is all-or-nothing per game.** 32 refused games had penalties
+  in their refetch but lost 1–5 `game_rosters` rows, so the guard reverted
+  everything, penalties included. `resync.py --salvage-from-raw` (approved
+  exception, no HTTP) re-applied only the tables that had been at zero:
+  304 penalty events and 37 goalkeeper events, with rosters untouched.
+  Every salvaged penalty's player is in that game's roster.
+- **7 competitive games still have zero penalties** at liiga.fi itself (6
+  RUNKOSARJA plus 2022:49298 PLAYOFFS). 2021:480 is damaged at source (a
+  0–1 final with no goal events). **The feature store treats zero-penalty
+  competitive games as missing data.**
+- **Open: 2015 looks partially damaged.** Recovered 2015 games average 10.5
+  penalties per game against 8.0 for games that were never at zero, and the
+  gap holds in every month. Confirming it needs a refetch of 259 games,
+  which is the user's call.
+- **Still deferred: the `game_stats` puck-control pass.** Its filter selects
+  5,512 of 5,515 games, so it's effectively the full ≈2.3 h sweep.
+- Tests: 48, `python -m unittest discover -s tests`.
+
 ## Status (as of 2026-09-18)
 
 Odds capture has now run live through one evening and one morning. **Phase 4
@@ -275,8 +307,8 @@ below) are explicitly deferred, not done. What did ship:
   window, 2026-07-19T19:55 UTC through 2026-07-21T05:53 UTC, during the
   original 10-season backfill run.** liiga.fi intermittently served
   `game_detail` responses missing real penalty/goalkeeper-event data during
-  that window — 1,164 games across 8 seasons (2015, 16, 17, 19, 20, 21, 23,
-  24) have zero `game_penalty_events` despite a `success` sync_state row,
+  that window — 1,164 games across all 10 seasons 2015–2024 (an earlier
+  version of this line said 8 and omitted 2018 and 2022, which have 35 and 72) have zero `game_penalty_events` despite a `success` sync_state row,
   in two distinct symptom shapes (missing the whole `game` JSON key vs. a
   `game` key present with empty event arrays) — both confirmed independently
   recoverable via a live refetch. Never recurred outside that window
@@ -284,8 +316,8 @@ below) are explicitly deferred, not done. What did ship:
   confirmed-clean run, and are more likely genuine than broken). Full
   per-season/per-symptom-class breakdown, the exact recovery commands (via
   the guarded `resync.py` path, not the unguarded `backfill.py` one — see
-  Gotchas), and cost estimates are in **`docs/RECOVERY_BACKLOG.md`** — not
-  run this session, ready to execute later. One open question logged there
+  Gotchas), and cost estimates are in **`docs/RECOVERY_BACKLOG.md`**.
+  **[Run 2026-09-24; see the 2026-09-24 Status entry.]** One open question logged there
   with no proposed mechanism: 45 `PLAYOFFS` games fetched in the exact same
   78-minute sub-window that broke 450 `RUNKOSARJA` games came through 100%
   clean — phase seems to matter, timing alone doesn't explain it.
@@ -576,11 +608,17 @@ below) are explicitly deferred, not done. What did ship:
   rule (an earlier, since-superseded version of this note said that): a
   *targeted* `game_detail` recovery through the guarded `resync.py` path is
   safe precisely because the guard blocks any reparse that would shrink
-  `game_rosters`/`game_penalty_events`/`game_goalkeeper_events`. 1,164
-  games across 8 seasons are confirmed to need exactly this recovery (a
-  bounded ~34h liiga.fi-side incident, 2026-07-19/21 — see the 2026-08-25
-  Status entry above) — exact commands and per-season counts in
-  `docs/RECOVERY_BACKLOG.md`, not run yet.
+  `game_rosters`/`game_penalty_events`/`game_goalkeeper_events`. That
+  recovery ran 2026-09-24 over 1,135 games in all 10 seasons 2015–2024,
+  covering the bounded ~34h liiga.fi-side incident of 2026-07-19/21.
+  Results are in `docs/RECOVERY_BACKLOG.md`. **The guard is all-or-nothing
+  per game**: one shrinking table reverts all of them, so use
+  `resync.py --salvage-from-raw` (grow-from-zero, no HTTP) to recover a
+  refused game's empty tables.
+- **A penalty `player_id` of 0 is not a player.** liiga.fi uses it for
+  penalties with no individual player, mostly *Joukkuerangaistus* (team
+  penalty): 2,152 rows, and no player 0 exists. Exclude it from any
+  player-level join or check.
 - **Goal-event surplus (`game_goal_events` count vs. final-score sum) is not
   a single consistent pattern — magnitude varies season to season and
   remains unexplained beyond the mechanisms already found.** Season 2026:
