@@ -72,7 +72,8 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 2. Snapshot capture job (lineups/goalies/odds) — deploy EARLY; missed data is gone forever
    — **deployed 2026-09-02**; lineups capturing, **odds capturing for real since
    2026-09-17** (OddsPapi, pinnacle + bet365)
-3. NHL ingest
+3. NHL ingest — **deferred (reordered 2026-09-24)**: historical recovery
+   (`docs/RECOVERY_BACKLOG.md`) then the Liiga feature store come first
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
 6. LightGBM + blend

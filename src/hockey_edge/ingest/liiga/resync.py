@@ -23,6 +23,15 @@ Usage (from repo root, venv active):
     python -m hockey_edge.ingest.liiga.resync --days 7
     python -m hockey_edge.ingest.liiga.resync --days 7 --dry-run
     python -m hockey_edge.ingest.liiga.resync --days 7 --endpoints game_stats
+    python -m hockey_edge.ingest.liiga.resync --targets data/recovery/game_detail_targets.csv \
+        --endpoints game_detail --min-hours-since-fetch 168 --outcomes data/recovery/game_detail_outcomes.csv
+
+`--targets` (mutually exclusive with `--days`) takes a CSV with a required
+`season,game_id` header and re-syncs exactly those games -- the historical
+recovery path (docs/RECOVERY_BACKLOG.md). Listed games that are unknown or
+not ended are logged at WARNING and skipped, never fatal. `--outcomes`
+appends one `season,game_id,endpoint,outcome` row per checked pair, so a
+resumed run adds to the record rather than overwriting it.
 
 Staleness is derived from `sync_state.fetched_at` vs. `games.start_utc` —
 two columns that already exist — rather than a new `last_verified_at`
@@ -30,6 +39,7 @@ column, so this needed no DDL change.
 """
 
 import argparse
+import csv
 import logging
 import sqlite3
 import sys
@@ -100,6 +110,50 @@ def find_resync_candidates(conn: sqlite3.Connection, *, days: int) -> list[tuple
         (cutoff,),
     ).fetchall()
     return [(r[0], r[1]) for r in rows]
+
+
+def load_targets(path: Path) -> list[tuple[int, int]]:
+    """Reads a `season,game_id` CSV (header required). Returns (season,
+    game_id) pairs in file order, duplicates dropped. A malformed row is
+    logged at WARNING and skipped; a missing/wrong header raises ValueError,
+    since then no row can be trusted."""
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.reader(f)
+        header = [h.strip() for h in next(reader, [])]
+        if header[:2] != ["season", "game_id"]:
+            raise ValueError(f"{path}: expected header 'season,game_id', got {header!r}")
+        targets: list[tuple[int, int]] = []
+        seen: set[tuple[int, int]] = set()
+        for line_no, row in enumerate(reader, start=2):
+            if not any(cell.strip() for cell in row):
+                continue
+            try:
+                pair = (int(row[0]), int(row[1]))
+            except (IndexError, ValueError):
+                logger.warning("%s line %d: bad target row %r, skipped", path, line_no, row)
+                continue
+            if pair not in seen:
+                seen.add(pair)
+                targets.append(pair)
+    return targets
+
+
+def find_target_candidates(conn: sqlite3.Connection, targets: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Listed (season, game_id) pairs that exist in `games` with ended=1, as
+    (game_id, season) pairs in target-file order. Anything else is logged at
+    WARNING and skipped."""
+    candidates = []
+    for season, game_id in targets:
+        row = conn.execute(
+            "SELECT ended FROM games WHERE game_id = ? AND season = ?", (game_id, season)
+        ).fetchone()
+        if row is None:
+            logger.warning("target season=%s game_id=%s: not in games, skipped", season, game_id)
+        elif row[0] != 1:
+            logger.warning("target season=%s game_id=%s: not ended, skipped", season, game_id)
+        else:
+            candidates.append((game_id, season))
+    return candidates
 
 
 def _get_sync_state(conn: sqlite3.Connection, endpoint_name: str, season: int, game_id: int):
@@ -242,34 +296,73 @@ def resync_game_endpoint(
 
 
 def run_resync(
-    conn: sqlite3.Connection, *, days: int, endpoints: list[str],
-    min_hours_since_fetch: float, dry_run: bool,
+    conn: sqlite3.Connection, *, endpoints: list[str], min_hours_since_fetch: float, dry_run: bool,
+    days: int | None = None, targets: list[tuple[int, int]] | None = None,
+    outcomes_path: Path | None = None,
 ) -> dict:
-    candidates = find_resync_candidates(conn, days=days)
-    logger.info(
-        "resync: %d candidate game(s) with ended=1 in the last %d day(s), endpoints=%s, dry_run=%s",
-        len(candidates), days, endpoints, dry_run,
-    )
+    """Exactly one of `days` (time window) or `targets` ((season, game_id)
+    pairs from load_targets) selects the candidates."""
+    if (days is None) == (targets is None):
+        raise ValueError("pass exactly one of days or targets")
+
+    if targets is not None:
+        candidates = find_target_candidates(conn, targets)
+        logger.info(
+            "resync: %d of %d target game(s) are ended, endpoints=%s, dry_run=%s",
+            len(candidates), len(targets), endpoints, dry_run,
+        )
+    else:
+        candidates = find_resync_candidates(conn, days=days)
+        logger.info(
+            "resync: %d candidate game(s) with ended=1 in the last %d day(s), endpoints=%s, dry_run=%s",
+            len(candidates), days, endpoints, dry_run,
+        )
+
+    outcomes_file = writer = None
+    if outcomes_path is not None and not dry_run:
+        new_file = not outcomes_path.exists()
+        outcomes_path.parent.mkdir(parents=True, exist_ok=True)
+        outcomes_file = open(outcomes_path, "a", newline="", encoding="utf-8")
+        writer = csv.writer(outcomes_file)
+        if new_file:
+            writer.writerow(["season", "game_id", "endpoint", "outcome", "checked_at"])
 
     outcome_counts: dict[str, dict[str, int]] = {}
-    for game_id, season in candidates:
-        for endpoint_name in endpoints:
-            if dry_run:
-                due = _is_due(conn, endpoint_name, season, game_id, min_hours_since_fetch=min_hours_since_fetch)
-                outcome = "would_check" if due else "skipped_not_due"
-            else:
-                outcome = resync_game_endpoint(
-                    conn, season, game_id, endpoint_name, min_hours_since_fetch=min_hours_since_fetch,
-                )
-            bucket = outcome_counts.setdefault(endpoint_name, {})
-            bucket[outcome] = bucket.get(outcome, 0) + 1
+    by_season: dict[int, dict[str, dict[str, int]]] = {}
+    try:
+        for game_id, season in candidates:
+            for endpoint_name in endpoints:
+                if dry_run:
+                    due = _is_due(conn, endpoint_name, season, game_id, min_hours_since_fetch=min_hours_since_fetch)
+                    outcome = "would_check" if due else "skipped_not_due"
+                else:
+                    outcome = resync_game_endpoint(
+                        conn, season, game_id, endpoint_name, min_hours_since_fetch=min_hours_since_fetch,
+                    )
+                    if writer is not None:
+                        writer.writerow([season, game_id, endpoint_name, outcome, _iso_utc(_now())])
+                        outcomes_file.flush()  # a Ctrl-C mid-run keeps every row written so far
+                bucket = outcome_counts.setdefault(endpoint_name, {})
+                bucket[outcome] = bucket.get(outcome, 0) + 1
+                season_bucket = by_season.setdefault(season, {}).setdefault(endpoint_name, {})
+                season_bucket[outcome] = season_bucket.get(outcome, 0) + 1
+    finally:
+        if outcomes_file is not None:
+            outcomes_file.close()
 
-    return {"days": days, "candidates": len(candidates), "dry_run": dry_run, "outcomes": outcome_counts}
+    return {
+        "days": days, "targets": len(targets) if targets is not None else None,
+        "candidates": len(candidates), "dry_run": dry_run,
+        "outcomes": outcome_counts, "by_season": dict(sorted(by_season.items())),
+    }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--days", type=int, default=DEFAULT_DAYS, help=f"re-sync games with ended=1 and start_utc within the last N days (default {DEFAULT_DAYS})")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--days", type=int, default=None, help=f"re-sync games with ended=1 and start_utc within the last N days (default {DEFAULT_DAYS})")
+    selection.add_argument("--targets", type=Path, default=None, help="CSV with a 'season,game_id' header: re-sync exactly these games (ended=1 only)")
+    parser.add_argument("--outcomes", type=Path, default=None, help="append one season,game_id,endpoint,outcome row per checked pair to this CSV (ignored with --dry-run)")
     parser.add_argument(
         "--endpoints", type=str, default=",".join(RESYNC_ENDPOINTS),
         help="comma-separated subset of " + ",".join(RESYNC_ENDPOINTS),
@@ -289,11 +382,17 @@ def main() -> None:
         parser.error(f"unknown endpoint(s): {sorted(unknown)}, must be from {RESYNC_ENDPOINTS}")
 
     _configure_logging()
+    try:
+        targets = load_targets(args.targets) if args.targets is not None else None
+    except (OSError, ValueError) as e:
+        parser.error(str(e))
+    days = None if targets is not None else (args.days if args.days is not None else DEFAULT_DAYS)
     conn = db.get_connection()
     try:
         summary = run_resync(
-            conn, days=args.days, endpoints=endpoints,
+            conn, days=days, targets=targets, endpoints=endpoints,
             min_hours_since_fetch=args.min_hours_since_fetch, dry_run=args.dry_run,
+            outcomes_path=args.outcomes,
         )
         logger.info("resync complete: %s", summary)
         print(summary)
