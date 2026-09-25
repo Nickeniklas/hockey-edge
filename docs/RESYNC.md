@@ -61,6 +61,12 @@ already be running.
 
 ### The deferred 2015–2024 `game_puck_control` recovery — exact command, and a hard warning
 
+**[Superseded 2026-09-25. It ran through `resync.py --targets`, not the
+`backfill.py` command below. Only 2023/2024 had puck-control values to
+gain, and the refetch stripped period stats, which had to be restored from
+backup. Do not run the command below: it would apply the stripped values
+with no guard at all. See `docs/RECOVERY_BACKLOG.md` section 2 results.]**
+
 CLAUDE.md's CRITICAL FINDING already identified ~11,000 missing
 `game_puck_control` rows across seasons 2015–2024 (average ~0.95 rows/game
 vs. ~2.9 in 2025/2026), recoverable via a `game_stats`-scoped `--force`
@@ -155,6 +161,17 @@ did to curated tables. **Compared per-table, not per-team** — an event
 moving between the home/away arrays (the `penaltyEvents` finding in 4a) is a
 legitimate correction and does not trip the guard.
 
+**The guard counts rows; it cannot see stripped values** (found
+2026-09-25). liiga.fi now serves 2015–2024 `game_stats` with the same
+number of period rows but time on ice, corsi, faceoffs, power-play lists
+and some goals zeroed or null. 3,953 such reparses passed the guard and had
+to be restored from backup (`scripts/repair_game_stats.py`,
+`docs/RECOVERY_BACKLOG.md`). After any bulk reparse, check
+`scripts/recovery_report.py --diff` section 8 (value sums), not just the
+row counts. **Open:** `--days 7` in the nightly sync reparses live games'
+`game_stats` through the same guard, and a value-level check for it is not
+built.
+
 **The guard is all-or-nothing per game** (noted 2026-09-24). One shrinking
 table reverts *every* guarded table for that game. So a refetch that
 recovers `game_penalty_events` 0→9 while carrying one fewer `game_rosters`
@@ -186,6 +203,8 @@ enriches completed games' responses" — true for `game_stats` and `shotmap`,
 **false as a general claim**: `game_detail` can retroactively *lose* data.
 Treat "liiga.fi's data for a completed game can still change after original
 fetch, in either direction" as the accurate framing going forward.
+**[2026-09-25: `game_stats` loses data too. 2015–2024 responses now come
+back with period stats stripped; see the guard note in 4c.]**
 
 ---
 

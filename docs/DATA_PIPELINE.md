@@ -225,8 +225,19 @@ Details and per-game lists are in `docs/RECOVERY_BACKLOG.md`.
   2026-09-24 refetch confirmed this comes from the source, not from damage.
   Count minors (`penalty_minutes = 2`) or derive power plays from penalty
   timing.
-- `game_puck_control` for 2015–2024 is still thin (~1 row per game against
-  ~3). The `game_stats` recovery (RECOVERY_BACKLOG section 2) has not run.
+- **`game_puck_control` has values only from 2023 on.** Every 2015–2022 row
+  is an all-null placeholder, at the source too. After the 2026-09-25
+  recovery, 2023 has 3 valued periods in 488/562 games and 2024 in 479/561
+  (2025: 528/614). Treat a null or missing period as missing data.
+- **Puck-control seconds are cumulative in 2023–2026 but per-period in
+  2027.** For 2023–2026, home + away + contested ≈ 1,200 / 2,400 / 3,600 s
+  for periods 1/2/3, and home control rises period on period in 98% of
+  consecutive pairs. For 2027 each period sums to ≈1,190 s. Difference
+  consecutive periods before 2027; don't use the raw values across seasons
+  as is.
+- **`game_stats` period stats for 2015–2024 come from the July 2026 fetch.**
+  liiga.fi now serves those games with time on ice, corsi, faceoffs and
+  power-play lists stripped. The curated tables hold the good version.
 - A penalty `player_id` of 0 means no individual player, mostly the team
   penalty. It is not a player.
 

@@ -73,11 +73,50 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
    — **deployed 2026-09-02**; lineups capturing, **odds capturing for real since
    2026-09-17** (OddsPapi, pinnacle + bet365)
 3. NHL ingest — **deferred (reordered 2026-09-24)**: historical recovery
-   (`docs/RECOVERY_BACKLOG.md`) then the Liiga feature store come first
+   (`docs/RECOVERY_BACKLOG.md`, **done 2026-09-25**) then the Liiga feature
+   store come first
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-09-25)
+
+**The historical recovery is finished.** The `game_stats` pass ran, damaged
+data without the guard noticing, and was repaired from the pre-run backup.
+Net result: 2015–2024 period stats are exactly as before, and 2023/2024
+gained puck control. Full record: `docs/RECOVERY_BACKLOG.md` section 2
+results. Next in the build order is the Liiga feature store (step 4).
+
+- **liiga.fi now serves 2015–2024 `game_stats` with the period stats
+  stripped.** The row counts are the same, but player time on ice and corsi
+  are 0, faceoffs are null, power-play/shorthanded lists are empty, and some
+  period goals are missing. `puckStats` gained periods. The run
+  (`resync.py --targets`, 5,512 requests, 0 fetch failures) reparsed 3,953
+  games. **The no-shrink guard compares row counts only, so it let every one
+  of them through.** It refused the other 1,553, which also had rows missing.
+- **Repaired with `scripts/repair_game_stats.py` (approved, no HTTP).** It
+  restored the three period-stats tables for the reparsed games exactly from
+  `data/backups/hockey_pre_gamestats.db` (verified table-for-table, ids
+  included). It then added only puck-control periods that carry a value and
+  whose game's stored rows appear unchanged in the new response. That was
+  1,934 rows, all in 2023/2024, and no existing row changed. The state before
+  the repair is kept in `data/backups/hockey_post_gamestats_run.db`.
+- **Puck control has values only from 2023 on.** 2015–2022 responses carry
+  all-null placeholder rows, before and after, so nothing was recoverable
+  there (the old "~11,000 recoverable rows" was row counts, not data). Games
+  with 3 valued periods: 2023 488/562, 2024 479/561, on par with 2025's
+  528/614.
+- **Puck-control seconds are cumulative in 2023–2026 and per-period in
+  2027** (see `docs/DATA_PIPELINE.md`).
+- **`recovery_report.py --diff` now checks value sums (section 8)**, not just
+  row counts. Section 7 counts only puck-control rows that carry a value.
+- **Open: the guard's blind spot applies to the nightly `resync --days 7`**
+  too. It refetches `game_stats` for live games through the same row-count
+  guard. 2025–2027 are unaffected today, but nothing would catch a stripped
+  refetch. A value-level check for `game_stats` in `resync.py` is the fix;
+  not built (it changes the reviewed guard, so it needs a decision).
+- Tests: 57, `python -m unittest discover -s tests`.
 
 ## Status (as of 2026-09-24)
 
@@ -110,6 +149,7 @@ and the Liiga feature store (plan: design chat, 2026-09-24).
   not raw penalty events, for power-play features.**
 - **Still deferred: the `game_stats` puck-control pass.** Its filter selects
   5,512 of 5,515 games, so it's effectively the full ≈2.3 h sweep.
+  **[Run 2026-09-25; see the 2026-09-25 Status entry.]**
 - Tests: 48, `python -m unittest discover -s tests`.
 
 ## Status (as of 2026-09-18)
@@ -285,6 +325,8 @@ below) are explicitly deferred, not done. What did ship:
 - **liiga.fi's `game_detail` responses can change in EITHER direction on
   refetch — not just retroactive enrichment.** The 2026-08-23 CRITICAL
   FINDING below only tested `game_stats` (which does only ever gain data).
+  **[Wrong for `game_stats` too: 2026-09-25 found historical responses
+  with period stats stripped. See the 2026-09-25 Status entry.]**
   `game_detail` can retroactively *lose* real event data
   (`goalKeeperEvents`/`goalKeeperChanges`) on a refetch of the same
   completed game; `shotmap` only ever corrects a stat in place. See
@@ -383,7 +425,8 @@ below) are explicitly deferred, not done. What did ship:
   section + its 2026-08-23 data-completeness audit table: (1) liiga.fi
   retroactively enriches `game_stats` responses after original fetch —
   confirmed on a season=2024 game, likely affects `game_puck_control` for
-  all of 2015-2024; (2) season 2025 has a 79-game `shot_events` gap
+  all of 2015-2024 **[2026-09-25: only 2023/2024 had puck-control values to
+  gain, and the same refetch stripped the period stats]**; (2) season 2025 has a 79-game `shot_events` gap
   (coordinates only, nothing else affected) clustered in the season's final
   month, unlike any other season's pattern.
 
@@ -597,7 +640,9 @@ below) are explicitly deferred, not done. What did ship:
   disk regardless (append-only, no loss either way). Consequences: (a) a
   `game_stats`-scoped (and `shotmap`-scoped) `--force` refetch of seasons
   2015-2024 would likely recover the missing `game_puck_control` periods —
-  still deferred, exact command in `docs/RESYNC.md`'s 4b section; (b) the
+  **[ran 2026-09-25 through `resync.py`: it recovered puck control for
+  2023/2024 only, and stripped period stats that had to be restored from
+  backup; see the next gotcha]**; (b) the
   live snapshot/ingest path needed a periodic re-sync of recently-completed
   games rather than fetch-once-and-mark-`success`-forever — built
   2026-08-24 as `resync.py --days N`, see `docs/RESYNC.md`. This is a
@@ -616,6 +661,16 @@ below) are explicitly deferred, not done. What did ship:
   per game**: one shrinking table reverts all of them, so use
   `resync.py --salvage-from-raw` (grow-from-zero, no HTTP) to recover a
   refused game's empty tables.
+- **The no-shrink guard counts rows; it cannot see stripped values.**
+  liiga.fi now serves 2015–2024 `game_stats` with the same number of period
+  rows but time on ice, corsi, faceoffs, power-play lists and some goals
+  zeroed or null (found 2026-09-25; real pair in
+  `fixtures/liiga/game_stats/2024_game2_*.json`). **Never refetch
+  `game_stats` for 2015–2024 into curated tables again**: the July 2026
+  fetch is the good copy, and the raw files keep both versions. Check value
+  sums (`recovery_report.py --diff` section 8), not just row counts, after
+  any bulk reparse. The nightly `resync --days 7` uses the same row-count
+  guard on live games; a value-level check for it is still open.
 - **A penalty `player_id` of 0 is not a player.** liiga.fi uses it for
   penalties with no individual player, mostly *Joukkuerangaistus* (team
   penalty): 2,152 rows, and no player 0 exists. Exclude it from any

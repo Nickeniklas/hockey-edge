@@ -1,7 +1,9 @@
-# RECOVERY_BACKLOG — historical recovery (planned 2026-08-25, section 1 run 2026-09-24)
+# RECOVERY_BACKLOG — historical recovery (planned 2026-08-25, section 1 run 2026-09-24, section 2 run 2026-09-25)
 
-**Status: section 1 (`game_detail`) is DONE, including the R5 salvage.
-Section 2 (`game_stats`) is still deferred.** The results come first below.
+**Status: both recoveries are DONE.** Section 1 (`game_detail`) includes the
+R5 salvage. Section 2 (`game_stats`) ran on 2026-09-25, damaged period stats
+without the guard noticing, and was repaired the same day; its net gain is
+puck control for 2023/2024 only. The results come first below.
 The original plan follows unchanged from "Both recoveries below…" onwards as
 history. Where it conflicts with the results, the results win: the target
 was 1,135, not 1,137, and the command used was `--targets`, not
@@ -181,14 +183,91 @@ power-play opportunities for 2015 (or anywhere). Count minors
 misconduct-style entries and untyped entries don't inflate special-teams
 rates. 2015 is otherwise no longer suspect.
 
-### Section 2 (`game_stats`), still deferred
+### Section 2 (`game_stats`), planned
 "Fewer than 3 `game_puck_control` rows" turned out not to narrow anything:
 it selects 5,512 of the 5,515 ended 2015–2024 games
 (`data/recovery/game_stats_targets.csv`). So the pass is effectively the full
 sweep, ≈2.3 h. When it runs, use `resync.py --targets
 data/recovery/game_stats_targets.csv --endpoints game_stats
 --min-hours-since-fetch 168 --outcomes …`, split by season if needed, not
-`backfill.py --force`.
+`backfill.py --force`. **[Ran 2026-09-25, see the next section.]**
+
+## Results — section 2, run and repaired 2026-09-25
+
+### How it was run
+- Backup: `data/backups/hockey_pre_gamestats.db`. Before/after reports:
+  `data/recovery/before_stats.json` and `after_stats.json`.
+- Fetch: `python -m hockey_edge.ingest.liiga.resync --targets
+  data/recovery/game_stats_targets.csv --endpoints game_stats
+  --min-hours-since-fetch 168 --outcomes data/recovery/game_stats_outcomes.csv`.
+  5,512 requests over 3 h (04:59–07:58 UTC), **0 fetch failures** (even the
+  160 games stored as `failed_permanent` since July came back). 3,953
+  reparsed, 1,553 refused by the guard, 6 unchanged.
+- The row-count diff passed ("invariants hold").
+
+### What went wrong: stripped values, same row counts
+liiga.fi now serves 2015–2024 `game_stats` with the per-period stats
+stripped. For season 2021 game 1: player `timeofice` 170 → 0, corsi → 0,
+faceoff fields → null, `powerPlayInstances` lists empty, and goals missing
+from some periods. The periods also come back in a different order. The JSON
+keys are unchanged, so this is not a rename. It's the data. The
+`puckStats` section gained periods at the same time.
+
+- **The 3,953 reparsed games** had the same row counts, so the guard let
+  them through. Across them, regulation power-play and shorthanded
+  instances summed to 0, goals fell about 25%, and faceoff wins fell to 0
+  for 2015–2022.
+- **The 1,553 refused games** had rows missing on top of that: 766 lost
+  regulation-period rows (375 of them inside a 20-minute spike, 05:50–06:10
+  UTC, which is why 2018 was refused 419/572), 579 lost only OT/shootout
+  period rows (spread evenly through the run), and 208 came back with no
+  team rows at all.
+- A rerun of the refused games was considered and dropped: it would apply
+  the same stripped values.
+
+### Puck control only ever had values from 2023 on
+Every 2015–2022 puck-control row is all-null, in both the July fetch and
+this one. The "~11,000 missing rows" in the original plan below counted
+rows, not values. The only real gain was 2023/2024.
+
+### The repair (approved 2026-09-25, no HTTP)
+`python scripts/repair_game_stats.py --backup
+data/backups/hockey_pre_gamestats.db --outcomes
+data/recovery/game_stats_outcomes.csv --apply --report
+data/recovery/game_stats_repair.csv`. The damaged state is kept in
+`data/backups/hockey_post_gamestats_run.db`.
+
+1. Restored `game_team_period_stats`, `game_player_period_stats`,
+   `game_goalie_period_stats` and `game_puck_control` for the 3,953
+   reparsed games from the backup, ids included.
+2. Added puck-control periods from each targeted game's latest raw
+   response, only where every stored row appears unchanged in it and only
+   rows that carry a value. **1,934 rows added (2023: 976, 2024: 958).** 9
+   games conflicted (2015: 4, 2016: 4, 2018: 1, all refused games) and were
+   left as they were. No existing row was changed or deleted.
+3. The script verified, in the same transaction, that the three period
+   tables equal the backup exactly and that `game_puck_control` equals the
+   backup plus the added rows.
+
+`recovery_report.py --diff data/recovery/before_repair.json
+data/recovery/after_repair.json` (the baseline taken from the pre-run
+backup): only `game_puck_control` changed, in 2023 and 2024; no value sum
+dropped anywhere (the new section 8); invariants hold.
+
+| season | games | games with 3 valued puck-control periods |
+|---|---|---|
+| 2015–2022 | 4,391 | 0 (no values exist at the source) |
+| 2023 | 562 | 0 → 488 |
+| 2024 | 561 | 0 → 479 |
+| 2025 (reference) | 614 | 528 |
+| 2026 (reference) | 605 | 527 |
+
+### Known gaps left
+- 2023: 74 games, 2024: 82 games still lack 3 valued puck-control periods.
+  Their responses don't have them.
+- The 9 conflict games keep their July puck-control rows.
+- `game_stats` period stats for 2015–2024 are the July 2026 fetch, which
+  the raw cache also holds. Don't refetch them into curated tables again.
 
 ---
 
@@ -287,6 +366,10 @@ only ~0.5h more traffic, there's no real reason to prefer this path — it's
 documented here so the trade-off is visible, not as a suggestion.
 
 ## 2. `game_stats`/`shotmap` puck-control recovery
+
+**[Superseded by the 2026-09-25 results above: the ~11,000 rows were all-null
+for 2015–2022, and the refetch stripped period stats. The "safe unguarded"
+claim below is wrong.]**
 
 Already fully documented in `docs/RESYNC.md`'s 4b section — cross-referenced
 here, not duplicated. Headline: ~11,000 missing `game_puck_control` rows
