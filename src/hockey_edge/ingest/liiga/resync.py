@@ -77,6 +77,34 @@ GUARDED_TABLES = {
     "shotmap": ["shot_events"],
 }
 
+# The value guard (game_stats only, added 2026-09-25). The row-count guard
+# above let through 3,953 reparses whose period stats liiga.fi had stripped
+# (time on ice, corsi, faceoffs zeroed or null, power-play lists empty, some
+# goals missing) with identical row counts. These are per-game totals
+# compared before vs. after a reparse. A total that was above zero must not
+# fall below VALUE_FLOOR of its old value: stripping takes a total to zero,
+# while the largest real drop seen across 44 live 2027 refetches was corsi
+# -12%. Backtest: refuses 3,767 of the 3,953 stripped reparses (the other
+# 186 had no stored values to lose) and none of the 44 live refetches.
+VALUE_FLOOR = 0.5
+VALUE_TOTALS = {
+    "player_toi": ("game_player_period_stats", "time_on_ice_seconds"),
+    "player_corsi_for": ("game_player_period_stats", "corsi_for"),
+    "player_faceoffs": ("game_player_period_stats", "faceoffs_total"),
+    "goalie_toi": ("game_goalie_period_stats", "time_on_ice_seconds"),
+    "team_face_off_wins": ("game_team_period_stats", "face_off_wins"),
+    "team_powerplay_instances": ("game_team_period_stats", "powerplay_instances"),
+    "team_shorthanded_instances": ("game_team_period_stats", "shorthanded_instances"),
+}
+# Goal totals must not move further from the final score. A plain drop rule
+# would refuse real corrections (player goals went 7->6 and 8->7 live, both
+# toward the final score); the team-period sum equals the final score in
+# every 2022-2024 game.
+GOAL_TOTALS = {
+    "team_goals": ("game_team_period_stats", "goals"),
+    "player_goals": ("game_player_period_stats", "goals"),
+}
+
 logger = logging.getLogger("hockey_edge.ingest.resync")
 
 
@@ -209,7 +237,41 @@ def _restore_table(conn: sqlite3.Connection, table: str, game_id: int, season: i
     conn.commit()
 
 
-def reparse_with_shrink_guard(conn: sqlite3.Connection, *, game_id: int, season: int, endpoint_name: str, do_upsert) -> bool:
+def game_stats_totals(conn: sqlite3.Connection, game_id: int, season: int) -> dict[str, float]:
+    """Per-game totals for VALUE_TOTALS and GOAL_TOTALS. A NULL total (no
+    rows, or every value null, as with stripped faceoffs) counts as 0."""
+    return {
+        name: conn.execute(
+            f"SELECT COALESCE(SUM({column}), 0) FROM {table} WHERE game_id = ? AND season = ?", (game_id, season)
+        ).fetchone()[0]
+        for name, (table, column) in {**VALUE_TOTALS, **GOAL_TOTALS}.items()
+    }
+
+
+def _final_goals(conn: sqlite3.Connection, game_id: int, season: int) -> int | None:
+    row = conn.execute(
+        "SELECT home_goals + away_goals FROM games WHERE game_id = ? AND season = ?", (game_id, season)
+    ).fetchone()
+    return row[0] if row else None
+
+
+def value_guard_violations(before: dict, after: dict, final_goals: int | None) -> dict[str, tuple]:
+    """{total: (before, after[, final])} for every total the value guard
+    refuses on; empty if the reparse may stand. Goal totals are skipped when
+    the final score is unknown."""
+    violations = {
+        name: (before[name], after[name])
+        for name in VALUE_TOTALS
+        if before[name] > 0 and after[name] < VALUE_FLOOR * before[name]
+    }
+    if final_goals is not None:
+        for name in GOAL_TOTALS:
+            if abs(after[name] - final_goals) > abs(before[name] - final_goals):
+                violations[name] = (before[name], after[name], final_goals)
+    return violations
+
+
+def reparse_with_shrink_guard(conn: sqlite3.Connection, *, game_id: int, season: int, endpoint_name: str, do_upsert) -> str:
     """Runs do_upsert() (a zero-arg callable performing the real parse+upsert,
     which commits internally same as backfill.py's flow), then compares
     per-table row counts before vs. after for every table this endpoint
@@ -218,11 +280,15 @@ def reparse_with_shrink_guard(conn: sqlite3.Connection, *, game_id: int, season:
     including original ids) and logs a WARNING with before/after counts per
     table. Compares per-table totals, not per-team split -- an event moving
     between the home/away arrays (seen in the 2026-08-24 finding) is a
-    legitimate correction and must not trip this guard. Returns True if the
-    reparse was applied, False if it was reverted."""
+    legitimate correction and must not trip this guard.
+
+    For game_stats, a reparse that passes the row counts must also pass the
+    value guard (value_guard_violations); a refusal restores the same way.
+    Returns 'reparsed', 'shrink_guarded' or 'value_guarded'."""
     tables = GUARDED_TABLES[endpoint_name]
     before = {t: _count(conn, t, game_id, season) for t in tables}
     backups = {t: _snapshot_table(conn, t, game_id, season) for t in tables}
+    totals_before = game_stats_totals(conn, game_id, season) if endpoint_name == "game_stats" else None
 
     do_upsert()
 
@@ -238,13 +304,28 @@ def reparse_with_shrink_guard(conn: sqlite3.Connection, *, game_id: int, season:
             "curated rows kept untouched",
             season, game_id, endpoint_name, shrinking,
         )
-        return False
+        return "shrink_guarded"
+
+    if totals_before is not None:
+        dropped = value_guard_violations(
+            totals_before, game_stats_totals(conn, game_id, season), _final_goals(conn, game_id, season),
+        )
+        if dropped:
+            for t in tables:
+                _restore_table(conn, t, game_id, season, backups[t])
+            logger.warning(
+                "season=%s game_id=%s endpoint=%s: reparse SKIPPED, value guard: totals would collapse "
+                "or goals move away from the final score (total: before->after[, final]): %s -- raw "
+                "response saved to disk regardless; existing curated rows kept untouched",
+                season, game_id, endpoint_name, dropped,
+            )
+            return "value_guarded"
 
     logger.info(
         "season=%s game_id=%s endpoint=%s: reparse applied, row counts: %s",
         season, game_id, endpoint_name, after,
     )
-    return True
+    return "reparsed"
 
 
 def salvage_grow_from_zero(conn: sqlite3.Connection, *, game_id: int, season: int, endpoint_name: str, do_upsert) -> dict[str, tuple[int, int]]:
@@ -355,7 +436,7 @@ def resync_game_endpoint(
     conn: sqlite3.Connection, season: int, game_id: int, endpoint_name: str, *, min_hours_since_fetch: float
 ) -> str:
     """Returns one of: 'skipped_not_due', 'fetch_failed', 'unchanged',
-    'reparsed', 'shrink_guarded'."""
+    'reparsed', 'shrink_guarded', 'value_guarded'."""
     if not _is_due(conn, endpoint_name, season, game_id, min_hours_since_fetch=min_hours_since_fetch):
         return "skipped_not_due"
 
@@ -383,26 +464,24 @@ def resync_game_endpoint(
 
     if endpoint_name == "game_detail":
         parsed = parsers.parse_game_detail(result.data, game_id, season)
-        applied = reparse_with_shrink_guard(
+        return reparse_with_shrink_guard(
             conn, game_id=game_id, season=season, endpoint_name="game_detail",
             do_upsert=lambda: parsers.upsert_game_detail(conn, game_id, season, parsed),
         )
     elif endpoint_name == "game_stats":
         parsed = parsers.parse_game_stats(result.data, game_id, season)
-        applied = reparse_with_shrink_guard(
+        return reparse_with_shrink_guard(
             conn, game_id=game_id, season=season, endpoint_name="game_stats",
             do_upsert=lambda: parsers.upsert_game_stats(conn, game_id, season, parsed),
         )
     elif endpoint_name == "shotmap":
         rows = parsers.parse_shotmap(result.data, game_id, season)
-        applied = reparse_with_shrink_guard(
+        return reparse_with_shrink_guard(
             conn, game_id=game_id, season=season, endpoint_name="shotmap",
             do_upsert=lambda: parsers.upsert_shot_events(conn, game_id, season, rows),
         )
     else:
         raise ValueError(f"resync not implemented for endpoint {endpoint_name!r}")
-
-    return "reparsed" if applied else "shrink_guarded"
 
 
 def run_resync(

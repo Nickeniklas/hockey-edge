@@ -63,10 +63,10 @@ class SalvageTest(unittest.TestCase):
 
     def test_uniform_guard_refuses_the_regression_payload(self):
         self._damage_penalties()
-        applied = resync.reparse_with_shrink_guard(
+        outcome = resync.reparse_with_shrink_guard(
             self.conn, game_id=GAME_ID, season=SEASON, endpoint_name="game_detail", do_upsert=self._upsert(REGRESSION),
         )
-        self.assertFalse(applied)
+        self.assertEqual(outcome, "shrink_guarded")
         self.assertEqual(len(rows(self.conn, "game_penalty_events")), 0)  # the lost recovery R5 exists for
 
     def test_salvage_takes_penalties_and_keeps_everything_else_exactly(self):

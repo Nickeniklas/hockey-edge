@@ -168,9 +168,24 @@ and some goals zeroed or null. 3,953 such reparses passed the guard and had
 to be restored from backup (`scripts/repair_game_stats.py`,
 `docs/RECOVERY_BACKLOG.md`). After any bulk reparse, check
 `scripts/recovery_report.py --diff` section 8 (value sums), not just the
-row counts. **Open:** `--days 7` in the nightly sync reparses live games'
-`game_stats` through the same guard, and a value-level check for it is not
-built.
+row counts.
+
+**Value guard for `game_stats` (added 2026-09-25).** A `game_stats` reparse
+that passes the row counts must also pass `value_guard_violations`, or it is
+refused with outcome `value_guarded` and restored the same way. It compares
+per-game totals before and after the reparse:
+- Player time on ice, corsi-for and faceoffs, goalie time on ice, and team
+  faceoff wins, power-play and shorthanded instances: a total above zero
+  must not fall below 50% of its old value (`VALUE_FLOOR`).
+- Team-period and player goal sums must not move further from the final
+  score.
+
+A plain "no total may drop" rule was rejected. Across 44 real live 2027
+refetches, legitimate corrections dropped time on ice by up to 5.3%, corsi
+by up to 12%, and player goals by 1 (toward the final score). Backtest: the
+guard refuses 3,767 of the 3,953 stripped reparses from 2026-09-25 (the
+other 186 had no stored values to lose), none of the 44 live refetches, and
+the 2024:2 pair. Tests: `tests/test_resync_value_guard.py`.
 
 **The guard is all-or-nothing per game** (noted 2026-09-24). One shrinking
 table reverts *every* guarded table for that game. So a refetch that
@@ -267,10 +282,10 @@ exact commands, recorded so it can be recreated on a rebuild — or translated
 to a cron entry / systemd timer on a future Linux host, where only the
 schedule and the two paths need substituting.
 
-Register (runs daily at 23:30 local):
+Register (runs daily at 23:00 local; moved from 23:30 on 2026-09-25):
 
 ```
-schtasks /Create /TN "hockey-edge nightly sync" /TR "C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\pythonw.exe C:\Users\Nikla_000\Documents\local-repo\hockey-edge\scripts\nightly_sync.py" /SC DAILY /ST 23:30
+schtasks /Create /TN "hockey-edge nightly sync" /TR "C:\Users\Nikla_000\Documents\local-repo\hockey-edge\.venv\Scripts\pythonw.exe C:\Users\Nikla_000\Documents\local-repo\hockey-edge\scripts\nightly_sync.py" /SC DAILY /ST 23:00
 ```
 
 Then set the working directory, which the above cannot do:
@@ -308,7 +323,7 @@ discovery is the one thing that is.
 
 **Sleep behaviour: a sleeping machine skips that night entirely.** No wake
 timer is set (`WakeToRun=False`), and unlike the snapshot job this task also
-has `StartWhenAvailable=False`, so a missed 23:30 does not run late on the
+has `StartWhenAvailable=False`, so a missed 23:00 does not run late on the
 next wake — it simply waits for the following night. That is deliberate and
 harmless: both passes are resumable and idempotent, so the next successful
 run picks up everything the skipped one would have done. The `--days 7`
@@ -317,7 +332,19 @@ nights is still fully recoverable, and beyond that the only loss is
 retroactive corrections to games that have aged out of the window, not the
 games themselves.
 
-23:30 is chosen to sit after the snapshot job's 11:00–23:00 window (no
-overlap, no contention on `hockey.db`) and late enough that a 19:30 puck drop
-— the latest regular start on the 2026-27 schedule — has finished and been
-marked `ended=1` on liiga.fi's side.
+23:00 is late enough that a 19:30 puck drop — the latest regular start on
+the 2026-27 schedule — has finished and been marked `ended=1` on liiga.fi's
+side. It was 23:30 until 2026-09-25, chosen to sit after the snapshot job's
+11:00–23:00 window. At 23:00 it now starts together with the snapshot job's
+last tick. That is harmless: the snapshot job never touches `hockey.db`, so
+the two share no database, and with no game starting after 19:30 that tick
+has no capture window due. The only overlap is two processes calling
+liiga.fi at the same moment, each at its own rate limit.
+
+To move an already-registered task (no re-registration needed; works from a
+non-elevated prompt, as noted above):
+
+```
+$trigger = New-ScheduledTaskTrigger -Daily -At 23:00
+Set-ScheduledTask -TaskName "hockey-edge nightly sync" -Trigger $trigger
+```

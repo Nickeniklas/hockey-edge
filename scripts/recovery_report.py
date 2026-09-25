@@ -193,7 +193,7 @@ def classify_targets(before: dict, after: dict, outcomes: dict[tuple[str, str], 
                 else:
                     cls = "recovered_by_salvage" if grew else "salvage_no_gain"
             else:
-                cls = {"shrink_guarded": "refused", "unchanged": "unchanged_hash"}.get(outcome, outcome)
+                cls = {"shrink_guarded": "refused", "value_guarded": "refused", "unchanged": "unchanged_hash"}.get(outcome, outcome)
             season = entity.split(":")[0]
             bucket = result.setdefault(endpoint, {}).setdefault(season, {})
             bucket[cls] = bucket.get(cls, 0) + 1
