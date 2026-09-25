@@ -238,6 +238,18 @@ Details and per-game lists are in `docs/RECOVERY_BACKLOG.md`.
 - **`game_stats` period stats for 2015–2024 come from the July 2026 fetch.**
   liiga.fi now serves those games with time on ice, corsi, faceoffs and
   power-play lists stripped. The curated tables hold the good version.
+- **2025 and 2026 `game_team_period_stats` are stripped at the team level,
+  in every phase** (found 2026-09-25). All 1,192 ended games have 0
+  power-play and 0 shorthanded instances, and team-period goals fall short
+  of the final score in 893 of them (regular season: 3.90 vs 5.78 per game
+  in 2025, 3.63 vs 5.66 in 2026). Player and goalie period stats (time on
+  ice, corsi, goals) look normal. Both seasons were fetched once, on
+  2026-08-22, so no clean copy is cached. **For 2025/2026 the feature store
+  takes goals from the final score (`games.home_goals`/`away_goals`) and
+  `game_goal_events`, and power plays from `game_penalty_events`**, never
+  from `game_team_period_stats`. The same applies to the seven 2027
+  opening-night games (2026-09-01, game_ids 2701274–2701280), which have 0
+  power-play instances despite 3–14 penalties each.
 - A penalty `player_id` of 0 means no individual player, mostly the team
   penalty. It is not a player.
 
