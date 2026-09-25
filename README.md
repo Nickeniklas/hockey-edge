@@ -87,7 +87,8 @@ on `(game_id, season)` because liiga.fi reuses game ids.
 **Re-sync.** liiga.fi's data for a finished game can change later, in either
 direction. `ingest/liiga/resync.py` re-fetches finished games and only
 reparses a response when no curated table would lose rows (the no-shrink
-guard). The raw response is always kept. `scripts/nightly_sync.py` wraps a
+guard) and, for `game_stats`, no per-game total collapses or goal sum drifts
+from the final score (the value guard). The raw response is always kept. `scripts/nightly_sync.py` wraps a
 live-season backfill and a 7-day re-sync.
 
 **Snapshot capture.** `snapshot/job.py` discovers upcoming games
@@ -120,7 +121,8 @@ and [docs/MODEL.md](docs/MODEL.md).
 - Only Liiga is ingested; NHL is deferred.
 - No model or predictions yet. The data layer and capture job are what exist.
 - liiga.fi's historical data has real gaps: some games miss penalties, puck
-  control has values only from 2023, and xG is absent before 2020 and
+  control has values only from 2023, team-level period stats for 2025 and
+  2026 lack power plays and some goals, and xG is absent before 2020 and
   incomplete until 2023. See [docs/DATA_PIPELINE.md](docs/DATA_PIPELINE.md)
   and [docs/BACKFILL_RESULTS.md](docs/BACKFILL_RESULTS.md).
 - The capture job only runs while the desktop is awake or wakeable; a missed

@@ -80,6 +80,34 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 6. LightGBM + blend
 7. Prediction log + local dashboard
 
+## Status (as of 2026-09-25, second session)
+
+**`resync.py` now has a value guard for `game_stats`, so the nightly sync
+can no longer apply a stripped refetch.** Next is still the Liiga feature
+store (step 4).
+
+- **Value guard.** A `game_stats` reparse that passes the row counts is
+  still refused (`value_guarded`, rows restored exactly) if a per-game total
+  above zero falls below 50%, or if a goal sum moves further from the final
+  score. The totals checked are player/goalie time on ice, corsi-for,
+  faceoffs, and team faceoff wins and power-play/shorthanded instances.
+  Backtest: it refuses 3,767 of the 3,953 stripped reparses (the other 186
+  had nothing stored to lose) and none of 44 real live 2027 refetches,
+  where corrections dropped time on ice by up to 5.3% and corsi by up to
+  12%. Details: `docs/RESYNC.md` 4c.
+- **2025 and 2026 `game_team_period_stats` were already stripped when
+  fetched (2026-08-22).** Every ended game has 0 power-play/shorthanded
+  instances, and team-period goals fall short of the final score in 893 of
+  1,192. Player/goalie period stats are fine. No clean copy exists. The
+  feature store takes goals from the final score and goal events, and power
+  plays from penalty events, for those seasons and the seven 2027
+  opening-night games. See `docs/DATA_PIPELINE.md` data gaps.
+- **Season 2027 period stats are healthy:** all 52 ended regular-season
+  games have real time on ice and corsi.
+- **Nightly sync now runs at 23:00** (was 23:30), together with the
+  snapshot job's last tick. They share no database.
+- Tests: 67, `python -m unittest discover -s tests`.
+
 ## Status (as of 2026-09-25)
 
 **The historical recovery is finished.** The `game_stats` pass ran, damaged
@@ -116,7 +144,10 @@ results. Next in the build order is the Liiga feature store (step 4).
   guard. 2025–2027 are unaffected today, but nothing would catch a stripped
   refetch. A value-level check for `game_stats` in `resync.py` is the fix;
   not built (it changes the reviewed guard, so it needs a decision).
-- Tests: 57, `python -m unittest discover -s tests`.
+  **[Built later on 2026-09-25 as the value guard. "2025–2027 are
+  unaffected" was wrong for 2025/2026 team stats; see the second-session
+  Status entry.]**
+- Tests: 57 at the time (now 67).
 
 ## Status (as of 2026-09-24)
 
@@ -669,8 +700,10 @@ below) are explicitly deferred, not done. What did ship:
   `game_stats` for 2015–2024 into curated tables again**: the July 2026
   fetch is the good copy, and the raw files keep both versions. Check value
   sums (`recovery_report.py --diff` section 8), not just row counts, after
-  any bulk reparse. The nightly `resync --days 7` uses the same row-count
-  guard on live games; a value-level check for it is still open.
+  any bulk reparse. `resync.py` also runs a value guard on `game_stats`
+  reparses (added 2026-09-25): a stripped refetch comes back
+  `value_guarded` instead of being applied. `backfill.py --force` has no
+  guard of either kind.
 - **A penalty `player_id` of 0 is not a player.** liiga.fi uses it for
   penalties with no individual player, mostly *Joukkuerangaistus* (team
   penalty): 2,152 rows, and no player 0 exists. Exclude it from any
