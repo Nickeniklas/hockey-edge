@@ -53,8 +53,8 @@ def build_db(path: Path) -> sqlite3.Connection:
             [(game_id, season, "x", i) for i in range(n_pen)],
         )
         conn.executemany(
-            "INSERT INTO game_puck_control (game_id, season, period) VALUES (?,?,?)",
-            [(game_id, season, p) for p in range(1, n_puck + 1)],
+            "INSERT INTO game_puck_control (game_id, season, period, home_control_seconds) VALUES (?,?,?,?)",
+            [(game_id, season, p, 100.0 * p) for p in range(1, n_puck + 1)],
         )
     conn.commit()
     return conn
@@ -214,6 +214,82 @@ class RecoveryReportTest(TempDirTest):
             ok = recovery_report.print_diff(before, after, recovery_report.load_outcomes(outcomes))
         self.assertFalse(ok)
         self.assertIn("SHRANK 2024 game_puck_control: 1 -> 0", out.getvalue())
+
+    def test_game_stats_pass_puck_control_and_guarded_tables(self):
+        before = recovery_report.build_report(self.conn, self.targets)
+        self.assertEqual(before["tables"][3:7], resync.GUARDED_TABLES["game_stats"])
+        g2025 = before["by_season_phase"]["2025"]["RUNKOSARJA"]
+        self.assertEqual((g2025["games_with_full_puck_control"], g2025["puck_control_per_game"]), (1, 3.0))
+        self.assertEqual(before["targets"]["2023:1"]["game_puck_control"], 1)
+
+        # 2024:1 starts with one goalie-period row. The pass recovers periods
+        # 2-3 for 2023:1, leaves 2023:2 unchanged, and loses 2024:1's row.
+        self.conn.execute(
+            "INSERT INTO game_goalie_period_stats (game_id, season, team_id, player_id, period) "
+            "VALUES (1, 2024, 'x', 1, 1)"
+        )
+        self.conn.commit()
+        before = recovery_report.build_report(self.conn, self.targets)
+        self.conn.executemany(
+            "INSERT INTO game_puck_control (game_id, season, period, home_control_seconds) VALUES (1, 2023, ?, ?)",
+            [(2, 200.0), (3, 300.0)],
+        )
+        self.conn.execute("DELETE FROM game_goalie_period_stats")
+        self.conn.commit()
+        after = recovery_report.build_report(self.conn, self.targets)
+
+        self.assertEqual(recovery_report.puck_control_by_season(before)["2023"], (2, 2, 0))
+        self.assertEqual(recovery_report.puck_control_by_season(after)["2023"], (2, 4, 1))
+
+        outcomes = self.write(
+            "o.csv",
+            "season,game_id,endpoint,outcome,checked_at\n"
+            "2023,1,game_stats,reparsed,t\n2023,2,game_stats,unchanged,t\n",
+        )
+        classes = recovery_report.classify_targets(before, after, recovery_report.load_outcomes(outcomes))
+        self.assertEqual(classes["game_stats"]["2023"], {"recovered": 1, "unchanged_hash": 1})
+
+        with redirect_stdout(io.StringIO()) as out:
+            ok = recovery_report.print_diff(before, after, recovery_report.load_outcomes(outcomes))
+        self.assertFalse(ok)
+        text = out.getvalue()
+        self.assertIn("2023 game_puck_control: 2 -> 4 (+2)", text)
+        self.assertIn("SHRANK 2024 game_goalie_period_stats: 1 -> 0", text)
+        self.assertIn("2023: 1.00 -> 2.00 rows/game  full (with values) 0/2 -> 1/2", text)
+        self.assertIn("2025: 3.00 -> 3.00 rows/game  full (with values) 1/1 -> 1/1  (reference)", text)
+
+    def test_value_drop_fails_even_when_row_counts_hold(self):
+        # The 2026-09-25 stripped reparse: same rows, time on ice zeroed.
+        self.conn.execute(
+            "INSERT INTO game_player_period_stats (game_id, season, team_id, player_id, period, time_on_ice_seconds) "
+            "VALUES (1, 2024, 'x', 1, 1, 170)"
+        )
+        self.conn.commit()
+        before = recovery_report.build_report(self.conn, self.targets)
+        self.conn.execute("UPDATE game_player_period_stats SET time_on_ice_seconds = 0")
+        self.conn.execute("UPDATE game_puck_control SET home_control_seconds = NULL WHERE season = 2025")
+        self.conn.commit()
+        after = recovery_report.build_report(self.conn, self.targets)
+        self.assertEqual(recovery_report.season_totals(before), recovery_report.season_totals(after))
+
+        with redirect_stdout(io.StringIO()) as out:
+            ok = recovery_report.print_diff(before, after, None)
+        self.assertFalse(ok)
+        text = out.getvalue()
+        self.assertIn("DROPPED 2024 game_player_period_stats.SUM(time_on_ice_seconds): 170 -> 0", text)
+        self.assertIn("DROPPED 2025 game_puck_control.COUNT(home_control_seconds): 3 -> 0", text)
+        self.assertIn("full (with values) 1/1 -> 0/1", text)
+
+    def test_diff_tolerates_reports_without_full_puck_control(self):
+        # data/recovery/before.json etc. predate the per-game puck-control counts.
+        report = recovery_report.build_report(self.conn, self.targets)
+        for phases in report["by_season_phase"].values():
+            for g in phases.values():
+                del g["games_with_full_puck_control"], g["puck_control_per_game"]
+                g.pop("value_sums", None)
+        with redirect_stdout(io.StringIO()) as out:
+            self.assertTrue(recovery_report.print_diff(report, report, None))
+        self.assertIn("2023: 1.00 -> 1.00 rows/game\n", out.getvalue())
 
 
 if __name__ == "__main__":

@@ -9,15 +9,22 @@ Read-only against data/hockey.db. Two modes:
 
 `--out` records, per season x phase over ended games: row counts for every
 table resync's no-shrink guard protects plus game_goal_events, zero-penalty
-game counts, penalties per game (mean, median), and goalkeeper-event
-coverage. With `--targets`, it also records each listed game's per-table
-counts, which `--diff` needs to classify outcomes.
+game counts, penalties per game (mean, median), goalkeeper-event coverage,
+and puck-control rows per game plus how many games have 3 periods of puck
+control that carry a value (the game_stats pass's recovery table; 2015-2022
+only ever return all-null placeholder rows), plus value sums for
+key game_stats columns and the number of puck-control rows that carry a
+value. With `--targets`, it also records each listed game's per-table counts, which `--diff` needs to
+classify outcomes.
 
 `--diff` prints the acceptance checks: any season where a guarded table
 shrank, any change in game_goal_events, zero-penalty RUNKOSARJA rates against
-the clean 2025/2026 reference, penalties per game, goalkeeper coverage, and
-(with `--outcomes`, the CSV written by `resync.py --outcomes`) one outcome
-class per targeted game.
+the clean 2025/2026 reference, penalties per game, goalkeeper coverage,
+puck-control rows per game per season against the same reference, value
+sums that must not drop (row counts alone missed the 2026-09-25 stripped
+reparses, see RECOVERY_BACKLOG.md), and (with
+`--outcomes`, the CSV written by `resync.py --outcomes`) one outcome class
+per targeted game.
 """
 
 import argparse
@@ -37,6 +44,17 @@ DEFAULT_DB = REPO / "data" / "hockey.db"
 TABLES = [t for tables in GUARDED_TABLES.values() for t in tables] + ["game_goal_events"]
 REFERENCE_SEASONS = ("2025", "2026")  # fetched in a clean run, see RECOVERY_BACKLOG.md
 
+# Summed per season x phase; a drop means values were lost even where row
+# counts held. COUNT(col) counts rows where the column is not null.
+VALUE_SUMS = {
+    "game_team_period_stats": ["SUM(goals)", "SUM(shots)", "SUM(powerplay_instances)", "SUM(face_off_wins)"],
+    "game_player_period_stats": ["SUM(time_on_ice_seconds)", "SUM(corsi_for)", "SUM(goals)"],
+    "game_goalie_period_stats": ["SUM(saves)", "SUM(time_on_ice_seconds)"],
+    "game_puck_control": ["COUNT(home_control_seconds)"],
+}
+
+FULL_PUCK_CONTROL = 3  # periods with a value; recovery_targets.py targets games below 3 rows
+
 # The table whose growth counts as "recovered" for each endpoint's pass.
 RECOVERY_TABLE = {"game_detail": "game_penalty_events", "game_stats": "game_puck_control"}
 
@@ -45,11 +63,11 @@ def connect_ro(db_path: Path) -> sqlite3.Connection:
     return sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True)
 
 
-def _per_game_counts(conn: sqlite3.Connection, table: str) -> dict[tuple[int, int], int]:
+def _per_game_counts(conn: sqlite3.Connection, table: str, count: str = "*") -> dict[tuple[int, int], int]:
     return {
         (season, game_id): n
         for game_id, season, n in conn.execute(
-            f"SELECT game_id, season, COUNT(*) FROM {table} GROUP BY game_id, season"
+            f"SELECT game_id, season, COUNT({count}) FROM {table} GROUP BY game_id, season"
         )
     }
 
@@ -59,6 +77,7 @@ def build_report(conn: sqlite3.Connection, targets: list[tuple[int, int]] | None
         "SELECT season, game_id, phase FROM games WHERE ended = 1 ORDER BY season, phase"
     ).fetchall()
     counts = {t: _per_game_counts(conn, t) for t in TABLES}
+    puck_valued = _per_game_counts(conn, "game_puck_control", "home_control_seconds")
 
     groups: dict[str, dict[str, dict]] = {}
     penalties: dict[tuple[str, str], list[int]] = {}
@@ -67,6 +86,7 @@ def build_report(conn: sqlite3.Connection, targets: list[tuple[int, int]] | None
         g = groups.setdefault(str(season), {}).setdefault(phase, {
             "games": 0, "rows": {t: 0 for t in TABLES},
             "zero_penalty_games": 0, "games_with_goalkeeper_events": 0,
+            "games_with_full_puck_control": 0,
         })
         g["games"] += 1
         for t in TABLES:
@@ -74,6 +94,7 @@ def build_report(conn: sqlite3.Connection, targets: list[tuple[int, int]] | None
         n_pen = counts["game_penalty_events"].get(key, 0)
         g["zero_penalty_games"] += n_pen == 0
         g["games_with_goalkeeper_events"] += counts["game_goalkeeper_events"].get(key, 0) > 0
+        g["games_with_full_puck_control"] += puck_valued.get(key, 0) >= FULL_PUCK_CONTROL
         penalties.setdefault((str(season), phase), []).append(n_pen)
 
     for (season, phase), values in penalties.items():
@@ -81,6 +102,15 @@ def build_report(conn: sqlite3.Connection, targets: list[tuple[int, int]] | None
         g["penalties_per_game_mean"] = round(statistics.fmean(values), 3)
         g["penalties_per_game_median"] = statistics.median(values)
         g["goalkeeper_event_coverage"] = round(g["games_with_goalkeeper_events"] / g["games"], 4)
+        g["puck_control_per_game"] = round(g["rows"]["game_puck_control"] / g["games"], 3)
+
+    for table, exprs in VALUE_SUMS.items():
+        sql = (f"SELECT g.season, g.phase, {', '.join(exprs)} FROM {table} t JOIN games g "
+               "ON g.game_id = t.game_id AND g.season = t.season WHERE g.ended = 1 GROUP BY g.season, g.phase")
+        for season, phase, *values in conn.execute(sql):
+            sums = groups[str(season)][phase].setdefault("value_sums", {})
+            for expr, v in zip(exprs, values):
+                sums[f"{table}.{expr}"] = round(v or 0, 3)
 
     report = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -100,6 +130,32 @@ def season_totals(report: dict) -> dict[str, dict[str, int]]:
         season: {t: sum(p["rows"][t] for p in phases.values()) for t in report["tables"]}
         for season, phases in report["by_season_phase"].items()
     }
+
+
+def puck_control_by_season(report: dict) -> dict[str, tuple[int, int, int | None]]:
+    """season -> (games, puck-control rows, games with full puck control),
+    over every phase. The last is None for a report written before that
+    count existed."""
+    result = {}
+    for season, phases in report["by_season_phase"].items():
+        full = [p.get("games_with_full_puck_control") for p in phases.values()]
+        result[season] = (
+            sum(p["games"] for p in phases.values()),
+            sum(p["rows"]["game_puck_control"] for p in phases.values()),
+            None if None in full else sum(full),
+        )
+    return result
+
+
+def value_sums_by_season(report: dict) -> dict[str, dict[str, float]]:
+    """season -> value-sum key -> total over every phase. Empty for a
+    report written before value sums existed."""
+    result: dict[str, dict[str, float]] = {}
+    for season, phases in report["by_season_phase"].items():
+        for g in phases.values():
+            for key, v in g.get("value_sums", {}).items():
+                result.setdefault(season, {})[key] = round(result.get(season, {}).get(key, 0) + v, 3)
+    return result
 
 
 def load_outcomes(path: Path) -> dict[tuple[str, str], str]:
@@ -206,6 +262,33 @@ def print_diff(before: dict, after: dict, outcomes: dict | None) -> bool:
             print(f"  {season} {phase:<15} n={g['games']:>4}  pen/game {gb['penalties_per_game_mean']:.2f} -> "
                   f"{g['penalties_per_game_mean']:.2f} (median {g['penalties_per_game_median']})  "
                   f"gk coverage {gb['goalkeeper_event_coverage']:.1%} -> {g['goalkeeper_event_coverage']:.1%}")
+
+    print("\n== 7. Puck-control rows per game per season (reference: 2025/2026) ==")
+    pb, pa = puck_control_by_season(before), puck_control_by_season(after)
+    for season in sorted(pa):
+        games_b, rows_b, full_b = pb.get(season, pa[season])
+        games_a, rows_a, full_a = pa[season]
+        full = "" if full_a is None else (
+            f"  full (with values) {'?' if full_b is None else full_b}/{games_b} -> {full_a}/{games_a}")
+        ref = "  (reference)" if season in REFERENCE_SEASONS else ""
+        print(f"  {season}: {rows_b / games_b:.2f} -> {rows_a / games_a:.2f} rows/game{full}{ref}")
+
+    print("\n== 8. Value sums per season (must not drop) ==")
+    vb, va = value_sums_by_season(before), value_sums_by_season(after)
+    if not vb or not va:
+        print("  (a report predates value sums)")
+    else:
+        values_ok = True
+        for season in sorted(set(vb) | set(va)):
+            for key in sorted(set(vb.get(season, {})) | set(va.get(season, {}))):
+                b, a = vb.get(season, {}).get(key, 0), va.get(season, {}).get(key, 0)
+                if a < b:
+                    values_ok = False
+                    print(f"  DROPPED {season} {key}: {b:g} -> {a:g}")
+                elif a != b:
+                    print(f"  {season} {key}: {b:g} -> {a:g}")
+        print("  (no drop)" if values_ok else "")
+        ok = ok and values_ok
 
     print("\nRESULT:", "invariants hold" if ok else "INVARIANT FAILED")
     return ok
