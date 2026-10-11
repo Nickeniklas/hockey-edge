@@ -188,15 +188,16 @@ Guideline shapes — final DDL decided in implementation, but keep these separat
 
 ## Feature store (Layer 3) — contract with the model
 
-Derived tables, rebuilt from raw at any time. Every feature row is keyed
+Derived tables, rebuilt from the curated layer at any time. Every feature row is keyed
 (game_id, season) for Liiga — see the note under Storage shapes — computed
 strictly from data with timestamps **before that game's puck drop**. Feature families (from planning discussion, in signal order):
 
-1. Goalie: rolling save% (vs expected where xG exists) for the **confirmed starter**
+1. Goalie: rolling save% (vs expected where xG exists) for the **resolved starter**
+   (`line == 1` inference from the pre-game snapshot, ~98.6%; actual starter on history)
 2. Team shot quality: rolling xG/Corsi for & against per 60 at EV, windows 10/25/40
 3. Special teams: PP/PK rates, penalty draw/take — regress hard to league mean early
-4. Schedule: back-to-back, games in last 6 days, travel/TZ (NHL only — irrelevant in
-   Liiga's geography)
+4. Schedule: back-to-back, games in last 6 days (both leagues); travel/TZ is NHL
+   only — irrelevant in Liiga's geography
 5. Home advantage: league constant + team offsets (bigger in Liiga than NHL)
 6. Roster availability: share of team ice time missing (crude version OK)
 7. Motivation proxy: playoff-probability delta late season; Liiga relegation
