@@ -1,15 +1,62 @@
 # FEATURE_STORE_PLAN — Liiga feature store (build step 4)
 
 Design chat, 2026-09-24; updated 2026-09-25 after the historical recovery;
-**updated 2026-10-11 after F0** (`docs/FEATURE_AUDIT.md`).
+**updated 2026-10-11 after F0** (`docs/FEATURE_AUDIT.md`); **updated 2026-10-12
+after F1**.
 Contract: `docs/DATA_PIPELINE.md` Layer 3 and `docs/MODEL.md`. Data rules:
 `docs/DATA_PIPELINE.md` → "Known data gaps". Items marked **[DECISION: Niklas]** are
 the user's call. Stop at every "STOP" line and report before going on.
 
-**Status: F0 done 2026-10-11. Next: F1.** For step 4, this file and
-`docs/FEATURE_AUDIT.md` are newer than `docs/PROJECT_CONTEXT.md`.
+**Status: F0 done 2026-10-11, F1 done 2026-10-12 (commits `c47137c`, `bec8b87`).
+Next: build step 5 (Elo + walk-forward harness), planned separately. F2 and F3
+follow for step 6.**
 
-Order: **F0 (audits, done) → F1 (Elo-ready slice) → F2 → F3.** NHL stays deferred.
+Order: **F0 (done) → F1 (done) → step 5 → F2 → F3.** NHL stays deferred.
+
+---
+
+## F1 result and accepted departures (2026-10-12)
+
+`python -m hockey_edge.features.build` rebuilds `data/features.db` in ~6 s; 99 tests
+pass (67 existing, 32 new). Tables: `game_spine` (7,331), `season_format` (13),
+`team_season` (198), `features_home` (6,469), `features_schedule` (6,469),
+`benchmark_odds` (57).
+
+Accepted departures from the plan as written:
+- **History is cut by UTC date, not by start time.** A game that started earlier the
+  same day may still be in play at puck drop, so "started earlier" leaks. For Liiga
+  this is safe: every game starts and ends within one UTC day, and no team plays
+  twice a day. It costs only same-day afternoon games that had already finished.
+  **Revisit before NHL**: NHL evening games cross UTC midnight, so a UTC-date cut
+  would let an in-progress game through. Use the league's local date or start time
+  plus a buffer there. The rule is one line in `features/history.py`.
+- **The fixture covers only what F1 reads** (seasons 2022, 2025, 2027, odds rows for
+  four games, `raw_payload` blanked). F2 and F3 extend it with the penalty, shot and
+  lineup rows listed under Fixtures.
+- Home-advantage defaults (league rate over the current and two previous seasons,
+  team offset shrunk with `k = 60` games) are Claude Code's choices. Raw values and
+  game counts are stored, so `k` is tuned inside training folds.
+- Rest days are NULL at each team's first competitive game of a season, not ~170
+  days carried over from spring.
+
+Findings after F1:
+- **2022 first round was a two-game aggregate series** (inferred from KooKoo–Pelicans
+  and Lukko–HPK; nothing stored states it). So 2022:49294 HPK–Lukko 2–2 is probably a
+  real regulation draw that was allowed to stand. Its D target is right; the
+  `end_type_anomaly` flag stays as a marker.
+- **2022:49298 KooKoo–Pelicans 1–0 is a sudden-death tiebreak** (2,101 s, played 17
+  minutes after 49296 ended, same crowd and rosters), not a 60-minute game. **Decision:
+  drop it from `feeds_ratings`**, with a recorded reason. It is also not "missing
+  penalty data": zero penalties in 35 minutes is plausible. Small F1 follow-up, done
+  as the first task of step 5.
+- `benchmark_odds`: 8 of 57 rows were captured more than an hour before start (five of
+  them 24–49 h out), so they are not closing lines. **Step 5 compares only rows with
+  `minutes_before_start` ≤ 60.**
+- The snapshot job captured nothing 2026-10-08 to 10-10 (PC shut down); all 50 odds
+  and lineup windows due then were missed. Those games have no lineup snapshot or
+  closing line. Historical starter resolution falls back to `actual_postgame` for them.
+- The 2026 relegation format is NULL in `season_format`. Only F3's motivation family
+  needs it; fill it then.
 
 ---
 
@@ -95,8 +142,8 @@ first season is unknown and they are not first-season cases.
 fingerprint = max `fetched_at`/`captured_at`, row counts).
 Point-in-time proof:
 - By construction: all history comes through one helper,
-  `history_before(conn, season, game_id)` → only `ended=1` games with
-  `start_utc <` this game's `start_utc` (strict). Feature code never queries base
+  `history_before(conn, season, game_id)` → only `ended=1` games on an earlier UTC
+  date than this game's `start_utc` (see "F1 result"). Feature code never queries base
   tables directly; a test enforces it. Derived per-game tables in `features.db`
   (like `penalty_events_resolved`) are read through the same helper.
 - Truncation test: features from the full fixture DB equal features from a copy with
@@ -146,7 +193,8 @@ Package `src/hockey_edge/features/`:
     → D. Never derived from goal-event counts.
   - A regular-time game with a tied final (only known case: 2022:49294 PLAYOFFS,
     HPK–Lukko 2–2) → D, with an `end_type_anomaly` flag. It is outside the
-    evaluation sample but feeds ratings.
+    evaluation sample but feeds ratings. (After F1: probably a real draw in a
+    two-game aggregate series.)
 - `season_format.py` → `season_format`, hand-curated and verified against `games`
   counts (15/60 historically, 16/60 for 2025–26, 17/64 from 2027; 2020 no playoffs;
   2027 direct relegation of bottom three). **Games per team is counted per
@@ -228,7 +276,8 @@ Then:
   at the same second as one of the team's own), on `penalty_events_resolved`. **Use
   the derived count for every season**, including 2015–2024 where a stored count
   exists, so there is one rule across seasons. PP/PK rates and draws/takes, hard
-  shrinkage. The seven zero-penalty competitive games are skipped as missing.
+  shrinkage. The six zero-penalty competitive games listed in PROJECT_CONTEXT are
+  skipped as missing (2022:49298 is no longer one of them; it is a short tiebreak).
 - Family 6 roster availability: missing share of last-N ice time, from `game_rosters`
   history plus the pre-game snapshot lineup.
 - Family 7 motivation: playoff-line and relegation-line distance via `season_format`.
