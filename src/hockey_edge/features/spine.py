@@ -15,6 +15,12 @@ END_TYPES = {
     "ENDED_DURING_WINNING_SHOT_COMPETITION": "SO",
 }
 
+# Competitive games that must not move a rating, as (season, game_id): reason.
+# The reason is stored in game_spine.ratings_exclusion_reason.
+RATINGS_EXCLUSIONS = {
+    (2022, 49298): "sudden-death tiebreak after a two-game aggregate series, 35 minutes",
+}
+
 
 def regulation_result(end_type: str, home_goals: int, away_goals: int) -> tuple[str, int]:
     """(H/D/A, end_type_anomaly). Overtime and shootout games are draws.
@@ -62,13 +68,16 @@ def build(conn: sqlite3.Connection) -> None:
             (g["season"], g["home_team_id"]) not in liiga_teams
             or (g["season"], g["away_team_id"]) not in liiga_teams
         )
+        exclusion = RATINGS_EXCLUSIONS.get((g["season"], g["game_id"]))
         rows.append((
             g["game_id"], g["season"], g["start_utc"], g["start_utc"][:10], g["phase"],
             g["home_team_id"], g["home_team_name"], g["away_team_id"], g["away_team_name"],
             g["ended"], home_goals, away_goals, end_type, result, anomaly,
-            int(competitive), int(non_liiga), int(competitive and not non_liiga),
+            int(competitive), int(non_liiga),
+            int(competitive and not non_liiga and exclusion is None),
             int(g["phase"] == EVAL_PHASE and not non_liiga),
+            exclusion,
         ))
     conn.executemany(
-        "INSERT INTO game_spine VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows
+        "INSERT INTO game_spine VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows
     )

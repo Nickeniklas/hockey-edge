@@ -5,6 +5,8 @@ Run: python -m unittest discover -s tests
 
 import unittest
 
+from hockey_edge.features.spine import RATINGS_EXCLUSIONS
+
 from .support import FeatureTest
 
 FLAGS = "phase, is_liiga_competitive, has_non_liiga_team, feeds_ratings, in_eval_sample"
@@ -69,6 +71,24 @@ class SpineTest(FeatureTest):
             "SELECT season, game_id FROM game_spine WHERE end_type_anomaly = 1 AND is_liiga_competitive = 1"
         ).fetchall()
         self.assertEqual([tuple(r) for r in anomalies], [(2022, 49294)])
+
+    def test_sudden_death_tiebreak_does_not_feed_ratings(self):
+        # 2022:49298 KooKoo - Pelicans 1-0, 2,101 seconds, right after 49296.
+        self.assertEqual(self.one(FLAGS, 2022, 49298), ("PLAYOFFS", 1, 0, 0, 0))
+        self.assertEqual(self.one(TARGET, 2022, 49298), ("REG", "H", 1, 0, 0))
+        excluded = self.full.execute(
+            "SELECT season, game_id, feeds_ratings, ratings_exclusion_reason FROM game_spine "
+            "WHERE ratings_exclusion_reason IS NOT NULL"
+        ).fetchall()
+        self.assertEqual([tuple(r) for r in excluded], [(2022, 49298, 0, RATINGS_EXCLUSIONS[2022, 49298])])
+        self.assertIn("tiebreak", RATINGS_EXCLUSIONS[2022, 49298])
+
+    def test_exclusion_changes_only_the_one_flag(self):
+        # Every other competitive all-Liiga game still feeds ratings.
+        counts = self.full.execute(
+            "SELECT SUM(is_liiga_competitive AND NOT has_non_liiga_team), SUM(feeds_ratings) FROM game_spine"
+        ).fetchone()
+        self.assertEqual(counts[1], counts[0] - len(RATINGS_EXCLUSIONS))
 
     def test_unplayed_game_has_no_result(self):
         unplayed = self.full.execute(

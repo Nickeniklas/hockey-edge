@@ -17,6 +17,8 @@ SCHEMA = """
 -- One row per game in hockey.games, every phase, played or not. Goals, end
 -- type and regulation_result are NULL until the game has ended. start_date
 -- is the UTC date of start_utc; history.py cuts on it.
+-- ratings_exclusion_reason is non-NULL only for the games listed in
+-- spine.RATINGS_EXCLUSIONS, which have feeds_ratings = 0.
 CREATE TABLE game_spine (
     game_id INTEGER NOT NULL,
     season INTEGER NOT NULL,
@@ -37,6 +39,7 @@ CREATE TABLE game_spine (
     has_non_liiga_team INTEGER NOT NULL,
     feeds_ratings INTEGER NOT NULL,
     in_eval_sample INTEGER NOT NULL,
+    ratings_exclusion_reason TEXT,
     PRIMARY KEY (game_id, season)
 );
 CREATE INDEX idx_game_spine_date ON game_spine (start_date);
