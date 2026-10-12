@@ -127,8 +127,9 @@ The ones that shape design:
 
 ## Open decisions (mine, not Claude Code's)
 
-1. **Off-machine backup of `data/`** — external drive vs cloud. If not done yet, it
-   is still the most important open task.
+1. **Off-machine backup of `data/`** — settled as a zip in Google Drive (cloud copy,
+   and the Mac can fetch it). A copy exists on a second local disk; the first Drive
+   upload is a manual 7-Zip zip, done outside 11:00–23:30. Automating it is next-step 3.
 2. **Thin odds benchmark.** Closing lines exist only from 2026-09-17 (~49 usable
    games now, plus ~15–20 a week). Accept that, or open a historical Liiga odds
    session.
@@ -144,8 +145,16 @@ The ones that shape design:
 2. **Plan step 5 in the design chat** (Elo + walk-forward harness). Its first task is
    the small F1 follow-up: drop 2022:49298 from `feeds_ratings` with a recorded
    reason. Odds comparison uses closing rows only (`minutes_before_start` ≤ 60).
-3. **Missed-window alert** — a short session of its own, so a shut-down or failed
-   job is noticed the same day, not three days later.
+3. **Pipeline safety session (one short session, planned in the design chat first):**
+   - **Missed-window alert**, so a shut-down or failed job is noticed the same day,
+     not three days later.
+   - **Scheduled backup script**: zip of `data/hockey.db`, `data/snapshots.db` and
+     `data/raw/` (not `features.db`, which rebuilds in seconds) into the Google Drive
+     folder, weekly. Never point Drive at the live `data/` folder. A plain file copy
+     of a SQLite file is only safe when nothing writes to it, i.e. outside the
+     snapshot job's 11:00–23:00 window and the 23:00 nightly sync. Either schedule
+     outside that (e.g. early morning), or copy the databases with SQLite's backup
+     API, which is safe at any time.
 4. Then F2 and F3 for step 6.
 
 ## Deferred (explicitly, with reasons)
@@ -196,7 +205,8 @@ The ones that shape design:
 
 ## Open items
 
-- **Failure alerting** — not built; the 10-08–10-10 gap went unnoticed for three days.
+- **Failure alerting and automated backup** — not built; the 10-08–10-10 gap went
+  unnoticed for three days. Both are in next-step 3.
 - 2026 relegation format is NULL in `season_format`; needed only for F3 motivation.
 - `homePreviousGames`/`awayPreviousGames` absent from `game_preview` — unresolved.
 - Goal-event surplus variance across seasons — unexplained; doesn't block anything.
