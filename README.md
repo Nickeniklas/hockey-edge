@@ -106,6 +106,7 @@ was known before puck drop.
 ```
 src/hockey_edge/ingest/     liiga.fi ingest, raw cache, re-sync
 src/hockey_edge/snapshot/   pre-game lineup and odds capture
+src/hockey_edge/features/   feature store, rebuilt into data/features.db
 scripts/                    nightly sync, checks, and one-off recovery tools
 fixtures/                   real saved API responses, used by the tests
 docs/                       plan, data and model contracts, run records

@@ -76,9 +76,43 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
    (`docs/RECOVERY_BACKLOG.md`, **done 2026-09-25**) then the Liiga feature
    store come first
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
+   — **F0 and F1 done** (2026-10-12); F2 and F3 open, per `docs/FEATURE_STORE_PLAN.md`
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-10-12)
+
+**Feature store phase F1 is built**: `src/hockey_edge/features/`, output
+`data/features.db` (gitignored, derived). It is enough to start build step
+5 (Elo + walk-forward harness). F2 and F3 are open.
+
+- **Rebuild:** `python -m hockey_edge.features.build`. Full rebuild every
+  time (about 6 s), built in a temp file and swapped in. `hockey.db` and
+  `snapshots.db` are attached read-only.
+- **Tables:** `game_spine` (all 7,331 games, flags and the regulation 1X2
+  target), `season_format`, `team_season`, `features_home`,
+  `features_schedule`, `benchmark_odds`, `build_meta`. Column meanings are
+  in the DDL comments in `features/db.py`.
+- **History is cut by UTC date, not by start time.** `history_before`
+  returns ended games from an earlier date. The plan said "started
+  earlier", but a game that started 90 minutes before is still in play at
+  puck drop, and `games.end_utc` is unusable (null for 2025, before the
+  start in some games). In a busy season over 100 competitive games have
+  another one starting up to three hours earlier.
+- **Feature modules read games only through `features/history.py`**, and
+  nothing model-facing reads odds. Both are enforced by tests.
+- **`season_format.py` is hand-curated and checked on every build.** A new
+  season, a new team or a wrong team count stops the build. The 2026
+  relegation format is left NULL: that season has no PLAYOUT or
+  QUALIFICATIONS games and the docs don't say why.
+- **`benchmark_odds` has 57 games**, all Pinnacle. It takes Pinnacle's last
+  parsed row before the start even when that row is old, so filter on
+  `minutes_before_start`: 8 rows are more than an hour out, 5 of them a day
+  or two (the snapshot job did not run 2026-10-08 to 10-10).
+- Tests: 99. The feature tests are in `tests/features/` and run on
+  `fixtures/features/mini.sql`, real rows written by
+  `scripts/make_feature_fixture.py`.
 
 ## Status (as of 2026-09-25, second session)
 
