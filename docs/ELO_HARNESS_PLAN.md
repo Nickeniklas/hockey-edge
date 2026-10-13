@@ -130,8 +130,8 @@ prior). For a team-season with `is_first_liiga_season = 1`:
 Starting grid. Widen any dimension where a fold's choice lands on an edge, and record
 edge hits per fold.
 - K: 4, 6, 8, 10, 14, 18
-- HFA: 0, 20, 40, 60, 80
-- r: 0.2, 0.35, 0.5, 0.7
+- HFA: 0, 20, 40, 60, 80 **[removed from the grid 2026-10-13, fixed at 0: see Decisions]**
+- r: 0.2, 0.35, 0.5, 0.7 **[0.85 added in E2 after the 2018 fold chose 0.7]**
 - margin multiplier: off, on
 - s_ot: 0, 0.15
 
@@ -345,5 +345,10 @@ and the blend.
 
 - Link: ordered logit (recommended), Davidson draw-Elo, or two-stage.
 - ~~`numpy` + `scipy` in `requirements.txt`~~ (decided: yes).
+- **HFA is fixed at 0 and removed from the grid (decided 2026-10-13, after E2).** The
+  link's cutpoints carry the home edge, so tuning can't identify HFA: every fold chose
+  the grid's lowest value, and the tuning loss fell by under 0.001 from +80 to −80 with
+  no minimum. The rerun without HFA (120 configs) gave identical predictions in every
+  fold. Details in `docs/ELO_RESULTS.md`.
 - Still open from PROJECT_CONTEXT, not decided here: the thin odds benchmark (E3 gives
   the number of games needed) and PLAYOFFS as an evaluation slice.

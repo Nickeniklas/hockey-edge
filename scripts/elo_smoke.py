@@ -4,7 +4,8 @@
 
 One pass with default parameters over data/features.db, the link fitted on
 the 2016-2017 regular seasons and frozen. Prints per-season log loss against
-base rates, the rank correlation of regular-season-end Elo with points, and
+base rates, the rank correlation of regular-season-end Elo with points per
+game, and
 the first-season teams' entries. Read-only; stores nothing. The real
 walk-forward numbers come from the harness (phase E2), not from here.
 """
@@ -80,8 +81,13 @@ def main() -> None:
 
 
 def _rank_correlation(rows) -> float:
-    """Elo after each team's last regular-season game against its points."""
+    """Elo after each team's last regular-season game against its points per game.
+
+    Per game, not total: 2020-2022 and a season in progress have uneven
+    games per team.
+    """
     points: dict[str, int] = {}
+    played: dict[str, int] = {}
     rating: dict[str, float] = {}
     for g, r in rows:
         if g.result == "D":
@@ -91,9 +97,11 @@ def _rank_correlation(rows) -> float:
             home, away = (3, 0) if g.result == "H" else (0, 3)
         points[g.home] = points.get(g.home, 0) + home
         points[g.away] = points.get(g.away, 0) + away
+        played[g.home] = played.get(g.home, 0) + 1
+        played[g.away] = played.get(g.away, 0) + 1
         rating[g.home], rating[g.away] = r.home_post, r.away_post
     teams = sorted(points)
-    return float(spearmanr([rating[t] for t in teams], [points[t] for t in teams]).statistic)
+    return float(spearmanr([rating[t] for t in teams], [points[t] / played[t] for t in teams]).statistic)
 
 
 if __name__ == "__main__":

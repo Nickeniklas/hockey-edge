@@ -43,9 +43,16 @@ def _unpack(theta) -> LinkParams:
 
 
 def fit(x, results) -> LinkParams:
-    """Maximum likelihood. `results` holds 'H', 'D' or 'A' per game."""
+    """Maximum likelihood.
+
+    `results` holds 'H', 'D' or 'A' per game, or an integer array of
+    positions in CLASSES.
+    """
     x = np.asarray(x, dtype=float)
-    y = np.array([CLASSES.index(r) for r in results])
+    if isinstance(results, np.ndarray) and results.dtype.kind == "i":
+        y = results
+    else:
+        y = np.array([CLASSES.index(r) for r in results], dtype=int)
     if len(x) != len(y) or not len(x):
         raise ValueError("x and results must be the same non-zero length")
     rates = np.bincount(y, minlength=3) / len(y)
