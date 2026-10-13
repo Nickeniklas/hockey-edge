@@ -14,13 +14,14 @@ the same games, and carries its standard error.
 import argparse
 import json
 import sqlite3
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 
 from hockey_edge.features.db import FEATURES_DB_PATH
-from hockey_edge.models import CLASSES
-from hockey_edge.validation import harness, metrics
+from hockey_edge.models import CLASSES, versions
+from hockey_edge.validation import harness, market, metrics
 
 RESULTS_PATH = Path(__file__).resolve().parents[3] / "docs" / "ELO_RESULTS.md"
 MARKER = "<!-- Generated below by python -m hockey_edge.validation.report. Edits below this line are overwritten. -->"
@@ -272,6 +273,29 @@ def _slices_section(run: _Run) -> list[str]:
     return lines
 
 
+def _version_section(run: _Run) -> list[str]:
+    """The last fold is the config a live prediction would be logged under."""
+    last = [f for f in run.folds if f["model"] == harness.ELO]
+    if not last:
+        return []
+    last = last[-1]
+    params, fitted = json.loads(last["chosen_params_json"]), json.loads(last["link_params_json"])
+    tagged = (
+        params == asdict(versions.ELO_1_PARAMS)
+        and all(fitted[k] == v for k, v in asdict(versions.ELO_1_LINK).items())
+    )
+    tuning = last["tuning_seasons"].split(",")
+    return [
+        f"## Tagged version: `{versions.ELO_1_VERSION}`", "",
+        f"The {last['test_season']} fold: tuned on {tuning[0]}–{tuning[-1]}, {fitted['tuning_games']:,} games.", "",
+        "- Elo: " + ", ".join(f"{k} {v}" for k, v in params.items() if v is not None),
+        f"- Link: c1 {fitted['c1']!r}, c2 {fitted['c2']!r}, beta {fitted['beta']!r}",
+        f"- Tuning log loss {fitted['tuning_log_loss']:.4f}",
+        "- " + ("Matches" if tagged else "**DOES NOT match**")
+        + f" `ELO_1_PARAMS` and `ELO_1_LINK` in `src/hockey_edge/models/versions.py`.", "",
+    ]
+
+
 def render(backtest: sqlite3.Connection, features: sqlite3.Connection, run_id: int) -> str:
     """The generated part of the results document, as Markdown."""
     run = _Run(backtest, features, run_id)
@@ -285,6 +309,8 @@ def render(backtest: sqlite3.Connection, features: sqlite3.Connection, run_id: i
     ]
     for section in (_log_loss_section, _secondary_section, _folds_section, _calibration_section, _slices_section):
         lines += section(run)
+    lines += market.render(backtest, features, run_id, LABELS)
+    lines += _version_section(run)
     return "\n".join(lines).rstrip() + "\n"
 
 

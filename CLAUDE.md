@@ -78,8 +78,57 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
    — **F0 and F1 done** (2026-10-12); F2 and F3 open, per `docs/FEATURE_STORE_PLAN.md`
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
+   — **done 2026-10-13**; `docs/ELO_RESULTS.md`, tagged `elo-1`
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-10-13)
+
+**Build step 5 is done: the Elo baseline and the walk-forward harness.**
+Plan `docs/ELO_HARNESS_PLAN.md` (E0-E3), results `docs/ELO_RESULTS.md`.
+Next is the design chat, then F2 for step 6.
+
+- **Headline:** Elo beats base rates by 0.0316 +/- 0.0039 log loss on pooled
+  2018-2026 (4,075 regular-season games, walk-forward). It beats a naive
+  goal-difference rating by only 0.0028 +/- 0.0014. Pinnacle's closing line
+  beats Elo by 0.0493 +/- 0.0204 on the 49 games of 2027 that have one;
+  about 816 games would be needed to pin a 0.01 gap.
+- **Commands:**
+  `python -m hockey_edge.features.build`, then
+  `python -m hockey_edge.validation.run --models elo,base_rate,gd_rating`
+  (about 8 s), then `python -m hockey_edge.validation.report --run latest`.
+  `scripts/elo_smoke.py` is a quick sanity pass with default parameters.
+- **Code:** `src/hockey_edge/models/` (`elo.py`, `link.py`, `baselines.py`,
+  `versions.py`) and `src/hockey_edge/validation/` (`folds.py`,
+  `harness.py`, `metrics.py`, `market.py`, `report.py`, `run.py`).
+- **`data/backtest.db` is not the prediction log.** It is gitignored,
+  rebuildable derived output; runs are append-only by `run_id`. The
+  immutable log is step 7.
+- **`elo-1` is tagged** in `models/versions.py`: K 10, HFA 0, r 0.5, margin
+  multiplier on, `s_ot` 0.15, tuned on 2016-2026. Step 7 logs under it.
+- **The home edge is fixed at 0, not tuned.** The ordered-logit link's
+  cutpoints carry it, so the tuning loss cannot identify HFA. Don't put it
+  back in the grid.
+- **Elo works one UTC date at a time**: predict every game on a date, then
+  apply that date's results. Same cut as `features/history.py`, and a test
+  checks the two agree game by game. The pass stops if a team appears twice
+  on one date.
+- **2022:49298 no longer feeds ratings** (sudden-death tiebreak; reason in
+  `game_spine.ratings_exclusion_reason`). `FEATURE_VERSION` is `f1.1`.
+- **`docs/ELO_RESULTS.md` is generated below its marker line**; the summary
+  above it is hand-written and kept. Regenerating does not update the
+  summary.
+- **Only `validation/market.py` reads odds.** A test checks the models and
+  the harness never reference `benchmark_odds` or `odds_snapshots`.
+- **Open:** the cold-start rule shows no measurable gain over a flat entry;
+  2025 was a weak season for every results-only rating; PLAYOFFS
+  predictions are stored but not evaluated.
+- **Snapshot gap:** no odds or confirmed lineups exist for the 13 games of
+  2026-10-08 to 10-10 (the job did not run). Odds rows are arriving again
+  as of 2026-10-13; the first closing windows since the gap are 2026-10-14.
+- Tests: 173, `python -m unittest discover -s tests`. Model and harness
+  tests are in `tests/models/` and `tests/validation/`, on the same fixture.
+  `numpy` and `scipy` are now in `requirements.txt`.
 
 ## Status (as of 2026-10-12)
 

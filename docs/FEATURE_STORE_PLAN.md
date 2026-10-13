@@ -8,8 +8,9 @@ Contract: `docs/DATA_PIPELINE.md` Layer 3 and `docs/MODEL.md`. Data rules:
 the user's call. Stop at every "STOP" line and report before going on.
 
 **Status: F0 done 2026-10-11, F1 done 2026-10-12 (commits `c47137c`, `bec8b87`).
-Next: build step 5 (Elo + walk-forward harness), planned separately. F2 and F3
-follow for step 6.**
+Build step 5 (Elo + walk-forward harness) is done 2026-10-13: plan
+`docs/ELO_HARNESS_PLAN.md`, results `docs/ELO_RESULTS.md`. F2 and F3 follow for
+step 6.**
 
 Order: **F0 (done) → F1 (done) → step 5 → F2 → F3.** NHL stays deferred.
 

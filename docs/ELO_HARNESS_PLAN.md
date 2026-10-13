@@ -6,7 +6,8 @@ from feature store phase F1 (`docs/FEATURE_STORE_PLAN.md`). Items marked
 **[DECISION: Niklas]** are the user's call. Stop at every "STOP" line and report before
 going on.
 
-**Status: planned, not started.**
+**Status: E0–E3 done 2026-10-13. Results: `docs/ELO_RESULTS.md`. Next: back to the
+design chat, then F2.**
 
 Order: **E0 → E1 → E2 → E3**, then back to the design chat before F2.
 

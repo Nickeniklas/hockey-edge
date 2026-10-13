@@ -1,6 +1,6 @@
 # Elo baseline results
 
-Build step 5, phase E2 (`docs/ELO_HARNESS_PLAN.md`). Walk-forward: each test season is
+Build step 5, phases E2 and E3 (`docs/ELO_HARNESS_PLAN.md`). Walk-forward: each test season is
 predicted with an Elo config, a link and base rates fitted only on the seasons before it.
 Regular-season games only. Rebuild with:
 
@@ -18,6 +18,15 @@ python -m hockey_edge.validation.report --run latest
 - **Elo barely beats the goal-difference rating:** −0.0028 ± 0.0014 pooled, 2 SE. A naive
   form table gets most of the way there.
 - **2027 says nothing yet.** 99 games; Elo is 0.0089 ± 0.0192 behind base rates.
+- **Pinnacle's closing line beats Elo, as expected.** On the 49 games of 2027 with a
+  closing line, the market's log loss is 0.9969 and Elo's 1.0462: +0.0493 ± 0.0204. Base
+  rates score the same as Elo on these games (1.0460). The per-game SD of Elo − market is
+  0.143, so a true gap of 0.01 would need about 816 games to reach 2 SE: more than one
+  full regular season of closing lines. No bet365-only games exist yet.
+- **Tagged `elo-1`:** K 10, HFA 0, r 0.5, margin on, `s_ot` 0.15, cold start m 2 for 15
+  games; link c1 −0.7342, c2 0.2740, β 3.0804. Tuned on 2016–2026 (the 2027 fold). The
+  constants are in `src/hockey_edge/models/versions.py`; the generated section at the
+  bottom checks them against the run.
 - **The gain is smaller early in a season:** −0.0146 ± 0.0074 while a team has under 10
   games, −0.0352 ± 0.0045 after.
 - **The cold-start rule shows no measurable gain.** Against a flat entry it is
@@ -186,3 +195,28 @@ First-season teams, and the same games with a flat entry (enter at the returning
 | 2025, all games | 480 | 1.0657 | 1.0649 | 1.0674 | +0.0008 ± 0.0011 | -0.0017 ± 0.0103 |
 | Jokerit 2027, its games | 13 | 0.9388 | 0.9901 | 1.0599 | -0.0513 ± 0.0392 | -0.1211 ± 0.0635 |
 | 2027, all games | 99 | 1.0538 | 1.0606 | 1.0450 | -0.0068 ± 0.0053 | +0.0089 ± 0.0192 |
+
+## Market benchmark
+
+Closing line: the last parsed 1X2 row captured at most 60 minutes before the start, vig removed proportionally. Same games for every column. A positive difference means the market is better. Books are never pooled.
+
+**pinnacle**, 49 games
+
+| Model | Log loss | Model − market (± SE) |
+|---|---|---|
+| Market (pinnacle) | 0.9969 | |
+| Elo | 1.0462 | +0.0493 ± 0.0204 |
+| Base rates | 1.0460 | +0.0491 ± 0.0288 |
+| Goal-diff rating | 1.0302 | +0.0332 ± 0.0238 |
+| Elo, flat entry | 1.0476 | +0.0507 ± 0.0205 |
+
+Per-game SD of Elo − market: 0.1428. A true gap of 0.01 would need about 816 games to reach 2 SE; this sample has 49.
+
+## Tagged version: `elo-1`
+
+The 2027 fold: tuned on 2016–2026, 4,975 games.
+
+- Elo: cold_m 2.0, cold_n 15, hfa 0.0, k 10, margin True, r 0.5, s_ot 0.15
+- Link: c1 -0.7341928726427005, c2 0.27399476649705745, beta 3.0804204715883925
+- Tuning log loss 1.0365
+- Matches `ELO_1_PARAMS` and `ELO_1_LINK` in `src/hockey_edge/models/versions.py`.
