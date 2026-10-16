@@ -236,6 +236,15 @@ means several consecutive missed nights still get caught up.
 
     python scripts/nightly_sync.py
 
+**Heartbeat (added 2026-10-14).** A real run pings the healthchecks.io
+`nightly-sync` check (`HC_NIGHTLY_SYNC` in `.env`, read from the repo root
+regardless of the working directory): start, then success, or fail with the
+exit status and the last ERROR/CRITICAL log line. The check expects a ping
+daily at 23:00 Europe/Helsinki with a 2 h grace, so a night the sync did not
+run or failed sends an email. `--dry-run` sends nothing. A failed ping logs a
+warning and never stops the sync. See `src/hockey_edge/ops/heartbeat.py` and
+`docs/PIPELINE_SAFETY_PLAN.md`.
+
 Why it's needed at all: **nothing else puts completed live-season games into
 `hockey.db`.** `hockey_edge.snapshot.job` writes only to `snapshots.db` (it
 reads liiga.fi live and deliberately never touches `hockey.db`), and

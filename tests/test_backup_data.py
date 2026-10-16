@@ -196,11 +196,17 @@ class FailureTest(BackupTestCase):
 
     def test_missing_destination_exits_non_zero(self):
         missing = self.dest / "not-here"
+        # load_dotenv is patched out so the real .env (and its ping URLs)
+        # never reaches this process.
         with mock.patch.object(sys, "argv", ["backup_data.py", "--dest", str(missing)]), \
-                mock.patch.object(backup_data, "DATA_DIR", self.data):
+                mock.patch.object(backup_data, "DATA_DIR", self.data), \
+                mock.patch.object(backup_data, "load_dotenv"), \
+                mock.patch.object(backup_data.ops_heartbeat, "ping") as ping:
             with self.assertRaises(SystemExit) as cm:
                 backup_data._main()
         self.assertEqual(cm.exception.code, 1)
+        self.assertEqual([c.args[:2] for c in ping.call_args_list], [("backup", "start"), ("backup", "fail")])
+        self.assertIn("does not exist", ping.call_args_list[1].args[2])
 
     def test_corrupted_zip_is_never_moved_into_the_destination(self):
         real_build = backup_data.build_zip

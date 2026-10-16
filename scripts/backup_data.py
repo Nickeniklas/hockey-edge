@@ -51,6 +51,10 @@ Usage (from repo root, venv active):
 Logs to logs/backup.log, plus stdout from a terminal. The weekly task runs
 pythonw.exe, where sys.stdout/sys.stderr are None and the log file is the
 only record. Exits non-zero on any failure.
+
+Heartbeat (docs/PIPELINE_SAFETY_PLAN.md phase S2): a real run pings the
+healthchecks.io `backup` check with start, then success, or fail with the
+error. --dry-run sends nothing.
 """
 
 import argparse
@@ -67,6 +71,8 @@ from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+from hockey_edge.ops import heartbeat as ops_heartbeat
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = REPO_ROOT / "data"
@@ -93,11 +99,12 @@ class BackupError(Exception):
 
 
 def heartbeat(status: str, body: str = "") -> None:
-    """Heartbeat hook, called with "start", "success" or "fail".
+    """Ping the healthchecks.io `backup` check: "start", "success" or "fail".
 
-    A no-op in S1. S2 makes it ping the `backup` check through
-    hockey_edge.ops.heartbeat (docs/PIPELINE_SAFETY_PLAN.md, design answer 5).
+    HC_BACKUP from .env; unset is a no-op. Never raises (see
+    hockey_edge.ops.heartbeat).
     """
+    ops_heartbeat.ping("backup", status, body)
 
 
 def zip_name(day: date) -> str:

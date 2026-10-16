@@ -45,10 +45,22 @@ Alerting: failures log at CRITICAL to logs/snapshot_job.log, plus the console
 when run from a terminal. The scheduled task runs pythonw.exe, where
 sys.stdout/sys.stderr are None and the log file is the only record — main()
 therefore logs any otherwise-unhandled exception before letting it exit
-non-zero. There's no email/Slack hookup yet (open item) — until one exists, a
-CRITICAL line in the log is the signal to check in manually. A missed capture
-is gone forever, so this job must never silently swallow a failure, and --once
-exits non-zero on any failure so a scheduler can surface it.
+non-zero. A missed capture is gone forever, so this job must never silently
+swallow a failure, and --once exits non-zero on any failure so a scheduler can
+surface it.
+
+Heartbeats (added 2026-10-14, docs/PIPELINE_SAFETY_PLAN.md phase S2): every
+--once pass pings two healthchecks.io checks through hockey_edge.ops.heartbeat.
+`missed-windows` is pinged right after missed-window marking: a fail ping
+listing kind, season, game_id and window of each window this pass newly
+marked missed, otherwise a success ping. mark_missed_windows returns a window
+only on its pending -> missed transition, so no window is reported twice.
+Every clean pass sends success, not just the first one after a fail: the
+check runs on a 30-day simple schedule and needs the regular pings.
+`snapshot-job` is pinged at the end of the pass: success, or fail with the
+last error line when the pass failed or aborted. --dry-run sends nothing. A
+ping never raises and gives up after a 10 s timeout; a lost fail ping is
+logged as a warning and is not resent.
 """
 
 import argparse
@@ -62,6 +74,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from hockey_edge.ops import heartbeat
 from hockey_edge.snapshot import fixtures, lineups, storage
 from hockey_edge.snapshot.odds.base import OddsProvider, OddsSnapshot
 from hockey_edge.snapshot.odds.oddspapi import OddsPapiProvider, load_team_map
@@ -459,6 +472,25 @@ def run_dry_run(conn: sqlite3.Connection, logger: logging.Logger) -> None:
     logger.info("dry-run: oddspapi usage this month: %d / %d ceiling", used, ODDS_MONTHLY_CEILING)
 
 
+def report_missed_windows(missed: list[sqlite3.Row]) -> bool:
+    """Ping the missed-windows check for this pass. Returns whether the ping landed.
+
+    `missed` is what mark_missed_windows just returned: only windows that
+    went pending -> missed in this pass, so a window is never reported twice.
+    Any of them -> one fail ping listing them all; none -> a success ping,
+    on every such pass.
+    """
+    if not missed:
+        return heartbeat.ping("missed-windows", "success")
+    lines = [
+        f"kind={row['kind']} season={row['season']} game_id={row['game_id']} "
+        f"window={row['window']} due_at={row['due_at']}"
+        for row in missed
+    ]
+    body = f"{len(missed)} capture window(s) newly missed:\n" + "\n".join(lines)
+    return heartbeat.ping("missed-windows", "fail", body)
+
+
 def run_once(conn: sqlite3.Connection, logger: logging.Logger) -> bool:
     """Normal pass. Returns True on success (no unhandled failure)."""
     now_iso = _now_iso()
@@ -479,6 +511,7 @@ def run_once(conn: sqlite3.Connection, logger: logging.Logger) -> bool:
             row["kind"], row["season"], row["game_id"], row["window"], row["due_at"],
             row["game_start_utc"],
         )
+    report_missed_windows(missed)
 
     due = storage.get_due_windows(conn, kind="odds", now_iso=now_iso)
     if due:
@@ -507,6 +540,9 @@ def main() -> None:
     # happens with no logger and — under pythonw — no stderr either, leaving
     # only Task Scheduler's non-zero Last Run Result.
     logger = _configure_logging()
+    last_error = heartbeat.LastErrorHandler()
+    logger.addHandler(last_error)
+    once = False
     try:
         parser = argparse.ArgumentParser()
         mode = parser.add_mutually_exclusive_group(required=True)
@@ -516,6 +552,7 @@ def main() -> None:
             help="Zero HTTP requests, zero writes: report which windows are due.",
         )
         args = parser.parse_args()
+        once = args.once
 
         load_dotenv()
         conn = storage.get_connection()
@@ -525,15 +562,19 @@ def main() -> None:
             else:
                 ok = run_once(conn, logger)
                 if not ok:
+                    heartbeat.ping("snapshot-job", "fail", last_error.last or "pass finished with failures")
                     sys.exit(1)
+                heartbeat.ping("snapshot-job", "success")
         finally:
             conn.close()
     except SystemExit:
         # --once's deliberate exit(1), and argparse's exit(2) on a bad
         # invocation: both already said what they needed to.
         raise
-    except BaseException:
+    except BaseException as exc:
         logger.critical("snapshot job aborted with an unhandled exception", exc_info=True)
+        if once:
+            heartbeat.ping("snapshot-job", "fail", f"aborted: {type(exc).__name__}: {exc}")
         raise
 
 

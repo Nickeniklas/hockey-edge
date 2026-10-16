@@ -6,7 +6,12 @@ manual and can't be done by Claude Code. Stop at every "STOP" line and report be
 going on.
 
 **Status: S1 built 2026-10-14 (`scripts/backup_data.py`, `docs/BACKUP.md`), first
-backup verified; weekly task not yet registered. S2 not started.**
+backup verified; weekly task not yet registered. S2 built 2026-10-14 on branch
+`s2-alerts` (worktree `../hockey-edge-s2`), not yet merged into the live checkout.**
+
+S2 note (Niklas, 2026-10-14): the `missed-windows` check has a 30-day simple
+schedule, so **every** snapshot run with nothing newly missed sends a success ping,
+not only the first one after a fail.
 
 Order: **S1 (backup) → S2 (alerts)**.
 

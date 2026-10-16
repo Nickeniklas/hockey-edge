@@ -114,7 +114,11 @@ Under `pythonw` there is no console, so a failure before logging starts shows
 only as a non-zero Last Run Result there. `WakeToRun` needs wake timers allowed
 in the power plan, and only wakes a sleeping PC, not one that is off.
 
-## Not yet
+## Heartbeat
 
-The heartbeat hook (`heartbeat()` in the script) is a no-op until phase S2
-makes it ping healthchecks.io.
+Added in phase S2. A real run pings the healthchecks.io `backup` check
+(`HC_BACKUP` in `.env`): start, then success, or fail with the error message.
+The check expects a ping every Sunday 11:00 with a 1-day grace, so a week
+without a backup, a PC that is off all Sunday, or a failed run sends an email.
+`--dry-run` sends nothing. A ping never stops the backup; see
+`src/hockey_edge/ops/heartbeat.py`.

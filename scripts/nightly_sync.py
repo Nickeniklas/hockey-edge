@@ -51,6 +51,11 @@ log file is the only record — main() therefore logs any otherwise-unhandled
 exception before letting it exit non-zero. Exits non-zero if either pass
 fails, so a scheduler can surface it. Registered with schtasks rather than by
 this repo — see docs/RESYNC.md's nightly-sync section.
+
+Heartbeat (added 2026-10-14, docs/PIPELINE_SAFETY_PLAN.md phase S2): a real
+run pings the healthchecks.io `nightly-sync` check (HC_NIGHTLY_SYNC in .env)
+with start, then success, or fail carrying the last ERROR/CRITICAL log line.
+--dry-run sends nothing. A ping never raises; see hockey_edge.ops.heartbeat.
 """
 
 import argparse
@@ -58,8 +63,11 @@ import logging
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from hockey_edge.ingest import db
 from hockey_edge.ingest.liiga import backfill, resync
+from hockey_edge.ops import heartbeat
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LOG_DIR = REPO_ROOT / "logs"
@@ -113,18 +121,35 @@ def main() -> None:
     # happens with no logger and -- under pythonw -- no stderr either, leaving
     # only Task Scheduler's non-zero Last Run Result.
     _configure_logging()
+    last_error = heartbeat.LastErrorHandler()
+    logging.getLogger().addHandler(last_error)
+    pinging = False
     try:
-        _main()
-    except SystemExit:
+        args = _parse_args()
+        pinging = not args.dry_run
+        # Explicit path: the heartbeat URL must not depend on the task's
+        # working directory.
+        load_dotenv(REPO_ROOT / ".env")
+        if pinging:
+            heartbeat.ping("nightly-sync", "start")
+        _main(args)
+    except SystemExit as exc:
         # _main's deliberate exit(1), and argparse's exit(2) on a bad
         # invocation: both already said what they needed to.
+        if pinging and exc.code not in (0, None):
+            heartbeat.ping("nightly-sync", "fail",
+                           f"exit status {exc.code}: {last_error.last or 'no error line logged'}")
         raise
-    except BaseException:
+    except BaseException as exc:
         logger.critical("nightly sync aborted with an unhandled exception", exc_info=True)
+        if pinging:
+            heartbeat.ping("nightly-sync", "fail", f"aborted: {type(exc).__name__}: {exc}")
         raise
+    if pinging:
+        heartbeat.ping("nightly-sync", "success")
 
 
-def _main() -> None:
+def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -142,8 +167,10 @@ def _main() -> None:
         help="report what the resync pass would check, zero HTTP requests. The backfill pass is "
         "SKIPPED entirely under --dry-run (backfill.py has no dry-run mode of its own).",
     )
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+def _main(args: argparse.Namespace) -> None:
     logger.info(
         "nightly sync starting: season=%s days=%s dry_run=%s", args.season, args.days, args.dry_run
     )
