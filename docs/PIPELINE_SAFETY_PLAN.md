@@ -5,9 +5,11 @@ Items marked **[DECISION: Niklas]** are the user's call. Steps marked **[Niklas]
 manual and can't be done by Claude Code. Stop at every "STOP" line and report before
 going on.
 
-**Status: S1 built 2026-10-14 (`scripts/backup_data.py`, `docs/BACKUP.md`), first
-backup verified; weekly task not yet registered. S2 built 2026-10-14 on branch
-`s2-alerts` (worktree `../hockey-edge-s2`), not yet merged into the live checkout.**
+**Status: done. S1 built 2026-10-14 (`scripts/backup_data.py`, `docs/BACKUP.md`),
+first backup verified, weekly task registered 2026-10-14. S2 built 2026-10-14, merged
+into the live checkout 2026-10-16 (`290708a`), test alert emails received. Shutdown
+alerts and recovery emails confirmed in normal use; the backup task's catch-up after
+a day off confirmed 2026-10-19.**
 
 S2 note (Niklas, 2026-10-14): the `missed-windows` check has a 30-day simple
 schedule, so **every** snapshot run with nothing newly missed sends a success ping,

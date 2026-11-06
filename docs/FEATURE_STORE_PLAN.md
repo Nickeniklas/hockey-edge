@@ -2,17 +2,18 @@
 
 Design chat, 2026-09-24; updated 2026-09-25 after the historical recovery;
 **updated 2026-10-11 after F0** (`docs/FEATURE_AUDIT.md`); **updated 2026-10-12
-after F1**.
+after F1**; F2 pre-check updated 2026-11-06 (Corsi/Fenwick rule, blocked-shot team
+check).
 Contract: `docs/DATA_PIPELINE.md` Layer 3 and `docs/MODEL.md`. Data rules:
 `docs/DATA_PIPELINE.md` → "Known data gaps". Items marked **[DECISION: Niklas]** are
 the user's call. Stop at every "STOP" line and report before going on.
 
 **Status: F0 done 2026-10-11, F1 done 2026-10-12 (commits `c47137c`, `bec8b87`).
 Build step 5 (Elo + walk-forward harness) is done 2026-10-13: plan
-`docs/ELO_HARNESS_PLAN.md`, results `docs/ELO_RESULTS.md`. F2 and F3 follow for
-step 6.**
+`docs/ELO_HARNESS_PLAN.md`, results `docs/ELO_RESULTS.md`. Pipeline safety (backup,
+alerts) done 2026-10-16. F2 is next, then F3, for step 6.**
 
-Order: **F0 (done) → F1 (done) → step 5 → F2 → F3.** NHL stays deferred.
+Order: **F0 (done) → F1 (done) → step 5 (done) → F2 → F3.** NHL stays deferred.
 
 ---
 
@@ -227,10 +228,19 @@ harness).
 
 ## Phase F2 — Goalie and shot quality (for LightGBM, step 6)
 
-**First, a short check (report before building):** the shot result types in
-`shot_events` per season. If blocked shots are included, the attempt features are
-Corsi. If not, they are Fenwick (unblocked attempts) and are named that way.
-Confirm attempts per game stay flat across 2023 by type.
+**First, a short read-only check (report, then STOP before building):**
+- Count `shot_events` per season by result type (`GOAL`, `GOALIE_BLOCKED`, `MISSED`,
+  `PLAYER_BLOCKED`, anything else) and by `strength_type`, as attempts per game.
+  Flag any season where a type is absent or its per-game rate moves sharply,
+  especially across the 2023 boundary.
+- For `PLAYER_BLOCKED` rows, check that `shooting_team_id` is the shooter's team
+  (shooter's roster team, after normalising the id), not the blocking team, per
+  season. Same for the other types on a sample.
+- **Naming rule (decided 2026-11-06):** Corsi = all attempts, Fenwick = unblocked
+  attempts (`GOAL` + `GOALIE_BLOCKED` + `MISSED`). If `PLAYER_BLOCKED` is present at
+  a steady rate in every season and attributed to the shooter, build **both** Corsi
+  and Fenwick columns and let the step 5 harness choose. If not, build Fenwick only
+  and record why.
 
 - `starters.py`: shared actual-starter logic (`verify_starters.py` then imports it)
   plus `resolve_starter`.

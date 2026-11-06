@@ -1,7 +1,7 @@
 # PROJECT_CONTEXT — hockey-edge (Liiga + NHL prediction & edge tool)
 
 Paste-ready summary for Claude project memory. Crystallized 2026-07-06; rewritten
-2026-09-03, 2026-09-20, 2026-09-25, 2026-10-12; rewritten 2026-10-14.
+2026-09-03, 2026-09-20, 2026-09-25, 2026-10-12, 2026-10-14; rewritten 2026-11-06.
 
 Owned by the design chat. Emitted whole and replaced wholesale at session close. Not
 edited by Human or by Claude Code sessions.
@@ -46,7 +46,7 @@ Elo turns its rating gap into 1X2 probabilities with an **ordered-logit link** f
 per fold (decided 2026-10-12).
 
 Tests: `tests/`, stdlib `unittest`, no pytest — `python -m unittest discover -s tests`
-(173 as of 2026-10-13). They assert against real saved data and make zero HTTP
+(about 203 as of 2026-10-16, after S1/S2). They assert against real saved data and make zero HTTP
 requests.
 
 ## Hard invariants
@@ -61,7 +61,7 @@ no autonomous git commits; no affiliate integrations.
 Composite `(season, game_id)` is the primary key everywhere. `game_id` is a per-season
 counter on liiga.fi's side and gets reused.
 
-## Where things stand (2026-10-14)
+## Where things stand (2026-11-06)
 
 Build order: 1 Liiga ingest → 2 snapshot capture → 3 NHL ingest (deferred) → 4 feature
 store → 5 Elo + walk-forward harness → 6 LightGBM + blend → 7 prediction log + local
@@ -77,20 +77,45 @@ dashboard.
   98% right; misses look like late changes or wrong published lines.
   **It captured nothing 2026-10-08 to 10-10 because the PC was shut down**: the 13
   games then have no confirmed lineup and no usable closing line, permanently.
-  Nothing alerted. Odds rows resumed 2026-10-13; 2026-10-14 is the first slate with
-  closing windows since the gap.
+  Nothing alerted then; since 2026-10-16 a shutdown or a missed window sends an
+  email (see Pipeline safety). Any later shutdown on a game day is a gap of the same
+  kind.
 - **Step 4 (feature store): F0 and F1 done.** Plan: `docs/FEATURE_STORE_PLAN.md`.
   Audit: `docs/FEATURE_AUDIT.md`. `python -m hockey_edge.features.build` rebuilds
   `data/features.db` in ~6 s: game spine with the regulation 1X2 target and phase
   flags, `season_format`, `team_season`, home advantage, rest days, and
   `benchmark_odds`. `FEATURE_VERSION` is `f1.1` (2022:49298 dropped from
-  `feeds_ratings`, with `ratings_exclusion_reason`). F2 (goalie, shot quality) and F3
-  (penalty-team correction, special teams, roster, motivation) are next, for step 6.
+  `feeds_ratings`, with `ratings_exclusion_reason`). **F2 (goalie, shot quality) is
+  next**, then F3 (penalty-team correction, special teams, roster, motivation), both
+  for step 6.
 - **Step 5 (Elo + walk-forward harness): done 2026-10-13.** Plan
   `docs/ELO_HARNESS_PLAN.md` (E0–E3), results `docs/ELO_RESULTS.md`. Summary below.
+- **Pipeline safety: done 2026-10-16** (`docs/PIPELINE_SAFETY_PLAN.md`). Weekly
+  verified backup and healthchecks.io alerts, both live and confirmed working.
+  Summary below.
 
-Repo: `origin/main` includes the E3 commit (2026-10-13; E2 was `33332e7`). GitHub
-knowledge sync run 2026-10-14.
+Repo: `origin/main` at `8598db4` (2026-10-16): S1 `4fdf8c5`, S2 `290708a`, then the
+previous version of this file. No build work since. The GitHub account is fine; the
+earlier suspension is long over.
+
+## Pipeline safety in short
+
+- **Backup:** `scripts/backup_data.py`, weekly task "hockey-edge backup", Sunday 11:05,
+  `StartWhenAvailable` (catches up after a day the PC was off; confirmed) and
+  `WakeToRun`. Zips `hockey.db` and `snapshots.db` (SQLite online backup, never a file
+  copy), `data/raw/` and `data/recovery/`; ~196 MB, verified before it reaches the
+  folder, keeps 4. Folder `D:\Users\Nikla_000\DATA\hockey-edge-backups` (second HDD,
+  synced to Google Drive). Restore steps in `docs/BACKUP.md`.
+- **Alerts:** `src/hockey_edge/ops/heartbeat.py`, four healthchecks.io checks in
+  `Europe/Helsinki`: `snapshot-job` (every tick, 45 min grace), `missed-windows` (fail
+  ping listing newly missed windows), `nightly-sync` (daily 23:00, 2 h grace), `backup`
+  (Sunday, 1 day grace). Email on failure or silence, green email on recovery. Ping
+  URLs live in `.env` and are secrets; the code never logs them. A ping can never stop
+  a job.
+- `snapshot-job` alerts on any day the PC is off during 11:00–23:00, game day or not.
+  Accepted noise; pause the check in the web UI when away on purpose.
+- Alerts shorten a gap from days to hours. Only an always-on machine prevents one
+  (open decision 5).
 
 ## Step 5 in short
 
@@ -151,7 +176,10 @@ The ones that shape design:
 - **Shot features from `shot_events`**, not liiga.fi's corsi (player corsi steps up
   ~10% in 2023). Even strength from `shot_events.strength_type`. On-ice counts change
   convention in 2025 and are not used. `shooting_team_id` is a bare number while other
-  tables use `number:slug`.
+  tables use `number:slug`. **Corsi vs Fenwick (decided 2026-11-06):** if blocked
+  shots (`PLAYER_BLOCKED`) are recorded at a steady rate in every season, build both
+  Corsi (all attempts) and Fenwick (unblocked) columns and let the harness choose; if
+  not, Fenwick only. Present in the 2024 sample; the F2 pre-check settles the rest.
 - xG: game-level complete from 2021; player-level only from 2025; no per-goalie xG.
 - Puck control: values only from 2023. Not a planned feature input.
 - Penalty `player_id = 0` is a team/bench penalty, not a player.
@@ -162,28 +190,26 @@ The ones that shape design:
 
 ## Open decisions (mine, not Claude Code's)
 
-1. **Off-machine backup of `data/`** — settled as a zip in Google Drive (cloud copy,
-   and the Mac can fetch it). Automating it is in `docs/PIPELINE_SAFETY_PLAN.md`.
-2. **Thin odds benchmark.** Closing lines exist only from 2026-09-17 (49 usable games
+1. **Thin odds benchmark.** Closing lines exist only from 2026-09-17 (49 usable games
    at 2026-10-13, plus ~15–20 a week). Step 5 put a number on it: ~816 games, about
    two seasons, before a 0.01 gap is measurable. Until then, model choices are judged
    by walk-forward log loss against the baselines; the market comparison grows in the
    background. A historical Liiga odds session is the only way to shorten that.
-3. **PLAYOFFS as a separate evaluation slice** (v1 evaluates RUNKOSARJA only).
-4. **In-house location xG** from `shot_events` coordinates — later or never.
-5. **Veikkaus as an additional odds source.** Optional; its own session.
-6. **When to move scheduling to the i5 Linux box.** The 10-08–10-10 gap shows the
+2. **PLAYOFFS as a separate evaluation slice** (v1 evaluates RUNKOSARJA only).
+3. **In-house location xG** from `shot_events` coordinates — later or never.
+4. **Veikkaus as an additional odds source.** Optional; its own session.
+5. **When to move scheduling to the i5 Linux box.** The 10-08–10-10 gap shows the
    cost of a desktop that gets shut down. An alert reports a gap; only an always-on
    machine prevents one.
 
 ## Immediate next steps, in order
 
-1. Commit this file and `docs/PIPELINE_SAFETY_PLAN.md`; push; sync.
-2. **Pipeline safety session** per `docs/PIPELINE_SAFETY_PLAN.md`: weekly backup to
-   Google Drive (S1), then heartbeat and missed-window alerts via healthchecks.io (S2).
-   S2 edits the live job code, so it is built off the live checkout and merged only
-   outside a capture window.
-3. **F2 then F3** per `docs/FEATURE_STORE_PLAN.md`.
+1. Commit this file, `docs/FEATURE_STORE_PLAN.md` and `docs/PIPELINE_SAFETY_PLAN.md`;
+   push; sync.
+2. **F2** per `docs/FEATURE_STORE_PLAN.md`. It starts with a read-only `shot_events`
+   check and a STOP before any building. F2 adds feature modules only; no scheduled
+   task runs feature code, so it can be built in the live checkout.
+3. **F3** per the same plan, starting with `penalty_events_resolved`.
 4. **Plan step 6 in the design chat** (LightGBM + blend), scored by the step 5 harness.
 
 ## Deferred (explicitly, with reasons)
@@ -225,7 +251,8 @@ The ones that shape design:
 - **Task Scheduler XML import is encoding-fragile**; `schtasks` inline can't set a
   working directory (matters for `.env`); editing the snapshot task needs an elevated
   PowerShell, the nightly sync does not.
-- **Both tasks run `pythonw.exe`**, so the log file is the only record. A failure
+- **All three tasks run `pythonw.exe`** (snapshot job, nightly sync, backup), so the
+  log file and the healthchecks.io ping body are the only record. A failure
   before logging shows only as a non-zero `LastTaskResult` (`Get-ScheduledTaskInfo`).
 - **The tasks run from the working checkout.** A half-finished edit to job code during
   11:00–23:00 can break a live capture.
@@ -238,18 +265,18 @@ The ones that shape design:
 
 ## Open items
 
-- **Failure alerting and automated backup** — planned in `docs/PIPELINE_SAFETY_PLAN.md`,
-  not built.
+- `CLAUDE.md` has no Status entry for S1/S2 yet (newest is 2026-10-13). The F2
+  session adds it.
 - 2026 relegation format is NULL in `season_format`; needed only for F3 motivation.
 - `homePreviousGames`/`awayPreviousGames` absent from `game_preview` — unresolved.
 - Goal-event surplus variance across seasons — unexplained; doesn't block anything.
 - Why the power-play derivation fits 2016 and 2023 less well — not investigated.
 - Review liiga.fi (and, if used, Veikkaus) ToS before anything public.
 
-Closed since the last version: 2022:49298 dropped from ratings with a recorded reason;
-team ids are continuous across 2015–2027 (18 ids, one per club); no team plays twice
-on one UTC date in rating games; all seven 2027 opening-night games are ingested and
-scored; the Elo link and HFA decisions.
+Closed since the last version: off-machine backup (automated, weekly, verified);
+failure alerting (healthchecks.io, four checks, confirmed by real shutdown emails);
+the backup task's catch-up after a day off (confirmed 2026-10-19); the Corsi/Fenwick
+rule.
 
 ## Meta — the pattern worth remembering
 
