@@ -76,11 +76,39 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
    (`docs/RECOVERY_BACKLOG.md`, **done 2026-09-25**) then the Liiga feature
    store come first
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
-   — **F0 and F1 done** (2026-10-12); F2 and F3 open, per `docs/FEATURE_STORE_PLAN.md`
+   — **F0 and F1 done** (2026-10-12); **F2 is next**, then F3, per
+   `docs/FEATURE_STORE_PLAN.md`
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
    — **done 2026-10-13**; `docs/ELO_RESULTS.md`, tagged `elo-1`
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-10-16)
+
+**Pipeline safety is done** (`docs/PIPELINE_SAFETY_PLAN.md`): a weekly
+verified backup (S1) and healthchecks.io alerts (S2), both live and
+confirmed working. No build work; F2 is next.
+
+- **Backup:** `scripts/backup_data.py`, weekly task "hockey-edge backup",
+  Sunday 11:05, `StartWhenAvailable` (catches up after a day the PC was
+  off; confirmed 2026-10-19) and `WakeToRun`. Zips `hockey.db` and
+  `snapshots.db` (SQLite online backup, never a file copy), `data/raw/` and
+  `data/recovery/`; about 196 MB, verified before it reaches the folder,
+  keeps 4. Folder `D:\Users\Nikla_000\DATA\hockey-edge-backups` (second
+  HDD, synced to Google Drive). Restore steps in `docs/BACKUP.md`.
+- **Alerts:** `src/hockey_edge/ops/heartbeat.py`, four healthchecks.io
+  checks in `Europe/Helsinki`: `snapshot-job` (every tick, 45 min grace),
+  `missed-windows` (fail ping listing newly missed windows), `nightly-sync`
+  (daily 23:00, 2 h grace), `backup` (Sunday, 1 day grace). Email on
+  failure or silence, green email on recovery. **Ping URLs live in `.env`
+  and are secrets**; the code never logs them. A ping can never stop a job.
+- `snapshot-job` alerts on any day the PC is off during 11:00–23:00, game
+  day or not. Accepted noise; pause the check in the web UI when away on
+  purpose.
+- Alerts shorten a gap from days to hours. Only an always-on machine
+  prevents one (open decision: moving scheduling to the i5 Linux box).
+- All three tasks (snapshot job, nightly sync, backup) run `pythonw.exe`.
+- Tests: 203, `python -m unittest discover -s tests`.
 
 ## Status (as of 2026-10-13)
 
