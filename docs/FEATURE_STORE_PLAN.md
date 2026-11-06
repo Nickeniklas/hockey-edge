@@ -236,11 +236,21 @@ harness).
 - For `PLAYER_BLOCKED` rows, check that `shooting_team_id` is the shooter's team
   (shooter's roster team, after normalising the id), not the blocking team, per
   season. Same for the other types on a sample.
-- **Naming rule (decided 2026-11-06):** Corsi = all attempts, Fenwick = unblocked
-  attempts (`GOAL` + `GOALIE_BLOCKED` + `MISSED`). If `PLAYER_BLOCKED` is present at
-  a steady rate in every season and attributed to the shooter, build **both** Corsi
-  and Fenwick columns and let the step 5 harness choose. If not, build Fenwick only
-  and record why.
+**Pre-check done 2026-11-06 → D4 (below).** Attribution is clean: `shooting_team_id`
+is the shooter's team in 98.4–100% of `PLAYER_BLOCKED` rows every season. Blocked
+shots per game jump from 5–8 to ~17 at 2023 while missed shots fall by about the same
+amount, so liiga.fi relabelled attempts from missed to blocked. Total attempts stay at
+88–96 per game in every season; unblocked attempts drop ~8% at 2023 and drift down
+before it.
+
+**D4. Corsi only (all attempts), no Fenwick (decided 2026-11-06).** The original rule
+("Fenwick only if blocked shots are unsteady") assumed blocked shots were
+under-recorded. They were relabelled instead, which breaks Fenwick and leaves Corsi
+comparable across 2023. Corsi = `GOAL` + `GOALIE_BLOCKED` + `MISSED` +
+`PLAYER_BLOCKED`. Shots on goal (`GOAL` + `GOALIE_BLOCKED`) are unaffected and stay
+available where a family needs them. No missed/blocked split appears in any feature.
+
+### F2a — Starters and goalie
 
 - `starters.py`: shared actual-starter logic (`verify_starters.py` then imports it)
   plus `resolve_starter`.
@@ -248,8 +258,17 @@ harness).
   shrunk toward league mean; team expected-goalie fallback. Per-goalie xG is not
   stored. An optional GSAx-style column uses the opponent's game xG, from 2021 only,
   and only for games where one goalie played the whole game.
-- Family 2 `shot_quality.py`, **from `shot_events` only (D3)**:
-  - Attempts for/against and attempt share, all situations and even strength
+- Tests: truncation/poison on `goalie`; resolver precedence; fallback path; skew
+  report on real 2027 rows; starter logic unchanged vs `verify_starters.py`'s current
+  output.
+
+**STOP after F2a.** Report: tables and row counts, the skew report, how often the
+fallback is used per season, test count.
+
+### F2b — Shot quality
+
+- Family 2 `shot_quality.py`, **from `shot_events` only (D3), Corsi only (D4)**:
+  - Corsi for/against and Corsi share, all situations and even strength
     (`strength_type = 'EvenStrengthShot'`), rolling windows 10/25/40.
   - Rates **per game**, not per 60 of even-strength time. Even-strength minutes would
     need penalty timing with corrected teams, which only exists after F3. Per-60 EV
@@ -260,9 +279,12 @@ harness).
   - Team xG for/against from game-level xG, from 2021, NULL before, plus
     `xg_available`.
   - Do not use liiga.fi's corsi columns, team-level period stats, or on-ice counts.
-- Tests: truncation/poison on both; resolver precedence; fallback path; skew report on
-  real 2027 rows; starter logic unchanged vs `verify_starters.py`'s current output;
-  team-id normalisation; a gap game treated as missing.
+- Tests: truncation/poison on `shot_quality`; team-id normalisation; a gap game
+  treated as missing; Corsi counts all four result types.
+
+**STOP after F2b.** Report: tables and row counts, league-average Corsi per game and
+mean Corsi share per season (share should sit at 0.5), test count, the new
+`FEATURE_VERSION`.
 
 ## Phase F3 — Remaining families
 

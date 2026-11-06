@@ -176,10 +176,10 @@ The ones that shape design:
 - **Shot features from `shot_events`**, not liiga.fi's corsi (player corsi steps up
   ~10% in 2023). Even strength from `shot_events.strength_type`. On-ice counts change
   convention in 2025 and are not used. `shooting_team_id` is a bare number while other
-  tables use `number:slug`. **Corsi vs Fenwick (decided 2026-11-06):** if blocked
-  shots (`PLAYER_BLOCKED`) are recorded at a steady rate in every season, build both
-  Corsi (all attempts) and Fenwick (unblocked) columns and let the harness choose; if
-  not, Fenwick only. Present in the 2024 sample; the F2 pre-check settles the rest.
+  tables use `number:slug`. **Corsi only, no Fenwick (D4, 2026-11-06):** from 2023
+  liiga.fi labels ~5.6 attempts per game as blocked that it earlier labelled missed.
+  Total attempts are stable across seasons, unblocked attempts are not. Never split
+  missed vs blocked in a feature.
 - xG: game-level complete from 2021; player-level only from 2025; no per-goalie xG.
 - Puck control: values only from 2023. Not a planned feature input.
 - Penalty `player_id = 0` is a team/bench penalty, not a player.
@@ -206,9 +206,10 @@ The ones that shape design:
 
 1. Commit this file, `docs/FEATURE_STORE_PLAN.md` and `docs/PIPELINE_SAFETY_PLAN.md`;
    push; sync.
-2. **F2** per `docs/FEATURE_STORE_PLAN.md`. It starts with a read-only `shot_events`
-   check and a STOP before any building. F2 adds feature modules only; no scheduled
-   task runs feature code, so it can be built in the live checkout.
+2. **F2** per `docs/FEATURE_STORE_PLAN.md`: pre-check done (D4), then F2a (starters,
+   goalie) and F2b (shot quality), each with a STOP. F2 adds feature modules only; no
+   scheduled task runs feature code, so it can be built in the live checkout. The one
+   shared file is `scripts/verify_starters.py`, which is run by hand, not scheduled.
 3. **F3** per the same plan, starting with `penalty_events_resolved`.
 4. **Plan step 6 in the design chat** (LightGBM + blend), scored by the step 5 harness.
 
@@ -276,7 +277,7 @@ The ones that shape design:
 Closed since the last version: off-machine backup (automated, weekly, verified);
 failure alerting (healthchecks.io, four checks, confirmed by real shutdown emails);
 the backup task's catch-up after a day off (confirmed 2026-10-19); the Corsi/Fenwick
-rule.
+decision (D4: Corsi only).
 
 ## Meta — the pattern worth remembering
 
