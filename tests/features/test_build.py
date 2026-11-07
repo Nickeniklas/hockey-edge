@@ -29,7 +29,8 @@ class BuildTest(FeatureTest):
     def test_build_meta(self):
         meta = self.full.execute("SELECT * FROM build_meta").fetchone()
         self.assertEqual(meta["code_version"], FEATURE_VERSION)
-        self.assertEqual(meta["snapshots_max_captured_at"], "2026-10-07T15:30:38.891377+00:00")
+        # The newest lineup snapshot in the fixture.
+        self.assertEqual(meta["snapshots_max_captured_at"], "2026-11-01T12:45:02.517808+00:00")
         counts = json.loads(meta["row_counts"])
         self.assertEqual(set(counts), set(feature_db.TABLES))
         self.assertEqual(counts["game_spine"], 1778)

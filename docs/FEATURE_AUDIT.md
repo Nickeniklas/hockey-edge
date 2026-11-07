@@ -218,6 +218,14 @@ Other checks on `shot_events`:
   blocked shots being left out before 2023. Corsi shares are unaffected, but
   per-60 rates are not comparable across that boundary.
 
+**Correction (F2 pre-check, 2026-11-06):** in `shot_events`, blocked shots
+were not left out before 2023; they were partly labelled as missed.
+`PLAYER_BLOCKED` goes from 5–8 per game to ~17 at 2023 while `MISSED` falls by
+about the same amount, and total attempts stay at 88–96 per game in every
+season. The guess above about the player-level corsi step is unconfirmed and
+does not follow from this. Consequence for features: Corsi only, no Fenwick
+(D4 in `docs/FEATURE_STORE_PLAN.md`).
+
 ## 7. Power-play derivation
 
 ```sql

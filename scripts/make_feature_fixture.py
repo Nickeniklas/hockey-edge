@@ -12,6 +12,10 @@ what phase F1 reads; later phases add their tables to SLICES.
   PITSITURNAUS, unplayed games and the games with odds.
 - snapshots.odds_snapshots: every row for four 2027 games. raw_payload is
   blanked (about 18 KB per row); nothing in the feature store reads it.
+- F2a: hockey.game_goalie_period_stats and hockey.game_goalkeeper_events for
+  the competitive games of 2025 and 2027 (goalie windows, actual starters),
+  and every snapshots.lineup_snapshots row of 2027 with raw_payload and
+  roster_json blanked (the resolver reads only the starter columns).
 
 Season 2027 is live, so regenerating this changes the file. The tests pin
 individual games, not totals.
@@ -27,6 +31,12 @@ GAME_SEASONS = (2022, 2025, 2027)
 # 2701309: both books, many polls. 2701319: rows captured after the start.
 # 2701332: Pinnacle inactive on the closing poll. 2701368: Pinnacle only.
 ODDS_GAMES = (2701309, 2701319, 2701332, 2701368)
+GOALIE_SEASONS = (2025, 2027)
+COMPETITIVE = "('RUNKOSARJA', 'PLAYOFFS', 'PLAYOUT', 'QUALIFICATIONS')"
+COMPETITIVE_GAMES = (
+    f"season IN {GOALIE_SEASONS} AND (game_id, season) IN "
+    f"(SELECT game_id, season FROM games WHERE phase IN {COMPETITIVE})"
+)
 BATCH_ROWS = 500
 
 # (schema, table, source db, column overrides, WHERE, ORDER BY)
@@ -35,6 +45,11 @@ SLICES = (
      f"season IN {GAME_SEASONS}", "season, game_id"),
     ("snapshots", "odds_snapshots", "snapshots.db", {"raw_payload": "''"},
      f"season = 2027 AND game_id IN {ODDS_GAMES}", "id"),
+    ("hockey", "game_goalie_period_stats", "hockey.db", {"jersey_id": "NULL", "save_percentage": "NULL"},
+     COMPETITIVE_GAMES, "id"),
+    ("hockey", "game_goalkeeper_events", "hockey.db", {}, COMPETITIVE_GAMES, "id"),
+    ("snapshots", "lineup_snapshots", "snapshots.db", {"raw_payload": "''", "roster_json": "''"},
+     "season = 2027", "id"),
 )
 
 

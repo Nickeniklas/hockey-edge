@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 
 from features.support import FeatureTest
+from hockey_edge.features import FEATURE_VERSION
 from hockey_edge.models import baselines, elo, link
 from hockey_edge.validation import folds, harness, report
 
@@ -207,7 +208,7 @@ class HarnessTest(FeatureTest):
         ).fetchall()
         self.assertEqual(tuple(runs[0]), tuple(runs[1]))
         self.assertTrue(runs[0]["model_version"].startswith("elo-1-"))
-        self.assertIn('"code_version": "f1.1"', runs[0]["features_build"])
+        self.assertIn(f'"code_version": "{FEATURE_VERSION}"', runs[0]["features_build"])
 
     def test_unknown_model_is_refused(self):
         with self.assertRaisesRegex(ValueError, "lightgbm"):

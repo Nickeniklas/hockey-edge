@@ -244,7 +244,8 @@ Details and per-game lists are in `docs/RECOVERY_BACKLOG.md`.
   power-play and 0 shorthanded instances, and team-period goals fall short
   of the final score in 893 of them (regular season: 3.90 vs 5.78 per game
   in 2025, 3.63 vs 5.66 in 2026). Player and goalie period stats (time on
-  ice, corsi, goals) look normal. Both seasons were fetched once, on
+  ice, corsi, goals) look normal [except goalie time on ice; see the goalie
+  gaps below]. Both seasons were fetched once, on
   2026-08-22, so no clean copy is cached. **For 2025/2026 the feature store
   takes goals from the final score (`games.home_goals`/`away_goals`) and
   `game_goal_events`, and power plays from `game_penalty_events`**, never
@@ -253,6 +254,20 @@ Details and per-game lists are in `docs/RECOVERY_BACKLOG.md`.
   power-play instances despite 3–14 penalties each.
 - A penalty `player_id` of 0 means no individual player, mostly the team
   penalty. It is not a player.
+- **Goalie gaps in `game_goalie_period_stats`** (found in F2a, 2026-11-06):
+  - **Goalie time on ice is 0 for every goalie in 2026 and only partly
+    present in 2025** (958 of 1,090 competitive team-games have any). Shots, saves and
+    goals against are there. Do not use goalie ice time; `whole_game` in
+    `features.db` comes from shots faced instead.
+  - **89 competitive games in 2025 have goalie rows with zero shots for
+    every goalie** on both teams, from 2024-12-27 to 2025-04-17. 79 of them
+    are the known 2025 `shot_events` gap. Their actual starter cannot be
+    derived.
+  - **51 competitive games in 2016 (102 team-games) have no goalie stats at
+    all.**
+  - Save% windows count shots, not games, so these games add nothing to a
+    goalie's window rather than counting as a zero. A game whose starter
+    cannot be derived uses the team's expected-goalie fallback.
 
 ## Gotchas
 - Leakage sneaks in via post-game box scores used to build "pre-game" features —

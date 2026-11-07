@@ -103,6 +103,86 @@ CREATE TABLE features_schedule (
     PRIMARY KEY (game_id, season)
 );
 
+-- Derived per-game table (starters.py), read by features only through
+-- history.history_before. One row per goalie per game in game_spine with
+-- goalie stats, summed over all periods (OT included, shootout attempts
+-- are not shots). whole_game = the only goalie of his team who faced a
+-- shot (goalie ice time is missing for 2026 and part of 2025).
+-- opponent_xg = the opponent's game xG, NULL unless both teams have one
+-- (none before 2021). is_actual_starter is starters.derive_actual_starter.
+CREATE TABLE game_goalies (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_id TEXT NOT NULL,
+    player_id INTEGER NOT NULL,
+    shots_against INTEGER NOT NULL,
+    goals_against INTEGER NOT NULL,
+    time_on_ice_seconds INTEGER NOT NULL,
+    is_actual_starter INTEGER NOT NULL,
+    whole_game INTEGER NOT NULL,
+    opponent_xg REAL,
+    PRIMARY KEY (game_id, season, team_id, player_id)
+);
+CREATE INDEX idx_game_goalies_player ON game_goalies (player_id, season);
+CREATE INDEX idx_game_goalies_team ON game_goalies (team_id, is_actual_starter, season);
+
+-- One row per team per competitive game. actual_* is the post-game starter
+-- (NULL for unplayed games, or when actual_reason is not 'ok');
+-- snapshot_* is the latest lineup snapshot with a starter captured before
+-- the start. resolved = snapshot, else actual, else NULL with source
+-- 'unknown'. resolved_source is an audit column and evaluation slice, never
+-- a model input.
+CREATE TABLE game_starters (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_role TEXT NOT NULL CHECK (team_role IN ('home', 'away')),
+    team_id TEXT NOT NULL,
+    actual_player_id INTEGER,
+    actual_reason TEXT NOT NULL,
+    snapshot_player_id INTEGER,
+    snapshot_captured_at TEXT,
+    resolved_player_id INTEGER,
+    resolved_source TEXT NOT NULL
+        CHECK (resolved_source IN ('snapshot_inferred', 'actual_postgame', 'unknown')),
+    PRIMARY KEY (game_id, season, team_role)
+);
+
+-- Family 1, one row per team per competitive game. Goalie history is the
+-- goalie's earlier games that feed ratings, any team, this season and the
+-- three before it.
+-- league_sv: saves / shots over earlier rated games, this season and the
+-- two before it. sv_short / sv_long: the goalie's raw save% over his most
+-- recent games until shots_short / shots_long reach the window (NULL with no
+-- shots). starter_sv: (saves_long + k * league_sv) / (shots_long + k).
+-- expected_sv: the team's expected-goalie fallback, the start-weighted mean
+-- of starter_sv over the goalies who started its last N games with a known
+-- starter, this season or last (league_sv when there are none); computed
+-- for every row. expected_starts_n is the number of those games.
+-- goalie_sv = starter_sv, or expected_sv when starter_source is 'unknown'.
+-- gsax_per_game: mean of (opponent_xg - goals_against) over the goalie's
+-- last whole games with opponent xG; NULL when gsax_n = 0.
+-- starter_source is an audit column, never a model input.
+CREATE TABLE features_goalie (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_role TEXT NOT NULL CHECK (team_role IN ('home', 'away')),
+    team_id TEXT NOT NULL,
+    starter_player_id INTEGER,
+    starter_source TEXT NOT NULL,
+    league_sv REAL,
+    shots_short INTEGER,
+    sv_short REAL,
+    shots_long INTEGER,
+    sv_long REAL,
+    starter_sv REAL,
+    expected_starts_n INTEGER NOT NULL,
+    expected_sv REAL,
+    goalie_sv REAL,
+    gsax_n INTEGER,
+    gsax_per_game REAL,
+    PRIMARY KEY (game_id, season, team_role)
+);
+
 -- NOT a feature table. Evaluation benchmark only: the last parsed 1X2 row
 -- captured before start_utc, Pinnacle if it has one, else bet365.
 CREATE TABLE benchmark_odds (
@@ -139,6 +219,9 @@ TABLES = (
     "team_season",
     "features_home",
     "features_schedule",
+    "game_goalies",
+    "game_starters",
+    "features_goalie",
     "benchmark_odds",
 )
 

@@ -76,12 +76,55 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
    (`docs/RECOVERY_BACKLOG.md`, **done 2026-09-25**) then the Liiga feature
    store come first
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
-   — **F0 and F1 done** (2026-10-12); **F2 is next**, then F3, per
-   `docs/FEATURE_STORE_PLAN.md`
+   — **F0 and F1 done** (2026-10-12), **F2a done** (2026-11-07); **F2b is
+   next**, then F3, per `docs/FEATURE_STORE_PLAN.md`
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
    — **done 2026-10-13**; `docs/ELO_RESULTS.md`, tagged `elo-1`
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-11-07)
+
+**Feature store phase F2a is built: starters and goalie quality (Family 1).**
+Plan `docs/FEATURE_STORE_PLAN.md` (D4: Corsi only, decided after the F2
+pre-check). F2b (shot quality) is next.
+
+- **Rebuild:** `python -m hockey_edge.features.build`, about 23 s now (was
+  about 6 s before F2a). The build's own connection uses a 256 MB page
+  cache (`build.CACHE_KIB`); nothing else does. `FEATURE_VERSION` is `f2a`.
+- **New tables:** `game_goalies` (26,875: one row per goalie per game,
+  shots, goals, actual starter, whole game, opponent xG), `game_starters`
+  (12,938: actual, snapshot and resolved starter per team per competitive
+  game), `features_goalie` (12,938: one row per team per game, not
+  home/away columns). Column meanings are in `features/db.py`.
+- **Code:** `features/starters.py` (`derive_actual_starter`,
+  `resolve_starter`; `scripts/verify_starters.py` now imports it, output
+  byte-identical), `features/goalie.py`, and
+  `python -m hockey_edge.features.goalie_report` for the skew report and
+  starter source per season.
+- **Resolver:** pre-game snapshot, else the actual starter (ended games,
+  training only), else `unknown`, which uses the team's expected-goalie
+  fallback (start-weighted mix over its last 10 games with a known
+  starter, this season or last). The fallback is stored for every row.
+  `starter_source` is an audit column, never a model input.
+- **Goalie quality:** save% over 500- and 1,500-shot windows (this season
+  and the three before it), shrunk toward the league rate with k = 1,000
+  shots; GSAx-style mean over the last 20 whole games with opponent xG.
+- **`history_before` takes `per_game=`** for derived per-game tables in
+  `features.db` (only `game_goalies` for now); anything else raises.
+- **Two accepted departures:** (1) the early-change check ignored the
+  starter's own opening goalkeeper event, which 2015–2024 log at
+  `begin_time` 0, so 786 team-games (468 in 2024) were wrongly
+  `flagged_early_change`; now only a different goalie in the first 300 s
+  counts. (2) `whole_game` is the only goalie of his team who faced a shot,
+  not ice time, since goalie ice time is 0 for all of 2026.
+- **Skew, 2027:** 1 mismatch in 250 team-games with both a snapshot and a
+  clean actual starter (2701312 TPS away). Fallback use: 10–23 team-games
+  a season, except 2016 (113: 51 games have no goalie stats) and 2025
+  (189: 89 games have zero goalie shots). See `docs/DATA_PIPELINE.md`.
+- Tests: 221, `python -m unittest discover -s tests`. The fixture now
+  holds goalie stats and goalkeeper events for 2025/2027 and every 2027
+  lineup snapshot (payloads blanked).
 
 ## Status (as of 2026-10-16)
 
@@ -165,7 +208,7 @@ Next is the design chat, then F2 for step 6.
 5 (Elo + walk-forward harness). F2 and F3 are open.
 
 - **Rebuild:** `python -m hockey_edge.features.build`. Full rebuild every
-  time (about 6 s), built in a temp file and swapped in. `hockey.db` and
+  time (about 6 s then; about 23 s since F2a), built in a temp file and swapped in. `hockey.db` and
   `snapshots.db` are attached read-only.
 - **Tables:** `game_spine` (all 7,331 games, flags and the regulation 1X2
   target), `season_format`, `team_season`, `features_home`,

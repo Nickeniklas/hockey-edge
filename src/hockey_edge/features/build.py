@@ -11,10 +11,17 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from hockey_edge.features import FEATURE_VERSION, benchmark, db, home, schedule, season_format, spine
+from hockey_edge.features import (
+    FEATURE_VERSION, benchmark, db, goalie, home, schedule, season_format, spine, starters,
+)
 
-# spine first: everything else reads game_spine.
-STEPS = (spine, season_format, home, schedule, benchmark)
+# spine first: everything else reads game_spine. starters before goalie.
+STEPS = (spine, season_format, home, schedule, starters, goalie, benchmark)
+# Page cache per database for this build's connection only, as a negative
+# cache_size (KiB): 256 MB. The build is one long transaction; with SQLite's
+# 2 MB default the goalie history reads spill the cache and run several
+# times slower.
+CACHE_KIB = -262144
 
 
 def build(
@@ -30,6 +37,8 @@ def build(
 
     conn = db.connect(building, hockey_path, snapshots_path)
     try:
+        for schema in ("main", "hockey", "snapshots"):
+            conn.execute(f"PRAGMA {schema}.cache_size = {CACHE_KIB}")
         conn.executescript(db.SCHEMA)
         for step in STEPS:
             step.build(conn)

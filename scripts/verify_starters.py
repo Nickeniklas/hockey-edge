@@ -24,7 +24,8 @@ realistic outcome), cross-checked against `game_goalkeeper_events` only to
 flag -- not silently resolve -- games where a substitution happened in the
 first 5 minutes (begin_time < 300s), since an extremely early change could
 make the period-1-stats read ambiguous between the true starter and their
-early replacement.
+early replacement. That derivation lives in hockey_edge.features.starters
+(derive_actual_starter), shared with the feature store.
 
 Usage:
     python scripts/verify_starters.py
@@ -35,11 +36,11 @@ import argparse
 import sqlite3
 from pathlib import Path
 
+from hockey_edge.features.starters import derive_actual_starter
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOTS_DB = REPO_ROOT / "data" / "snapshots.db"
 HOCKEY_DB = REPO_ROOT / "data" / "hockey.db"
-
-EARLY_CHANGE_THRESHOLD_SECONDS = 300  # 5 minutes into period 1
 
 
 def _readonly_connection(db_path: Path) -> sqlite3.Connection:
@@ -93,41 +94,6 @@ def _team_id_for_role(hockey_conn: sqlite3.Connection, season: int, game_id: int
     return row["home_team_id"] if role == "home" else row["away_team_id"]
 
 
-def _derive_actual_starter(
-    hockey_conn: sqlite3.Connection, season: int, game_id: int, team_id: str
-) -> tuple[int | None, str]:
-    """Returns (actual_starter_player_id_or_None, reason). reason is
-    'ok' on a clean single-candidate derivation, or a string explaining why
-    it's None (ambiguous / no data / flagged early change) -- never a
-    guess."""
-    period1 = hockey_conn.execute(
-        "SELECT player_id, shots_on_goal, saves FROM game_goalie_period_stats "
-        "WHERE season = ? AND game_id = ? AND team_id = ? AND period = 1",
-        (season, game_id, team_id),
-    ).fetchall()
-    if not period1:
-        return None, "no_period1_stats"
-
-    candidates = [r["player_id"] for r in period1 if (r["shots_on_goal"] or 0) > 0]
-    if len(candidates) == 0:
-        candidates = [r["player_id"] for r in period1 if (r["saves"] or 0) > 0]
-    if len(candidates) != 1:
-        return None, f"ambiguous_period1_stats ({len(candidates)} candidates)"
-
-    starter_id = candidates[0]
-
-    early_change = hockey_conn.execute(
-        "SELECT COUNT(*) AS n FROM game_goalkeeper_events "
-        "WHERE season = ? AND game_id = ? AND team_id = ? "
-        "AND begin_time < ? AND player_id != 0",
-        (season, game_id, team_id, EARLY_CHANGE_THRESHOLD_SECONDS),
-    ).fetchone()
-    if early_change["n"] > 0:
-        return None, "flagged_early_change"
-
-    return starter_id, "ok"
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--season", type=int, help="restrict to one season (default: all)")
@@ -154,7 +120,7 @@ def main() -> None:
             not_ended.append(row)
             continue
 
-        actual_id, reason = _derive_actual_starter(hockey_conn, season, game_id, team_id)
+        actual_id, reason = derive_actual_starter(hockey_conn, season, game_id, team_id)
         if actual_id is None:
             undetermined.append((row, reason))
             continue
