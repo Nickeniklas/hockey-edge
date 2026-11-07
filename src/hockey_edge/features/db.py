@@ -255,6 +255,38 @@ CREATE TABLE features_shots (
     PRIMARY KEY (game_id, season, team_role)
 );
 
+-- Derived per-game table (penalties.py, D1), read by features only through
+-- history.history_before. One row per penalty event of a competitive game.
+-- team_id is the penalised team, corrected: the penalised player's roster
+-- team ('roster'), else the game's direction ('game_direction': the stored
+-- team, or the other one when most of the game's roster-resolved penalties
+-- are stored on the wrong team), used for team/bench penalties (player_id
+-- 0) and players on both rosters. 'unresolved' (team_id NULL): a player in
+-- neither roster, or a game whose direction is unknown. stored_team_id is
+-- the team liiga.fi listed it under; was_swapped = team_id <> stored_team_id,
+-- NULL when unresolved. The other columns are copied from
+-- hockey.game_penalty_events.
+CREATE TABLE penalty_events_resolved (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    event_id INTEGER NOT NULL,
+    player_id INTEGER,
+    team_id TEXT,
+    team_source TEXT NOT NULL CHECK (team_source IN ('roster', 'game_direction', 'unresolved')),
+    stored_team_id TEXT NOT NULL,
+    was_swapped INTEGER,
+    sufferer_player_id INTEGER,
+    period INTEGER,
+    game_time_seconds INTEGER,
+    penalty_begin_time INTEGER,
+    penalty_end_time INTEGER,
+    fault_name TEXT,
+    fault_type TEXT,
+    penalty_minutes INTEGER,
+    PRIMARY KEY (game_id, season, event_id),
+    CHECK ((team_id IS NULL) = (team_source = 'unresolved'))
+);
+
 -- NOT a feature table. Evaluation benchmark only: the last parsed 1X2 row
 -- captured before start_utc, Pinnacle if it has one, else bet365.
 CREATE TABLE benchmark_odds (
@@ -296,6 +328,7 @@ TABLES = (
     "features_goalie",
     "game_team_shots",
     "features_shots",
+    "penalty_events_resolved",
     "benchmark_odds",
 )
 

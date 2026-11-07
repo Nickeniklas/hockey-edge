@@ -77,11 +77,56 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
    store come first
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
    — **F0 and F1 done** (2026-10-12), **F2 done** (F2a and F2b,
-   2026-11-07); **F3 is next**, per `docs/FEATURE_STORE_PLAN.md`
+   2026-11-07), **F3a done** (2026-11-07); **F3b is next**, per
+   `docs/FEATURE_STORE_PLAN.md`
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
    — **done 2026-10-13**; `docs/ELO_RESULTS.md`, tagged `elo-1`
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-11-07, F3a)
+
+**Feature store phase F3a is done: `penalty_events_resolved` (D1), the
+penalised team corrected in `features.db`.** Plan
+`docs/FEATURE_STORE_PLAN.md`. F3b (special teams) is next. No ingest,
+parser, `hockey.db` DDL, backfill, resync or nightly-sync change:
+`hockey.db` keeps what liiga.fi sent.
+
+- **Rebuild:** `python -m hockey_edge.features.build`, 26–28 s on
+  2026-11-07 (the penalty step is 0.4 s; the 45 s quoted for F2b looks like
+  machine state, not code). `FEATURE_VERSION` is `f3a`.
+- **New table:** `penalty_events_resolved` (46,687: one row per penalty
+  event of a competitive game). Columns in `features/db.py`; code in
+  `features/penalties.py`. `history_before`'s `per_game=` allowlist has it.
+- **Rule:** a player penalty takes the penalised player's roster team
+  (`roster`). A bench penalty (`player_id` 0), or a player liiga.fi lists on
+  both rosters of the game (3 penalties: 2016:7661, 2016:7665, 2025:399),
+  takes the game's direction (`game_direction`): the stored team when most of
+  the game's roster-resolved penalties are stored right, the other team when
+  most are swapped. `unresolved` (team NULL): a player in neither roster, or
+  no direction (no roster-resolved penalty, or a tie). `stored_team_id` and
+  `was_swapped` are kept for audit. A stored or resolved team outside the
+  game stops the build.
+- **Report:** `python -m hockey_edge.features.penalty_report`. Swapped share
+  per season reproduces FEATURE_AUDIT item 7 (2018 100%, 2023 0%, 2024
+  100%, ...) **except 2016 and 2025, where item 7's counts double-count
+  players on both rosters**: its roster join counts such a penalty once kept
+  and once swapped (built 3,221 / 97 vs audit 3,223 / 99 in 2016; 3,464 / 4
+  vs 3,465 / 5 in 2025).
+- **5 unresolved rows:** 2 by a player in neither roster (2016:7943,
+  2016:7968, the same player); 3 bench penalties in games with no player
+  penalty (2016:37752 PLAYOFFS, two; 2022:35, one). No tied game.
+- **9 games with mixed direction**, all RUNKOSARJA, one stray row each
+  (2016:7856; 2025:87, 173, 231, 324; 2026:62, 66, 303, 324). Bench
+  penalties there follow the majority. Item 7's method finds 12 today, the
+  three both-rosters games included.
+- Tests: 244. `tests/features/test_penalties.py` runs on penalty events and
+  rosters for five games appended to the fixture: 2022:152 (swapped),
+  2027:2701274 (right) and 2025:231 (mixed), each with a bench penalty;
+  2025:399 (both rosters); 2022:35 (bench only, unresolved). 2018 game 1 and
+  2023 game 1 are not in it: no bench penalty, and the build takes whole
+  seasons only. The new slices were appended, not regenerated, so no other
+  fixture row changed.
 
 ## Status (as of 2026-11-07, F2b)
 

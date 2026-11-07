@@ -12,7 +12,8 @@ import unittest
 from pathlib import Path
 
 from hockey_edge.features import (
-    goalie, history, home, schedule, season_format, shot_quality, spine, starters, team_shots,
+    goalie, history, home, penalties, schedule, season_format, shot_quality, spine, starters,
+    team_shots,
 )
 
 from .support import UNPLAYED, FeatureTest, rows
@@ -165,6 +166,7 @@ class SourceRulesTest(unittest.TestCase):
     def test_model_inputs_never_touch_odds(self):
         for module in (
             spine, history, season_format, home, schedule, starters, goalie, team_shots, shot_quality,
+            penalties,
         ):
             with self.subTest(module=module.__name__):
                 source = self.source(module).lower()

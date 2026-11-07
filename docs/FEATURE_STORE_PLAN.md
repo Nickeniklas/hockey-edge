@@ -12,9 +12,10 @@ the user's call. Stop at every "STOP" line and report before going on.
 Build step 5 (Elo + walk-forward harness) is done 2026-10-13: plan
 `docs/ELO_HARNESS_PLAN.md`, results `docs/ELO_RESULTS.md`. Pipeline safety (backup,
 alerts) done 2026-10-16. F2 pre-check done 2026-11-06 (D4). F2 done 2026-11-07: F2a
-(starters, goalie) and F2b (shot quality). F3 is next (F3a–F3d), for step 6.**
+(starters, goalie) and F2b (shot quality). F3a (`penalty_events_resolved`) done
+2026-11-07. F3b is next, then F3c and F3d, for step 6.**
 
-Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3a → F3b → F3c → F3d.** NHL stays
+Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3a (done) → F3b → F3c → F3d.** NHL stays
 deferred.
 
 ---
@@ -303,14 +304,29 @@ One row per competitive penalty event, built from `game_penalty_events` +
 - **Team/bench penalties (`player_id = 0`):** take the game's direction. If that
   game's player penalties are stored on the opposite team, swap; if they are stored
   on the right team, keep.
+- **Player on both rosters of the game** (3 competitive penalties: 2016:7661,
+  2016:7665, 2025:399): the roster cannot decide, so take the game's direction, as
+  for a bench penalty. Accepted 2026-11-07.
 - **`team_source`** column: `roster`, `game_direction` or `unresolved` (player not in
   the roster, or a game with only bench penalties).
 - Also keep the stored `team_id` and a `was_swapped` flag, for auditing.
 - **Build report:** swapped share per season (should reproduce FEATURE_AUDIT item 7's
   table), the number of `unresolved` rows, and games with mixed direction (the audit
   saw eleven competitive games with one stray row).
-- Tests on real fixtures: 2018 game 1 (swapped) and 2023 game 1 (correct), including
-  their bench penalties.
+- Tests on real fixtures: the five penalty-direction games listed under "Fixtures"
+  (2022:152 swapped, 2027:2701274 right, 2025:231 mixed, each with a bench penalty;
+  2025:399 a player on both rosters; 2022:35 bench-only, unresolved). 2018 game 1
+  and 2023 game 1 have no bench penalty; the swapped share on the real build covers
+  their seasons.
+
+**F3a done 2026-11-07.** 46,687 rows. The swapped share reproduces FEATURE_AUDIT
+item 7 except 2016 (3,221 / 97 vs 3,223 / 99) and 2025 (3,464 / 4 vs 3,465 / 5):
+the audit's roster join counted each both-rosters penalty once kept and once
+swapped. 5 unresolved rows (2 by a player in neither roster, 2016:7943 and
+2016:7968; 3 bench penalties in games with no player penalty, 2016:37752 and
+2022:35). 9 games with mixed direction, each with one stray row; the audit's
+method finds 12 today, the three both-rosters games included. Report:
+`python -m hockey_edge.features.penalty_report`.
 
 **STOP after F3a.** Report the build report above, row counts, test count.
 
@@ -371,8 +387,18 @@ building.
   load it into an in-memory DB. Include: two seasons, all teams, a few known OT/SO
   games, one PLAYOFFS series, 2022:49294, one foreign friendly, the 2025 Jokerit
   qualification series and the 2025 PLAYOUT series, one 2025/2026 game with stripped
-  team stats, one game from the 2025 `shot_events` gap, 2018 game 1 and 2023 game 1
-  (penalty direction), and the 2027 games with snapshots.
+  team stats, one game from the 2025 `shot_events` gap, the 2027 games with
+  snapshots, and penalty events plus rosters for five penalty-direction games (F3a):
+  - 2022:152: stored swapped, with a bench penalty;
+  - 2027:2701274: stored right, with a bench penalty;
+  - 2025:231: mixed (one stray row among seven player penalties), with a bench
+    penalty;
+  - 2025:399: a penalised player listed on both rosters;
+  - 2022:35: a single bench penalty and nothing else, so unresolved.
+
+  2018 game 1 and 2023 game 1 are not in the fixture: neither has a bench penalty,
+  and the build accepts only whole seasons. The per-season swapped share on the
+  real build checks 2018 and 2023 against FEATURE_AUDIT item 7.
 
 ## Decisions for Niklas (collected)
 

@@ -20,6 +20,8 @@ what phase F1 reads; later phases add their tables to SLICES.
   2025-01-22 to 2025-02-23, which runs into the start of the 2025 shot_events
   gap (game 393 on). Only the columns Corsi reads are kept; the rest are left
   out of the INSERT and load as NULL (about 6 MB otherwise).
+- F3a: hockey.game_penalty_events and hockey.game_rosters for five games
+  (PENALTY_GAMES), one per case of the penalty-team correction.
 
 Season 2027 is live, so regenerating this changes the file. The tests pin
 individual games, not totals.
@@ -50,6 +52,15 @@ SHOT_COLUMNS_DROPPED = (
     "id", "period", "game_time_seconds", "shooter_player_id", "blocker_player_id", "shot_x",
     "shot_y", "own_team_players_on_ice", "other_team_players_on_ice",
 )
+# F3a penalty direction, all in seasons already in the fixture:
+# 2022:152 swapped, with a bench penalty; 2027:2701274 stored right, with a
+# bench penalty; 2025:231 mixed (one stray row) with a bench penalty;
+# 2025:399 a penalised player listed on both rosters; 2022:35 a single bench
+# penalty and nothing else, so unresolved.
+PENALTY_GAMES = ((2022, 152), (2027, 2701274), (2025, 231), (2025, 399), (2022, 35))
+PENALTY_WHERE = (
+    "(season, game_id) IN (VALUES " + ", ".join(f"({s}, {g})" for s, g in PENALTY_GAMES) + ")"
+)
 BATCH_ROWS = 500
 
 # (schema, table, source db, column overrides, WHERE, ORDER BY). An override of
@@ -66,6 +77,8 @@ SLICES = (
      "season = 2027", "id"),
     ("hockey", "shot_events", "hockey.db", dict.fromkeys(SHOT_COLUMNS_DROPPED),
      SHOT_GAMES, "id"),
+    ("hockey", "game_penalty_events", "hockey.db", {}, PENALTY_WHERE, "id"),
+    ("hockey", "game_rosters", "hockey.db", {}, PENALTY_WHERE, "id"),
 )
 
 
