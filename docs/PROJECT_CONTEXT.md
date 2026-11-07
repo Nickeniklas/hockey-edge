@@ -1,7 +1,8 @@
 # PROJECT_CONTEXT — hockey-edge (Liiga + NHL prediction & edge tool)
 
 Paste-ready summary for Claude project memory. Crystallized 2026-07-06; rewritten
-2026-09-03, 2026-09-20, 2026-09-25, 2026-10-12, 2026-10-14; rewritten 2026-11-06.
+2026-09-03, 2026-09-20, 2026-09-25, 2026-10-12, 2026-10-14, 2026-11-06; rewritten
+2026-11-07 after F2.
 
 Owned by the design chat. Emitted whole and replaced wholesale at session close. Not
 edited by Human or by Claude Code sessions.
@@ -46,8 +47,10 @@ Elo turns its rating gap into 1X2 probabilities with an **ordered-logit link** f
 per fold (decided 2026-10-12).
 
 Tests: `tests/`, stdlib `unittest`, no pytest — `python -m unittest discover -s tests`
-(about 203 as of 2026-10-16, after S1/S2). They assert against real saved data and make zero HTTP
-requests.
+(232 as of 2026-11-07, after F2b). They assert against real saved data and make zero
+HTTP requests. The feature tests run on `fixtures/features/mini.sql` (2.7 MB),
+regenerated from the live databases by `scripts/make_feature_fixture.py`; a nightly
+resync can renumber row ids in it with values unchanged, so tests never pin ids.
 
 ## Hard invariants
 
@@ -61,7 +64,7 @@ no autonomous git commits; no affiliate integrations.
 Composite `(season, game_id)` is the primary key everywhere. `game_id` is a per-season
 counter on liiga.fi's side and gets reused.
 
-## Where things stand (2026-11-06)
+## Where things stand (2026-11-07)
 
 Build order: 1 Liiga ingest → 2 snapshot capture → 3 NHL ingest (deferred) → 4 feature
 store → 5 Elo + walk-forward harness → 6 LightGBM + blend → 7 prediction log + local
@@ -80,23 +83,52 @@ dashboard.
   Nothing alerted then; since 2026-10-16 a shutdown or a missed window sends an
   email (see Pipeline safety). Any later shutdown on a game day is a gap of the same
   kind.
-- **Step 4 (feature store): F0 and F1 done.** Plan: `docs/FEATURE_STORE_PLAN.md`.
-  Audit: `docs/FEATURE_AUDIT.md`. `python -m hockey_edge.features.build` rebuilds
-  `data/features.db` in ~6 s: game spine with the regulation 1X2 target and phase
-  flags, `season_format`, `team_season`, home advantage, rest days, and
-  `benchmark_odds`. `FEATURE_VERSION` is `f1.1` (2022:49298 dropped from
-  `feeds_ratings`, with `ratings_exclusion_reason`). **F2 (goalie, shot quality) is
-  next**, then F3 (penalty-team correction, special teams, roster, motivation), both
-  for step 6.
+- **Step 4 (feature store): F0, F1 and F2 done; F3 next.** Plan:
+  `docs/FEATURE_STORE_PLAN.md`. Audit: `docs/FEATURE_AUDIT.md`.
+  `python -m hockey_edge.features.build` rebuilds `data/features.db` in ~45 s (full
+  rebuild every time; the build's own connection uses a 256 MB page cache).
+  `FEATURE_VERSION` is `f2b`. F1: game spine with the regulation 1X2 target and phase
+  flags, `season_format`, `team_season`, home advantage, rest days, `benchmark_odds`
+  (2022:49298 dropped from `feeds_ratings`). F2: starters, goalie quality, shot
+  attempts and team xG (summary below). F3 (penalty-team correction, special teams,
+  roster availability, motivation) is the last phase before step 6.
 - **Step 5 (Elo + walk-forward harness): done 2026-10-13.** Plan
   `docs/ELO_HARNESS_PLAN.md` (E0–E3), results `docs/ELO_RESULTS.md`. Summary below.
 - **Pipeline safety: done 2026-10-16** (`docs/PIPELINE_SAFETY_PLAN.md`). Weekly
   verified backup and healthchecks.io alerts, both live and confirmed working.
   Summary below.
 
-Repo: `origin/main` at `8598db4` (2026-10-16): S1 `4fdf8c5`, S2 `290708a`, then the
-previous version of this file. No build work since. The GitHub account is fine; the
-earlier suspension is long over.
+Repo: `origin/main` at `9390aab` (2026-11-07): F2a `d42a76f`, F2b `9390aab`. GitHub
+knowledge sync run 2026-11-07. The GitHub account is fine; the earlier suspension is
+long over.
+
+## F2 in short
+
+- **Tables:** `game_goalies` (one row per goalie per game), `game_starters` (actual,
+  snapshot and resolved starter per team-game), `features_goalie`, `game_team_shots`
+  (Corsi for/against, even-strength Corsi, game xG per team-game), `features_shots`.
+  **F2 feature tables are one row per team per game**, unlike F1's home/away columns;
+  step 6 pivots them.
+- **Starter resolver:** pre-game snapshot, else the actual starter (ended games,
+  training only), else `unknown` → the team's expected-goalie fallback (start-weighted
+  mix of its last 10 known starters, this season or last). The fallback is stored on
+  every row so it can be scored. `starter_source` is audit only, never a model input.
+  2027 skew: 1 mismatch in 250 team-games.
+- **Goalie quality:** save% over 500- and 1,500-shot windows, shrunk toward the league
+  rate (k = 1,000 shots); GSAx-style mean over the last 20 whole games with opponent
+  xG (from 2021). "Whole game" = the only goalie of his team who faced a shot.
+- **Accepted F2a fix:** the actual-starter early-change check counted the starter's own
+  opening event (logged 2015–2024) as a change; 786 team-games now resolve. 2027
+  output of `verify_starters.py` unchanged.
+- **Shots (D4, Corsi only):** every `shot_events` row counts. Windows 10/25/40 games,
+  per game, all situations and even strength, this season and last. Gap games are
+  NULL and skipped. **No shrinkage by design**; window game counts are stored and
+  shrinkage is a step 6 option. League Corsi is 89–96 per game every season, no break
+  at 2023.
+- 2027's mean Corsi share sits at ~0.493 in the 25/40-game windows because Jokerit's
+  windows hold only 2027 games while the others reach into 2026. Fades as 2027 fills.
+- `history_before(..., per_game=...)` serves derived per-game tables in `features.db`
+  through the same date cut; only listed tables are allowed.
 
 ## Pipeline safety in short
 
@@ -181,6 +213,11 @@ The ones that shape design:
   Total attempts are stable across seasons, unblocked attempts are not. Never split
   missed vs blocked in a feature.
 - xG: game-level complete from 2021; player-level only from 2025; no per-goalie xG.
+- **Goalie ice time is 0 for all of 2026 and partial in 2025** (958 of 1,090 team-games
+  have any). 89 competitive 2025 games have goalie rows with zero shots (79 are the
+  `shot_events` gap); 51 games in 2016 have no goalie stats. Never define anything by
+  ice time without checking these seasons; shot-based windows simply skip such games.
+  Player ice time per season is not yet checked (F3c pre-check).
 - Puck control: values only from 2023. Not a planned feature input.
 - Penalty `player_id = 0` is a team/bench penalty, not a player.
 - The 2025 Pelicans–Jokerit qualification series and 2022:49298 (a 35-minute
@@ -204,14 +241,15 @@ The ones that shape design:
 
 ## Immediate next steps, in order
 
-1. Commit this file, `docs/FEATURE_STORE_PLAN.md` and `docs/PIPELINE_SAFETY_PLAN.md`;
-   push; sync.
-2. **F2** per `docs/FEATURE_STORE_PLAN.md`: pre-check done (D4), then F2a (starters,
-   goalie) and F2b (shot quality), each with a STOP. F2 adds feature modules only; no
-   scheduled task runs feature code, so it can be built in the live checkout. The one
-   shared file is `scripts/verify_starters.py`, which is run by hand, not scheduled.
-3. **F3** per the same plan, starting with `penalty_events_resolved`.
-4. **Plan step 6 in the design chat** (LightGBM + blend), scored by the step 5 harness.
+1. Commit this file and `docs/FEATURE_STORE_PLAN.md`; push; sync.
+2. **F3** per `docs/FEATURE_STORE_PLAN.md`, in a fresh Claude Code session: F3a
+   (`penalty_events_resolved`), F3b (special teams), F3c (roster availability, after a
+   player ice-time pre-check), F3d (motivation, needs the 2026 relegation format).
+   Each has a STOP. Feature code only; no scheduled task runs it, so it can be built
+   in the live checkout.
+3. **Plan step 6 in the design chat** (LightGBM + blend), scored by the step 5 harness.
+   Carried into it: pivoting the per-team F2/F3 tables, shrinkage for the shot
+   windows, and whether the build (~45 s and growing) needs to become incremental.
 
 ## Deferred (explicitly, with reasons)
 
@@ -266,18 +304,18 @@ The ones that shape design:
 
 ## Open items
 
-- `CLAUDE.md` has no Status entry for S1/S2 yet (newest is 2026-10-13). The F2
-  session adds it.
-- 2026 relegation format is NULL in `season_format`; needed only for F3 motivation.
+- 2026 relegation format is NULL in `season_format`; needed only for F3d motivation.
+  Niklas to confirm what the 2025–26 relegation rule actually was (the data has no
+  PLAYOUT or QUALIFICATIONS games that season).
 - `homePreviousGames`/`awayPreviousGames` absent from `game_preview` — unresolved.
 - Goal-event surplus variance across seasons — unexplained; doesn't block anything.
 - Why the power-play derivation fits 2016 and 2023 less well — not investigated.
 - Review liiga.fi (and, if used, Veikkaus) ToS before anything public.
 
-Closed since the last version: off-machine backup (automated, weekly, verified);
-failure alerting (healthchecks.io, four checks, confirmed by real shutdown emails);
-the backup task's catch-up after a day off (confirmed 2026-10-19); the Corsi/Fenwick
-decision (D4: Corsi only).
+Closed since the last version: F2 (starters, goalie quality, Corsi, team xG); the
+Corsi/Fenwick decision (D4: Corsi only); the early-change bug in the actual-starter
+logic; `CLAUDE.md` status entries for S1/S2, F2a and F2b. Earlier on 2026-11-06:
+off-machine backup and failure alerting, both confirmed in normal use.
 
 ## Meta — the pattern worth remembering
 

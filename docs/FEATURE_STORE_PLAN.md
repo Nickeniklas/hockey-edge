@@ -3,7 +3,7 @@
 Design chat, 2026-09-24; updated 2026-09-25 after the historical recovery;
 **updated 2026-10-11 after F0** (`docs/FEATURE_AUDIT.md`); **updated 2026-10-12
 after F1**; F2 pre-check updated 2026-11-06 (Corsi/Fenwick rule, blocked-shot team
-check).
+check); F3 split into F3a–F3d 2026-11-07.
 Contract: `docs/DATA_PIPELINE.md` Layer 3 and `docs/MODEL.md`. Data rules:
 `docs/DATA_PIPELINE.md` → "Known data gaps". Items marked **[DECISION: Niklas]** are
 the user's call. Stop at every "STOP" line and report before going on.
@@ -12,9 +12,9 @@ the user's call. Stop at every "STOP" line and report before going on.
 Build step 5 (Elo + walk-forward harness) is done 2026-10-13: plan
 `docs/ELO_HARNESS_PLAN.md`, results `docs/ELO_RESULTS.md`. Pipeline safety (backup,
 alerts) done 2026-10-16. F2 pre-check done 2026-11-06 (D4). F2 done 2026-11-07: F2a
-(starters, goalie) and F2b (shot quality). F3 is next, for step 6.**
+(starters, goalie) and F2b (shot quality). F3 is next (F3a–F3d), for step 6.**
 
-Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3.** NHL stays
+Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3a → F3b → F3c → F3d.** NHL stays
 deferred.
 
 ---
@@ -290,8 +290,15 @@ mean Corsi share per season (share should sit at 0.5), test count, the new
 
 ## Phase F3 — Remaining families
 
-**First item: `penalty_events_resolved` (D1).** One row per competitive penalty
-event, built from `game_penalty_events` + `game_rosters`:
+Split 2026-11-07 into F3a–F3d, each with a STOP. Conventions carried over from F2:
+feature tables are **one row per team per game**; derived per-game tables are read
+through `history_before(..., per_game=...)`; anything that depends on ice time is
+checked per season first (goalie ice time is 0 for all of 2026).
+
+### F3a — `penalty_events_resolved` (D1)
+
+One row per competitive penalty event, built from `game_penalty_events` +
+`game_rosters`:
 - **Player penalties:** team = the penalised player's roster team in that game.
 - **Team/bench penalties (`player_id = 0`):** take the game's direction. If that
   game's player penalties are stored on the opposite team, swap; if they are stored
@@ -305,19 +312,55 @@ event, built from `game_penalty_events` + `game_rosters`:
 - Tests on real fixtures: 2018 game 1 (swapped) and 2023 game 1 (correct), including
   their bench penalties.
 
-Then:
-- Family 3 special teams: PP opportunities with the **coincident-adjusted count**
-  (opponent's 2- and 5-minute penalties with non-zero duration, minus those starting
-  at the same second as one of the team's own), on `penalty_events_resolved`. **Use
-  the derived count for every season**, including 2015–2024 where a stored count
-  exists, so there is one rule across seasons. PP/PK rates and draws/takes, hard
-  shrinkage. The six zero-penalty competitive games listed in PROJECT_CONTEXT are
-  skipped as missing (2022:49298 is no longer one of them; it is a short tiebreak).
-- Family 6 roster availability: missing share of last-N ice time, from `game_rosters`
-  history plus the pre-game snapshot lineup.
-- Family 7 motivation: playoff-line and relegation-line distance via `season_format`.
-  From 2027, relegation pressure is season-long.
-- Same test pattern.
+**STOP after F3a.** Report the build report above, row counts, test count.
+
+### F3b — Special teams (Family 3)
+
+- PP opportunities with the **coincident-adjusted count** (opponent's 2- and 5-minute
+  penalties with non-zero duration, minus those starting at the same second as one of
+  the team's own), on `penalty_events_resolved`. **Use the derived count for every
+  season**, including 2015–2024 where a stored count exists, so there is one rule
+  across seasons.
+- PP goals: goals scored while the team had the man advantage, from goal events
+  and resolved penalty timing (or the goal event's own strength label, if one exists
+  and agrees; check and report which). PP% and PK% over rolling windows, plus
+  penalties drawn and taken per game. Hard shrinkage toward the league rate, `k` in
+  opportunities, raw counts stored.
+- The six zero-penalty competitive games listed in PROJECT_CONTEXT are skipped as
+  missing (2022:49298 is not one of them; it is a short tiebreak).
+- Report: opportunities per team-game per season (should match FEATURE_AUDIT item 7:
+  ~3.1 in 2024–2025, ~2.9–3.0 in 2026–2027), league PP% per season, and any season
+  that breaks the pattern.
+- Same test pattern (truncation, poison, a gap game treated as missing).
+
+**STOP after F3b.**
+
+### F3c — Roster availability (Family 6)
+
+**Pre-check first (report, then STOP):** player ice time per season in
+`game_player_period_stats` (share of skater rows with ice time > 0, per season,
+competitive games). If any season is zero or partial, as goalie ice time is, propose
+a fallback weight (games played, or line position from `game_rosters`) before
+building.
+
+- Missing share of the team's recent ice time (or the agreed fallback weight): players
+  who carried ice time over the last N games and are absent from this game's lineup.
+- Lineup source mirrors the starter resolver: pre-game snapshot lineup when one
+  exists, else the actual roster (ended games, training only), else `unknown` with a
+  fallback (the team's last known lineup). Source is an audit column, never a model
+  input. Skew report on 2027 games that have both.
+
+**STOP after F3c.**
+
+### F3d — Motivation (Family 7)
+
+- Playoff-line and relegation-line distance via `season_format`. From 2027, relegation
+  pressure is season-long.
+- **Needs the 2026 relegation format filled in `season_format` first.**
+  **[DECISION: Niklas]** confirm what the 2025–26 rule was; the data has no PLAYOUT or
+  QUALIFICATIONS games that season.
+
+**STOP after F3d**, which ends build step 4.
 
 ---
 
