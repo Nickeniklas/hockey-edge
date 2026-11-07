@@ -15,7 +15,7 @@ import sqlite3
 
 # Derived per-game tables in features.db that history_before may join.
 # Never a hockey.* or snapshots.* table: those are read by the builders.
-PER_GAME_TABLES = ("game_goalies",)
+PER_GAME_TABLES = ("game_goalies", "game_team_shots")
 
 
 def target_games(conn: sqlite3.Connection) -> list[sqlite3.Row]:

@@ -11,17 +11,17 @@ the user's call. Stop at every "STOP" line and report before going on.
 **Status: F0 done 2026-10-11, F1 done 2026-10-12 (commits `c47137c`, `bec8b87`).
 Build step 5 (Elo + walk-forward harness) is done 2026-10-13: plan
 `docs/ELO_HARNESS_PLAN.md`, results `docs/ELO_RESULTS.md`. Pipeline safety (backup,
-alerts) done 2026-10-16. F2 pre-check done 2026-11-06 (D4). F2a (starters, goalie) done
-2026-11-07. F2b is next, then F3, for step 6.**
+alerts) done 2026-10-16. F2 pre-check done 2026-11-06 (D4). F2 done 2026-11-07: F2a
+(starters, goalie) and F2b (shot quality). F3 is next, for step 6.**
 
-Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b → F3.** NHL stays
+Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3.** NHL stays
 deferred.
 
 ---
 
 ## F1 result and accepted departures (2026-10-12)
 
-`python -m hockey_edge.features.build` rebuilds `data/features.db` in ~6 s (~23 s since F2a); 99 tests
+`python -m hockey_edge.features.build` rebuilds `data/features.db` in ~6 s (~23 s at F2a, ~45 s since F2b); 99 tests
 pass (67 existing, 32 new). Tables: `game_spine` (7,331), `season_format` (13),
 `team_season` (198), `features_home` (6,469), `features_schedule` (6,469),
 `benchmark_odds` (57).

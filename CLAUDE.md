@@ -76,12 +76,55 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
    (`docs/RECOVERY_BACKLOG.md`, **done 2026-09-25**) then the Liiga feature
    store come first
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
-   — **F0 and F1 done** (2026-10-12), **F2a done** (2026-11-07); **F2b is
-   next**, then F3, per `docs/FEATURE_STORE_PLAN.md`
+   — **F0 and F1 done** (2026-10-12), **F2 done** (F2a and F2b,
+   2026-11-07); **F3 is next**, per `docs/FEATURE_STORE_PLAN.md`
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
    — **done 2026-10-13**; `docs/ELO_RESULTS.md`, tagged `elo-1`
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-11-07, F2b)
+
+**Feature store phase F2 is done: F2b adds shot attempts and team xG
+(Family 2).** Plan `docs/FEATURE_STORE_PLAN.md`. F3 is next.
+
+- **Rebuild:** `python -m hockey_edge.features.build`, about 45 s now (was
+  about 23 s at F2a): the shot steps add about 12 s. `FEATURE_VERSION` is
+  `f2b`.
+- **New tables:** `game_team_shots` (13,890: one row per team per ended
+  game, Corsi for/against, even-strength Corsi, game xG) and
+  `features_shots` (12,938: one row per team per game, same shape as
+  `features_goalie`). Column meanings are in `features/db.py`.
+- **Code:** `features/team_shots.py` (builds `game_team_shots`) and
+  `features/shot_quality.py` (the windows). `history_before`'s `per_game=`
+  allowlist now has `game_team_shots` too.
+- **Corsi rules (D4):** every `shot_events` row counts, all four result
+  types; no Fenwick. Even strength = `EvenStrengthShot`. `shot_events` has
+  the bare team number, so teams are matched on the part of `games`' team
+  id before the `:`. The build stops if any attempt matches neither team of
+  its game (none today). No liiga.fi corsi columns or team period stats.
+- **Gap games are missing, not zero:** a game with no `shot_events` row
+  has NULL Corsi and is skipped in the windows (79 in 2025, one or two in
+  2016, 2017, 2021, 2022). Game xG is used only where both teams have
+  xG > 0, so from 2021; `xg_available` says whether a team's history has
+  any.
+- **Windows:** 10/25/40 games, per game (not per 60), all situations and
+  even strength, over the team's rating-feeding games this season and last.
+  Share is for ÷ (for + against) summed over the window. **No shrinkage,
+  by design:** each window stores how many games it held (`corsi_n_*`,
+  `xg_n_*`, `corsi_n_season`), and shrinking toward the league mean is a
+  step 6 option.
+- **League Corsi is 89–96 per game in every season, with no break at 2023**,
+  and mean shares sit at 0.500 ± 0.002, except 2027.
+- **2027's mean share dips to 0.493 (25-game) and 0.494 (40-game).** Not a
+  counting error: for and against mirror exactly, and over 2027 games alone
+  the 17-team mean is 0.5000. Early in the season those windows reach back
+  into 2026 for 16 teams but not for Jokerit (promoted, no 2026 games), so
+  the shares no longer net to 0.5. It fades as 2027 fills the windows.
+- Tests: 232. `tests/features/test_shots.py` has truncation and poison
+  tests on three games plus the rules above. The fixture is now 2.7 MB: it
+  holds `shot_events` (five columns kept) for 2027 and for 2025 from
+  2025-01-22 to 2025-02-23, into the 2025 gap.
 
 ## Status (as of 2026-11-07)
 
@@ -89,8 +132,8 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
 Plan `docs/FEATURE_STORE_PLAN.md` (D4: Corsi only, decided after the F2
 pre-check). F2b (shot quality) is next.
 
-- **Rebuild:** `python -m hockey_edge.features.build`, about 23 s now (was
-  about 6 s before F2a). The build's own connection uses a 256 MB page
+- **Rebuild:** `python -m hockey_edge.features.build`, about 23 s at F2a (was
+  about 6 s before F2a; about 45 s since F2b). The build's own connection uses a 256 MB page
   cache (`build.CACHE_KIB`); nothing else does. `FEATURE_VERSION` is `f2a`.
 - **New tables:** `game_goalies` (26,875: one row per goalie per game,
   shots, goals, actual starter, whole game, opponent xG), `game_starters`
@@ -208,7 +251,7 @@ Next is the design chat, then F2 for step 6.
 5 (Elo + walk-forward harness). F2 and F3 are open.
 
 - **Rebuild:** `python -m hockey_edge.features.build`. Full rebuild every
-  time (about 6 s then; about 23 s since F2a), built in a temp file and swapped in. `hockey.db` and
+  time (about 6 s then; about 45 s since F2b), built in a temp file and swapped in. `hockey.db` and
   `snapshots.db` are attached read-only.
 - **Tables:** `game_spine` (all 7,331 games, flags and the regulation 1X2
   target), `season_format`, `team_season`, `features_home`,

@@ -11,7 +11,9 @@ import re
 import unittest
 from pathlib import Path
 
-from hockey_edge.features import goalie, history, home, schedule, season_format, spine, starters
+from hockey_edge.features import (
+    goalie, history, home, schedule, season_format, shot_quality, spine, starters, team_shots,
+)
 
 from .support import UNPLAYED, FeatureTest, rows
 
@@ -152,7 +154,7 @@ class SourceRulesTest(unittest.TestCase):
         return Path(module.__file__).read_text(encoding="utf-8")
 
     def test_feature_modules_read_games_only_through_history(self):
-        for module in (home, schedule, goalie):
+        for module in (home, schedule, goalie, shot_quality):
             with self.subTest(module=module.__name__):
                 source = self.source(module).replace("hockey_edge.", "")
                 self.assertNotRegex(source, r"\b(FROM|JOIN)\b")
@@ -161,7 +163,9 @@ class SourceRulesTest(unittest.TestCase):
                 self.assertNotIn(".execute(", source)
 
     def test_model_inputs_never_touch_odds(self):
-        for module in (spine, history, season_format, home, schedule, starters, goalie):
+        for module in (
+            spine, history, season_format, home, schedule, starters, goalie, team_shots, shot_quality,
+        ):
             with self.subTest(module=module.__name__):
                 source = self.source(module).lower()
                 self.assertNotIn("odds", source)

@@ -12,11 +12,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from hockey_edge.features import (
-    FEATURE_VERSION, benchmark, db, goalie, home, schedule, season_format, spine, starters,
+    FEATURE_VERSION, benchmark, db, goalie, home, schedule, season_format, shot_quality, spine,
+    starters, team_shots,
 )
 
-# spine first: everything else reads game_spine. starters before goalie.
-STEPS = (spine, season_format, home, schedule, starters, goalie, benchmark)
+# spine first: everything else reads game_spine. Each derived per-game
+# table (starters, team_shots) before the family that reads it.
+STEPS = (spine, season_format, home, schedule, starters, goalie, team_shots, shot_quality, benchmark)
 # Page cache per database for this build's connection only, as a negative
 # cache_size (KiB): 256 MB. The build is one long transaction; with SQLite's
 # 2 MB default the goalie history reads spill the cache and run several

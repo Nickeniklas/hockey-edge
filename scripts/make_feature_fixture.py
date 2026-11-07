@@ -16,6 +16,10 @@ what phase F1 reads; later phases add their tables to SLICES.
   the competitive games of 2025 and 2027 (goalie windows, actual starters),
   and every snapshots.lineup_snapshots row of 2027 with raw_payload and
   roster_json blanked (the resolver reads only the starter columns).
+- F2b: hockey.shot_events for the competitive games of 2027 and of 2025 from
+  2025-01-22 to 2025-02-23, which runs into the start of the 2025 shot_events
+  gap (game 393 on). Only the columns Corsi reads are kept; the rest are left
+  out of the INSERT and load as NULL (about 6 MB otherwise).
 
 Season 2027 is live, so regenerating this changes the file. The tests pin
 individual games, not totals.
@@ -37,9 +41,19 @@ COMPETITIVE_GAMES = (
     f"season IN {GOALIE_SEASONS} AND (game_id, season) IN "
     f"(SELECT game_id, season FROM games WHERE phase IN {COMPETITIVE})"
 )
+SHOT_GAMES = (
+    "(game_id, season) IN (SELECT game_id, season FROM games "
+    f"WHERE phase IN {COMPETITIVE} AND (season = 2027 OR "
+    "(season = 2025 AND start_utc >= '2025-01-22' AND start_utc < '2025-02-24')))"
+)
+SHOT_COLUMNS_DROPPED = (
+    "id", "period", "game_time_seconds", "shooter_player_id", "blocker_player_id", "shot_x",
+    "shot_y", "own_team_players_on_ice", "other_team_players_on_ice",
+)
 BATCH_ROWS = 500
 
-# (schema, table, source db, column overrides, WHERE, ORDER BY)
+# (schema, table, source db, column overrides, WHERE, ORDER BY). An override of
+# None leaves the column out of the INSERT, so it loads as its default.
 SLICES = (
     ("hockey", "games", "hockey.db", {"source_raw_response_id": "NULL"},
      f"season IN {GAME_SEASONS}", "season, game_id"),
@@ -50,6 +64,8 @@ SLICES = (
     ("hockey", "game_goalkeeper_events", "hockey.db", {}, COMPETITIVE_GAMES, "id"),
     ("snapshots", "lineup_snapshots", "snapshots.db", {"raw_payload": "''", "roster_json": "''"},
      "season = 2027", "id"),
+    ("hockey", "shot_events", "hockey.db", dict.fromkeys(SHOT_COLUMNS_DROPPED),
+     SHOT_GAMES, "id"),
 )
 
 
@@ -57,7 +73,10 @@ def dump(schema, table, db_name, overrides, where, order_by) -> list[str]:
     """INSERT statements for one slice."""
     conn = sqlite3.connect((ROOT / "data" / db_name).as_uri() + "?mode=ro", uri=True)
     try:
-        columns = [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
+        columns = [
+            row[1] for row in conn.execute(f"PRAGMA table_info({table})")
+            if not (row[1] in overrides and overrides[row[1]] is None)
+        ]
         values = " || ', ' || ".join(
             "'" + overrides[c].replace("'", "''") + "'" if c in overrides else f"quote({c})"
             for c in columns

@@ -183,6 +183,78 @@ CREATE TABLE features_goalie (
     PRIMARY KEY (game_id, season, team_role)
 );
 
+-- Derived per-game table (team_shots.py), read by features only through
+-- history.history_before. One row per team per ended game in game_spine.
+-- corsi_* count every shot_events row of the team / its opponent, all four
+-- result types (D4); ev_corsi_* only strength_type 'EvenStrengthShot'. All
+-- four are NULL when the game has no shot_events at all (missing, not 0).
+-- xg_for / xg_against are the game-level xG, NULL unless both teams have
+-- one (none before 2021).
+CREATE TABLE game_team_shots (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_id TEXT NOT NULL,
+    opponent_id TEXT NOT NULL,
+    corsi_for INTEGER,
+    corsi_against INTEGER,
+    ev_corsi_for INTEGER,
+    ev_corsi_against INTEGER,
+    xg_for REAL,
+    xg_against REAL,
+    PRIMARY KEY (game_id, season, team_id)
+);
+CREATE INDEX idx_game_team_shots_team ON game_team_shots (team_id, season);
+
+-- Family 2, one row per team per competitive game. History is the team's
+-- earlier games that feed ratings, this season and last. Windows _10, _25,
+-- _40 take the team's most recent N such games that have shot_events
+-- (games without are skipped, not counted as 0); corsi_n_N is how many
+-- there were (< N early on). Rates are per game: corsi_for_N = attempts
+-- for per game, corsi_share_N = for / (for + against) summed over the
+-- window; ev_ = even strength only. corsi_n_season counts the window games
+-- from this season. xg_*_N are per game over the most recent N games with
+-- game xG (from 2021), xg_n_N their count; xg_available = 1 when there is
+-- at least one. Everything is NULL when its window is empty.
+CREATE TABLE features_shots (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_role TEXT NOT NULL CHECK (team_role IN ('home', 'away')),
+    team_id TEXT NOT NULL,
+    corsi_n_season INTEGER NOT NULL,
+    corsi_n_10 INTEGER NOT NULL,
+    corsi_for_10 REAL,
+    corsi_against_10 REAL,
+    corsi_share_10 REAL,
+    ev_corsi_for_10 REAL,
+    ev_corsi_against_10 REAL,
+    ev_corsi_share_10 REAL,
+    corsi_n_25 INTEGER NOT NULL,
+    corsi_for_25 REAL,
+    corsi_against_25 REAL,
+    corsi_share_25 REAL,
+    ev_corsi_for_25 REAL,
+    ev_corsi_against_25 REAL,
+    ev_corsi_share_25 REAL,
+    corsi_n_40 INTEGER NOT NULL,
+    corsi_for_40 REAL,
+    corsi_against_40 REAL,
+    corsi_share_40 REAL,
+    ev_corsi_for_40 REAL,
+    ev_corsi_against_40 REAL,
+    ev_corsi_share_40 REAL,
+    xg_available INTEGER NOT NULL,
+    xg_n_10 INTEGER NOT NULL,
+    xg_for_10 REAL,
+    xg_against_10 REAL,
+    xg_n_25 INTEGER NOT NULL,
+    xg_for_25 REAL,
+    xg_against_25 REAL,
+    xg_n_40 INTEGER NOT NULL,
+    xg_for_40 REAL,
+    xg_against_40 REAL,
+    PRIMARY KEY (game_id, season, team_role)
+);
+
 -- NOT a feature table. Evaluation benchmark only: the last parsed 1X2 row
 -- captured before start_utc, Pinnacle if it has one, else bet365.
 CREATE TABLE benchmark_odds (
@@ -222,6 +294,8 @@ TABLES = (
     "game_goalies",
     "game_starters",
     "features_goalie",
+    "game_team_shots",
+    "features_shots",
     "benchmark_odds",
 )
 

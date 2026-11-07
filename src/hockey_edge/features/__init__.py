@@ -6,4 +6,4 @@ snapshots.db.
 """
 
 # Recorded in build_meta. Bump when a table's meaning changes.
-FEATURE_VERSION = "f2a"
+FEATURE_VERSION = "f2b"
