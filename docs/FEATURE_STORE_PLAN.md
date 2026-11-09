@@ -14,9 +14,10 @@ Build step 5 (Elo + walk-forward harness) is done 2026-10-13: plan
 alerts) done 2026-10-16. F2 pre-check done 2026-11-06 (D4). F2 done 2026-11-07: F2a
 (starters, goalie) and F2b (shot quality). F3a (`penalty_events_resolved`) done
 2026-11-07 (bench fix 2026-11-09). F3b (special teams) done 2026-11-09. F3c (roster
-availability) done 2026-11-09. F3d is next, for step 6.**
+availability) done 2026-11-09. F3d (motivation) done 2026-11-09: build step 4 is
+done.**
 
-Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3a (done) → F3b (done) → F3c (done) → F3d.** NHL stays
+Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3a (done) → F3b (done) → F3c (done) → F3d (done).** NHL stays
 deferred.
 
 ---
@@ -61,8 +62,9 @@ Findings after F1:
 - The snapshot job captured nothing 2026-10-08 to 10-10 (PC shut down); all 50 odds
   and lineup windows due then were missed. Those games have no lineup snapshot or
   closing line. Historical starter resolution falls back to `actual_postgame` for them.
-- The 2026 relegation format is NULL in `season_format`. Only F3's motivation family
-  needs it; fill it then.
+- ~~The 2026 relegation format is NULL in `season_format`.~~ **Closed 2026-11-09:**
+  2025–26 had no relegation from Liiga (Niklas); `season_format` says `none`, 0
+  spots.
 
 ---
 
@@ -494,9 +496,48 @@ still `f3c`):**
 
 - Playoff-line and relegation-line distance via `season_format`. From 2027, relegation
   pressure is season-long.
-- **Needs the 2026 relegation format filled in `season_format` first.**
-  **[DECISION: Niklas]** confirm what the 2025–26 rule was; the data has no PLAYOUT or
-  QUALIFICATIONS games that season.
+- ~~**Needs the 2026 relegation format filled in `season_format` first.**~~ **Closed
+  2026-11-09:** 2025–26 had no relegation from Liiga (Niklas).
+
+**Built 2026-11-09** (`FEATURE_VERSION` `f3d`). `features_motivation` (12,938 rows,
+`features/motivation.py`); `season_format` gains `playoff_spots` and
+`relegation_spots`. Rebuild about 45 s. Report:
+`python -m hockey_edge.features.motivation_report`.
+- **season_format (hand-curated):** playoff spots 10 in 2015–2024, 12 in 2025–2027;
+  relegation zone none before 2025, 2025 bottom 2 (places 15–16 to the playout),
+  2026 none, 2027 bottom 3 (15–17 directly). 2020's playoffs were cancelled; its
+  planned 10 spots are kept as the line teams played for. 2027's format (top 12 of
+  17 to the playoffs, bottom three relegated directly) is confirmed by Niklas from
+  MTV Uutiset's season preview, 2026-08-31; the data can check it only once the
+  2027 playoffs are listed.
+  The build now stops if a season has more PLAYOFFS teams than curated spots, or,
+  once a later season exists, a different number (playoff games are listed round
+  by round, so the live season may fall short). Checked against the data: in every season with playoffs the
+  PLAYOFFS teams are exactly the top N of the derived final table, and 2025's
+  PLAYOUT teams exactly its bottom 2. No season failed to fit.
+- **Standings:** the season's RUNKOSARJA games on earlier UTC dates, through
+  `history_before`; teams from `team_season`. Points 3/2/1/0 (regulation win, OT/SO
+  win, OT/SO loss, regulation loss); order points, then goal difference.
+- **Points check:** the derived final table matches liiga.fi's own standings
+  (`hockey.standings`, phase `season`) in points and games for every team of every
+  season 2015–2027 (198 team-seasons). In 2015 and 2016 liiga.fi files Espoo
+  Blues' full record under K-Espoo's id and adds a stray partial Blues row; the
+  report matches the record by games and points.
+- **Order check:** the derived order differs from liiga.fi's in 2016 (2 places),
+  2017 (2), 2023 (4), 2025 (2) and live 2027 (4), always between teams level on
+  points: liiga.fi breaks ties its own way, not modelled. No difference crosses a
+  playoff or relegation line in a finished season.
+- **games_remaining** uses the nominal schedule (`games_per_team` − games
+  played), known before the season. It equals the listed schedule in every
+  complete season; counting listed games would leak the 2020 cut and the
+  2021–2022 mid-season cancellations.
+- **Flags** are conservative (3 points a game left, ties not settled). A test
+  checks that every clinched, eliminated, safe or doomed team-game in 2022 and 2025
+  ends on the right side of its line. In each team's last 10 games, playoff
+  clinched / eliminated team-games: 2015 53/20, 2016 62/13, 2017 65/13, 2018 59/18,
+  2019 58/19, 2020 75/22, 2021 41/10, 2022 24/30, 2023 55/17, 2024 51/19,
+  2025 54/8 (relegation safe 69, doomed 8), 2026 81/12. 2021–2022 count fewer
+  because the nominal schedule overstates games left after cancellations.
 
 **STOP after F3d**, which ends build step 4.
 

@@ -38,7 +38,7 @@ request per book**. `snapshot/job.py` runs `OddsPapiProvider` over
 zero-request stub. See `docs/ODDS_PLAN.md`.
 
 Tests: `tests/`, **stdlib `unittest`, no pytest** — run
-`python -m unittest discover -s tests` (278 tests, 5–8 min). New tests go in
+`python -m unittest discover -s tests` (292 tests, 5–8 min). New tests go in
 `tests/test_*.py` or the matching subpackage (`tests/features/`,
 `tests/models/`, `tests/validation/`). They assert against **real saved data**
 (`fixtures/oddspapi/`, `fixtures/liiga/`, `fixtures/features/mini.sql`), never
@@ -93,8 +93,7 @@ runs; **not the prediction log**, which is step 7).
 2. Snapshot capture job (lineups/goalies/odds) — **live**: lineups since
    2026-09-02, odds since 2026-09-17
 3. NHL ingest — **deferred** behind the Liiga feature store and Elo
-4. Feature store — **F0, F1, F2, F3a, F3b, F3c done; F3d next**
-   (`docs/FEATURE_STORE_PLAN.md`)
+4. Feature store — **done 2026-11-09** (F0–F3d, `docs/FEATURE_STORE_PLAN.md`)
 5. Elo baseline + walk-forward harness — **done 2026-10-13**, tagged `elo-1`
 6. LightGBM + blend
 7. Prediction log + local dashboard
@@ -120,10 +119,10 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
   (lineups and odds alike): no confirmed lineup and no closing line for
   them either, permanently.**
 - **Step 3, NHL ingest: deferred.**
-- **Step 4, feature store: F0–F3c done, `FEATURE_VERSION` is `f3c`.** Plan
-  `docs/FEATURE_STORE_PLAN.md`, audit `docs/FEATURE_AUDIT.md`. Rebuild
-  44–74 s on 2026-11-09 (it varies with machine load). Table meanings are
-  in the DDL comments in `features/db.py`.
+- **Step 4, feature store: done 2026-11-09 (F0–F3d), `FEATURE_VERSION` is
+  `f3d`.** Plan `docs/FEATURE_STORE_PLAN.md`, audit `docs/FEATURE_AUDIT.md`.
+  Rebuild about 45 s (up to 74 s under machine load). Table meanings are in
+  the DDL comments in `features/db.py`.
   - F1: `game_spine` (regulation 1X2 target, phase flags), `season_format`,
     `team_season`, `features_home`, `features_schedule`, `benchmark_odds`,
     `build_meta`.
@@ -142,17 +141,23 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
     lineup). Report `python -m hockey_edge.features.availability_report`.
     In 2027 the confirmed lineup equals who played in all 254 team-games
     with both.
+    2016-01-05 is a named ice-time gap day (`lineups.GAP_DATES`); a NULL
+    roster `role` takes `pos` from `role_code`'s letter (H/KH → F, P → D).
+  - F3d: `features_motivation` (RUNKOSARJA only, NULL otherwise): table
+    before the game (3/2/1/0 points, then goal difference), games
+    remaining on the nominal schedule, signed gaps to the playoff and
+    relegation lines, conservative clinched / eliminated / safe / doomed
+    flags. Lines in `season_format.playoff_spots` / `relegation_spots`
+    (hand-curated): 10 spots 2015–2024 (2020's planned 10 although
+    cancelled), 12 from 2025; relegation zone 2025 bottom 2 (playout),
+    2026 none, 2027 bottom 3 direct (2027 format confirmed from MTV
+    Uutiset's season preview, 2026-08-31). Report
+    `python -m hockey_edge.features.motivation_report`.
   - F2/F3 feature tables are **one row per team per game**; F1's are
     home/away columns. Step 6 pivots them.
-  - F3c follow-up (Niklas, 2026-11-09): every team-game on 2016-01-05 is
-    an ice-time gap, named in `lineups.GAP_DATES` (no threshold); the
-    nine other partial team-games stay in windows. When roster `role` is
-    NULL, `pos` comes from `role_code`'s letter (H/KH → F, P → D); 623
-    rows of 2015–2019 gained `pos`, 6 with both NULL stay unmapped.
-  - Next: **F3d** (motivation; needs the 2025–26 relegation rule from
-    Niklas). Before step 6: one full regeneration of
-    `fixtures/features/mini.sql` with the tests re-pinned (it now has
-    F3c slices appended by `scripts/make_feature_fixture.py --append-f3c`).
+  - Before step 6: one full regeneration of `fixtures/features/mini.sql`
+    with the tests re-pinned (it has F3c slices appended by
+    `scripts/make_feature_fixture.py --append-f3c`).
 - **Step 5, Elo + harness: done 2026-10-13.** Plan `docs/ELO_HARNESS_PLAN.md`,
   results `docs/ELO_RESULTS.md`. Elo beats base rates by 0.0316 ± 0.0039 log
   loss on pooled 2018–2026 (4,075 games), a goal-difference rating by only
@@ -166,7 +171,7 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
   `D:\Users\Nikla_000\DATA\hockey-edge-backups`. Restore: `docs/BACKUP.md`.
   healthchecks.io alerts via `src/hockey_edge/ops/heartbeat.py`: checks
   `snapshot-job`, `missed-windows`, `nightly-sync`, `backup`.
-- **Tests: 278** (5–8 min; F3c added 22), `python -m unittest discover -s tests`.
+- **Tests: 292** (5–8 min; F3d added 14), `python -m unittest discover -s tests`.
 
 Commands (repo root, venv active):
 
@@ -177,6 +182,7 @@ python -m hockey_edge.features.goalie_report
 python -m hockey_edge.features.penalty_report
 python -m hockey_edge.features.special_teams_report
 python -m hockey_edge.features.availability_report
+python -m hockey_edge.features.motivation_report
 python -m hockey_edge.validation.run --models elo,base_rate,gd_rating
 python -m hockey_edge.validation.report --run latest
 python -m hockey_edge.snapshot.job --dry-run
@@ -271,8 +277,18 @@ Full gap lists: `docs/DATA_PIPELINE.md` "Known data gaps" and
 - **Season team lists come from `team_season`**, never from games seen so far
   (that leaked future games in step 5; the truncation test caught it).
   `season_format.py` is hand-curated and checked every build: a new season,
-  new team or wrong team count stops the build. The 2026 relegation format is
-  NULL (no PLAYOUT/QUALIFICATIONS games that season).
+  new team, wrong team count, or more PLAYOFFS teams than the curated
+  `playoff_spots` (any other count once a later season exists; the live
+  season's playoff games are listed round by round) stops the build. 2026 had no relegation from Liiga
+  (Niklas, 2026-11-09).
+- **Standings are derived, not read from `hockey.standings`**: 3/2/1/0
+  points match liiga.fi for every team 2015–2027, but liiga.fi breaks
+  points ties its own way (not modelled; motivation ranks by goal
+  difference), and in 2015–2016 it files Espoo Blues' record under
+  K-Espoo's id next to a stray partial Blues row.
+- **`games_remaining` uses the nominal schedule** (`games_per_team`), not
+  the listed games: 2020 was cut short and 2021–2022 lost games mid-season,
+  so counting listed games would leak those later cancellations.
 - **The home edge is fixed at 0 in Elo, not tuned.** The ordered-logit
   link's cutpoints carry it, so tuning can't identify HFA. Don't put it back
   in the grid.

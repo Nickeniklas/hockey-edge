@@ -47,6 +47,10 @@ CREATE INDEX idx_game_spine_season_date ON game_spine (season, start_date);
 
 -- Curated in season_format.py and checked against hockey.games on every
 -- build. runkosarja_* and playoff_teams are counted from the games.
+-- playoff_spots: the top N of the regular-season table reach the playoffs
+-- (curated; equal to playoff_teams wherever playoffs were played; 2020's
+-- planned 10 although they were cancelled). relegation_spots: the bottom N
+-- go to the playout (2025) or straight down (2027 on); 0 with no relegation.
 CREATE TABLE season_format (
     season INTEGER PRIMARY KEY,
     n_teams INTEGER NOT NULL,
@@ -55,7 +59,9 @@ CREATE TABLE season_format (
     relegation TEXT,
     runkosarja_games INTEGER NOT NULL,
     runkosarja_ended INTEGER NOT NULL,
-    playoff_teams INTEGER
+    playoff_teams INTEGER,
+    playoff_spots INTEGER NOT NULL,
+    relegation_spots INTEGER NOT NULL
 );
 
 -- Regular-season games per team, counted. games_played is as of the build,
@@ -422,6 +428,45 @@ CREATE TABLE features_availability (
     PRIMARY KEY (game_id, season, team_role)
 );
 
+-- Family 7, one row per team per competitive game (the row set of
+-- features_goalie); every column after team_id is NULL unless the game is
+-- RUNKOSARJA. The table is the season's regular-season games on earlier
+-- UTC dates: 3 points for a regulation win, 2 for an OT/SO win, 1 for an
+-- OT/SO loss, 0 for a regulation loss; ranked by points, then goal
+-- difference (liiga.fi's own tie-break is not modelled). Teams come from
+-- team_season. games_remaining = season_format.games_per_team (the nominal
+-- schedule) - games_played. playoff_gap: inside the top playoff_spots,
+-- points minus the best team outside; outside, points minus the last team
+-- inside. relegation_gap: above the bottom relegation_spots, points minus
+-- the best team in the zone; in it, points minus the lowest safe team;
+-- NULL when relegation_in_force = 0. The four flags are conservative
+-- bounds, 3 points per game left, ties counted as not settled:
+-- playoff_clinched = at most playoff_spots - 1 other teams can still reach
+-- the team's points; playoff_eliminated = at least playoff_spots teams
+-- already have more than the team can reach; relegation_safe = at least
+-- relegation_spots teams cannot reach its points; relegation_doomed = at
+-- least n_teams - relegation_spots teams already have more than it can
+-- reach.
+CREATE TABLE features_motivation (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_role TEXT NOT NULL CHECK (team_role IN ('home', 'away')),
+    team_id TEXT NOT NULL,
+    games_played INTEGER,
+    points INTEGER,
+    goal_diff INTEGER,
+    table_rank INTEGER,
+    games_remaining INTEGER,
+    playoff_gap INTEGER,
+    playoff_clinched INTEGER,
+    playoff_eliminated INTEGER,
+    relegation_in_force INTEGER,
+    relegation_gap INTEGER,
+    relegation_safe INTEGER,
+    relegation_doomed INTEGER,
+    PRIMARY KEY (game_id, season, team_role)
+);
+
 -- NOT a feature table. Evaluation benchmark only: the last parsed 1X2 row
 -- captured before start_utc, Pinnacle if it has one, else bet365.
 CREATE TABLE benchmark_odds (
@@ -468,6 +513,7 @@ TABLES = (
     "features_special_teams",
     "game_skater_toi",
     "features_availability",
+    "features_motivation",
     "benchmark_odds",
 )
 

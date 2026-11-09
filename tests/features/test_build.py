@@ -43,8 +43,8 @@ class BuildTest(FeatureTest):
 
     def test_season_format(self):
         formats = {r["season"]: tuple(r)[1:] for r in self.full.execute("SELECT * FROM season_format")}
-        self.assertEqual(formats[2022], (15, 60, 1, "none", 448, 448, 10))
-        self.assertEqual(formats[2025], (16, 60, 1, "playout_qualification", 480, 480, 12))
+        self.assertEqual(formats[2022], (15, 60, 1, "none", 448, 448, 10, 10, 0))
+        self.assertEqual(formats[2025], (16, 60, 1, "playout_qualification", 480, 480, 12, 12, 2))
         self.assertEqual(formats[2027][:4], (17, 64, 1, "direct_bottom_three"))
         self.assertEqual(formats[2027][4], 544)
 
