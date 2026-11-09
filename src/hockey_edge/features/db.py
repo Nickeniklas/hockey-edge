@@ -365,6 +365,63 @@ CREATE TABLE features_special_teams (
     PRIMARY KEY (game_id, season, team_role)
 );
 
+-- Derived per-game table (lineups.py), read by features only through
+-- history.history_before. One row per skater per team per ended
+-- competitive game with a game_player_period_stats row: the historical
+-- lineup is the players with stats rows (game_rosters is the squad list,
+-- not the lineup). toi_s = time on ice summed over periods. pos = 'D' for
+-- a defenceman, 'F' for another skater, from that game's game_rosters.role,
+-- or its role_code letter when role is NULL (H/KH -> F, P -> D); NULL when
+-- neither maps or there is no roster row (availability_report lists them).
+-- Ice-time gap: when the team's skater total for the game is 0, or the
+-- game is on a lineups.GAP_DATES day (2016-01-05), toi_s is NULL on all
+-- its rows; the rows are kept, they still say who dressed.
+CREATE TABLE game_skater_toi (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_id TEXT NOT NULL,
+    player_id INTEGER NOT NULL,
+    pos TEXT CHECK (pos IN ('F', 'D')),
+    toi_s INTEGER,
+    PRIMARY KEY (game_id, season, team_id, player_id)
+);
+CREATE INDEX idx_game_skater_toi_team ON game_skater_toi (team_id, season);
+
+-- Family 6, one row per team per competitive game (the row set of
+-- features_goalie). Window _5 / _10: the team's most recent N earlier games
+-- this season that feed ratings and have ice time (gap games are skipped,
+-- not counted as 0); n_window_games_N is how many there were. Window
+-- skaters are the team's players in those games, weighted by their ice
+-- time for this team only. missing_share_N = window ice time of window
+-- skaters absent from the resolved lineup / window ice time of all window
+-- skaters; _f_ / _d_ the same within forward / defence ice time, pos from
+-- the player's most recent window game with a known pos. NULL when the
+-- window is empty (a team's first game of the season) or there is no
+-- lineup. lineup_source: 'snapshot' (the confirmed lineup captured before
+-- the start), 'actual' (players with a stats row; ended games, training
+-- only) or 'unknown', when the main columns use the fallback lineup: the
+-- team's lineup in its most recent earlier game this season with one.
+-- missing_share_10_fallback is missing_share_10 against that fallback
+-- lineup, on every row. lineup_source is an audit column, never a model
+-- input.
+CREATE TABLE features_availability (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_role TEXT NOT NULL CHECK (team_role IN ('home', 'away')),
+    team_id TEXT NOT NULL,
+    lineup_source TEXT NOT NULL CHECK (lineup_source IN ('snapshot', 'actual', 'unknown')),
+    n_window_games_5 INTEGER NOT NULL,
+    missing_share_5 REAL,
+    missing_share_f_5 REAL,
+    missing_share_d_5 REAL,
+    n_window_games_10 INTEGER NOT NULL,
+    missing_share_10 REAL,
+    missing_share_f_10 REAL,
+    missing_share_d_10 REAL,
+    missing_share_10_fallback REAL,
+    PRIMARY KEY (game_id, season, team_role)
+);
+
 -- NOT a feature table. Evaluation benchmark only: the last parsed 1X2 row
 -- captured before start_utc, Pinnacle if it has one, else bet365.
 CREATE TABLE benchmark_odds (
@@ -409,6 +466,8 @@ TABLES = (
     "penalty_events_resolved",
     "game_team_special_teams",
     "features_special_teams",
+    "game_skater_toi",
+    "features_availability",
     "benchmark_odds",
 )
 

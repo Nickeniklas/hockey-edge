@@ -13,10 +13,10 @@ Build step 5 (Elo + walk-forward harness) is done 2026-10-13: plan
 `docs/ELO_HARNESS_PLAN.md`, results `docs/ELO_RESULTS.md`. Pipeline safety (backup,
 alerts) done 2026-10-16. F2 pre-check done 2026-11-06 (D4). F2 done 2026-11-07: F2a
 (starters, goalie) and F2b (shot quality). F3a (`penalty_events_resolved`) done
-2026-11-07 (bench fix 2026-11-09). F3b (special teams) done 2026-11-09. F3c is
-next, then F3d, for step 6.**
+2026-11-07 (bench fix 2026-11-09). F3b (special teams) done 2026-11-09. F3c (roster
+availability) done 2026-11-09. F3d is next, for step 6.**
 
-Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3a (done) → F3b (done) → F3c → F3d.** NHL stays
+Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3a (done) → F3b (done) → F3c (done) → F3d.** NHL stays
 deferred.
 
 ---
@@ -397,6 +397,97 @@ building.
   fallback (the team's last known lineup). Source is an audit column, never a model
   input. Skew report on 2027 games that have both.
 
+**Pre-check result (2026-11-09).** Skater ice time in `game_player_period_stats`
+exists in every season: 97.2–99.5% of skater rows (competitive ended games) have
+ice time > 0 (2015 98.3%, 2016 98.0%, 2025 97.5%, 2026 99.5%, 2027 97.2%; the
+rest 98.4–99.2%). Team-games whose skaters total 0: 2016 4 (all on 2016-01-05),
+2021 1 (51700 HPK), 2025 20 (the five PLAYOUT games and five QUALIFICATIONS
+games). Games with no stats rows at all: 2016 51, 2015 1 (45873), 2021 1 (480).
+Goalies are not in the table.
+
+**Decisions (Niklas, 2026-11-09):**
+- Weight = skater ice time, every season. No fallback weight.
+- `game_rosters` is the squad list, not the lineup; never use it for "who
+  played". The historical lineup is the players with stats rows. Position
+  comes from that game's `game_rosters.role` (defenceman → D, other skater →
+  F), never the snapshot's `roleCode` (the `game_rosters.role_code` fallback
+  for a NULL role came in the follow-up below).
+- 2016's 51 no-stats games stay without a lineup: no `line` parse, no reparse.
+  They resolve to `unknown`.
+- A gap team-game (total 0) keeps its rows with `toi_s` NULL (they still say who
+  dressed); windows skip it, and it is featured like any other game when it is
+  the game being predicted. Partial team-games are reported, no rule.
+- Window: the team's last N rating-feeding games with ice time, this season
+  only, N = 5 and 10; a traded player's minutes for another team don't count.
+- Lineup resolver mirrors the starter's, with the snapshot chosen the same way
+  (now the shared `pregame.latest_pregame_snapshot`); unknown falls back to the
+  team's lineup in its most recent earlier game this season with one.
+
+**Built 2026-11-09** (`FEATURE_VERSION` `f3c`). `game_skater_toi` (228,790 rows;
+`features/lineups.py`, also `resolve_lineup`) and `features_availability`
+(12,938; `features/availability.py`); `history_before` accepts
+`game_skater_toi`. `game_starters` and `features_goalie` came out row-for-row
+identical after the snapshot choice moved to `features/pregame.py`. Rebuild
+44–74 s on 2026-11-09, varying with machine load (56 s before F3c). Report:
+`python -m hockey_edge.features.availability_report`.
+- **Skew, 2027:** 254 team-games have both a snapshot and an actual lineup; the
+  sets match in all 254, so every feature value is identical. Missing a lineup
+  window costs a mean |missing_share_10 − fallback| of 0.029 (max 0.166) on the
+  snapshot rows, 0.022 on the actual ones.
+- **Lineup source:** `actual` for every ended game with stats; `unknown`
+  2015 2, 2016 102, 2021 2 (no stats); 2027 `snapshot` 254, `actual` 68 (team-games
+  of 2026-09-01, before capture began; missed windows on 09-04 and 09-05; the
+  10-08–10 and 10-17 capture gaps), `unknown` 766
+  (unplayed). `missing_share_10` is NULL only for an empty window (15–28 per
+  season: first games, plus Jokerit's 2025 qualification games); mean
+  0.12–0.14 per season (2027 so far 0.09), p90 about 0.20–0.24.
+- **Partial ice time** (total > 0 but < 0.8 × 5 × game time): 15 team-games in
+  the first build. Six were the other team-games of 2016-01-05, the gap day, at
+  2–17% of a full game; the rest are 2015:6226, 2015:6241, 2016:7875,
+  2016:7935, 2017:4342, 2019:431, 2020:94, 2021:55522, 2025:435 (25–78%), kept
+  in windows, report only.
+- **Positions:** no stats row lacks a roster row. 629 skater rows (2015–2019)
+  have a roster row with `role` NULL, 623 of them `role_code` "13. H". Every
+  snapshot role maps.
+
+**F3c follow-up 2026-11-09 (Niklas's decisions on the two open questions;
+still `f3c`):**
+- **2016-01-05 is a gap day, by name** (`lineups.GAP_DATES`, not a threshold):
+  all ten team-games there get `toi_s` NULL. 114 rows of the six partial
+  team-games changed (the four at 0 were already NULL); 2016 now has 10 gap
+  team-games. The nine other partial team-games stay as they are.
+- **Position fallback:** when `game_rosters.role` is NULL, `pos` comes from that
+  row's `role_code` by its letter after any "N. " prefix (H or KH → F, P → D);
+  `role` stays first. Only `game_rosters.role_code`: the snapshot's `roleCode` is
+  never used. 623 rows gained `pos` F (2015 25, 2016 2, 2017 220, 2018 239,
+  2019 137). **Still without a position: 6 rows**, `role` and `role_code` both
+  NULL (2015:6399 KalPa 25461491; 2015:45882, 45883, 45901 Tappara 21924709;
+  2016:7691 Blues 28576383; 2016:7747 Pelicans 24244606). Each of these players
+  has a position in 35–72 other games that season, so a window usually gets it
+  from another game.
+- **Effect on `features_availability`, 2015–2019** (vs. the first F3c build):
+  rows with any changed value 2015 3, 2016 80, 2017 145, 2018 112, 2019 73.
+  `n_window_games_5` unchanged; `n_window_games_10` down by 1 on 3 rows of 2016.
+  `missing_share_10` changed only in 2016 (78 rows, mean |shift| 0.009, max
+  0.023; season mean 0.1334 → 0.1341); 2015 and 2017–2019 unchanged, as the
+  position rule moves only the F/D split. `missing_share_f_10` shifts by a mean
+  0.002–0.011 per season (max 0.035), `missing_share_d_10` by 0.006–0.027 (max
+  0.041; a player whose most recent window game had no position used to take an
+  older one).
+- **Resync guard (read-only question):** the `game_stats` value guard does check
+  skater ice time: `player_toi` = SUM of `game_player_period_stats.
+  time_on_ice_seconds` over the game. Its other value totals: `player_corsi_for`,
+  `player_faceoffs` (`faceoffs_total`), `goalie_toi`, `team_face_off_wins`,
+  `team_powerplay_instances`, `team_shorthanded_instances` (each refused below
+  50% of its old value), plus the goal totals `team_goals` and `player_goals`
+  (refused when they move away from the final score). The totals are per game,
+  both teams together: one team's ice time stripped to 0 leaves about half the
+  total, right at the 50% floor, so such a reparse can pass.
+- Fixture: F3c slices appended to `mini.sql` with
+  `scripts/make_feature_fixture.py --append-f3c` (skater stats for 2027 and
+  Pelicans', Jukurit's and Jokerit's 2025 games from 2025-02-01; their roster
+  rows with role; 2027 snapshot rosters cut to id, role, line).
+
 **STOP after F3c.**
 
 ### F3d — Motivation (Family 7)
@@ -434,6 +525,12 @@ building.
   2018 game 1 and 2023 game 1 are not in the fixture: neither has a bench penalty,
   and the build accepts only whole seasons. The per-season swapped share on the
   real build checks 2018 and 2023 against FEATURE_AUDIT item 7.
+- F3c (appended 2026-11-09 with `--append-f3c`, cut to the file's 2026-11-01
+  state): skater period stats (keys and ice time) for the ended competitive
+  games of 2027 and for Pelicans', Jukurit's and Jokerit's 2025 games from
+  2025-02-01 (run-in, then the ice-time gap of the PLAYOUT and QUALIFICATIONS
+  series), the roster rows of those skaters with `role`, and the 2027 lineup
+  snapshots' `roster_json` cut to id, role and line.
 
 ## Decisions for Niklas (collected)
 

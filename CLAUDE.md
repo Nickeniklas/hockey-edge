@@ -38,7 +38,7 @@ request per book**. `snapshot/job.py` runs `OddsPapiProvider` over
 zero-request stub. See `docs/ODDS_PLAN.md`.
 
 Tests: `tests/`, **stdlib `unittest`, no pytest** — run
-`python -m unittest discover -s tests` (256 tests, about 3 min). New tests go in
+`python -m unittest discover -s tests` (278 tests, 5–8 min). New tests go in
 `tests/test_*.py` or the matching subpackage (`tests/features/`,
 `tests/models/`, `tests/validation/`). They assert against **real saved data**
 (`fixtures/oddspapi/`, `fixtures/liiga/`, `fixtures/features/mini.sql`), never
@@ -93,7 +93,7 @@ runs; **not the prediction log**, which is step 7).
 2. Snapshot capture job (lineups/goalies/odds) — **live**: lineups since
    2026-09-02, odds since 2026-09-17
 3. NHL ingest — **deferred** behind the Liiga feature store and Elo
-4. Feature store — **F0, F1, F2, F3a, F3b done; F3c next, then F3d**
+4. Feature store — **F0, F1, F2, F3a, F3b, F3c done; F3d next**
    (`docs/FEATURE_STORE_PLAN.md`)
 5. Elo baseline + walk-forward harness — **done 2026-10-13**, tagged `elo-1`
 6. LightGBM + blend
@@ -115,12 +115,15 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
   since 2026-09-02, odds (`odds_snapshots`, OddsPapi pinnacle + bet365) since
   2026-09-17. Starter inference (`line == 1`) is about 98% right. **No
   capture 2026-10-08 to 10-10 (PC shut down): those 13 games have no
-  confirmed lineup and no usable closing line, permanently.**
+  confirmed lineup and no usable closing line, permanently.** **On
+  2026-10-17 the mid and closing windows were missed for all 7 games
+  (lineups and odds alike): no confirmed lineup and no closing line for
+  them either, permanently.**
 - **Step 3, NHL ingest: deferred.**
-- **Step 4, feature store: F0–F3b done, `FEATURE_VERSION` is `f3b`.** Plan
-  `docs/FEATURE_STORE_PLAN.md`, audit `docs/FEATURE_AUDIT.md`. Rebuild about
-  45–56 s (56 s on 2026-11-09). Table meanings are in the DDL comments in
-  `features/db.py`.
+- **Step 4, feature store: F0–F3c done, `FEATURE_VERSION` is `f3c`.** Plan
+  `docs/FEATURE_STORE_PLAN.md`, audit `docs/FEATURE_AUDIT.md`. Rebuild
+  44–74 s on 2026-11-09 (it varies with machine load). Table meanings are
+  in the DDL comments in `features/db.py`.
   - F1: `game_spine` (regulation 1X2 target, phase flags), `season_format`,
     `team_season`, `features_home`, `features_schedule`, `benchmark_odds`,
     `build_meta`.
@@ -132,12 +135,24 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
     `f3a.1`).
   - F3b: `game_team_special_teams`, `features_special_teams` (PP%/PK% shrunk
     with k = 150 opportunities; raw counts stored).
+  - F3c: `game_skater_toi` (who dressed, with ice time and F/D; 228,790
+    rows), `features_availability` (share of the last 5/10 games' ice
+    time missing from the resolved lineup, this season only; lineup from
+    `lineups.resolve_lineup`: snapshot, else actual, else the last known
+    lineup). Report `python -m hockey_edge.features.availability_report`.
+    In 2027 the confirmed lineup equals who played in all 254 team-games
+    with both.
   - F2/F3 feature tables are **one row per team per game**; F1's are
     home/away columns. Step 6 pivots them.
-  - Next: **F3c** (roster availability; player ice-time pre-check first,
-    then stop for review), then **F3d** (motivation; needs the 2025–26
-    relegation rule from Niklas). Before step 6: one full regeneration of
-    `fixtures/features/mini.sql` with the tests re-pinned.
+  - F3c follow-up (Niklas, 2026-11-09): every team-game on 2016-01-05 is
+    an ice-time gap, named in `lineups.GAP_DATES` (no threshold); the
+    nine other partial team-games stay in windows. When roster `role` is
+    NULL, `pos` comes from `role_code`'s letter (H/KH → F, P → D); 623
+    rows of 2015–2019 gained `pos`, 6 with both NULL stay unmapped.
+  - Next: **F3d** (motivation; needs the 2025–26 relegation rule from
+    Niklas). Before step 6: one full regeneration of
+    `fixtures/features/mini.sql` with the tests re-pinned (it now has
+    F3c slices appended by `scripts/make_feature_fixture.py --append-f3c`).
 - **Step 5, Elo + harness: done 2026-10-13.** Plan `docs/ELO_HARNESS_PLAN.md`,
   results `docs/ELO_RESULTS.md`. Elo beats base rates by 0.0316 ± 0.0039 log
   loss on pooled 2018–2026 (4,075 games), a goal-difference rating by only
@@ -151,7 +166,7 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
   `D:\Users\Nikla_000\DATA\hockey-edge-backups`. Restore: `docs/BACKUP.md`.
   healthchecks.io alerts via `src/hockey_edge/ops/heartbeat.py`: checks
   `snapshot-job`, `missed-windows`, `nightly-sync`, `backup`.
-- **Tests: 256**, `python -m unittest discover -s tests`.
+- **Tests: 278** (5–8 min; F3c added 22), `python -m unittest discover -s tests`.
 
 Commands (repo root, venv active):
 
@@ -161,6 +176,7 @@ python -m hockey_edge.features.build
 python -m hockey_edge.features.goalie_report
 python -m hockey_edge.features.penalty_report
 python -m hockey_edge.features.special_teams_report
+python -m hockey_edge.features.availability_report
 python -m hockey_edge.validation.run --models elo,base_rate,gd_rating
 python -m hockey_edge.validation.report --run latest
 python -m hockey_edge.snapshot.job --dry-run
@@ -286,9 +302,21 @@ Full gap lists: `docs/DATA_PIPELINE.md` "Known data gaps" and
 - **Goalie ice time is 0 for all of 2026 and partial in 2025.** "Whole game"
   means the only goalie of his team who faced a shot. Never define anything by
   ice time without checking these seasons.
-- **`starter_source` is an audit column, never a model input.** Starter
-  resolver: pre-game snapshot, else the actual starter (ended games, training
-  only), else the expected-goalie fallback, which is stored on every row.
+- **Skater ice time exists in every season** (97–99.5% of skater rows > 0).
+  Gaps: a team-game whose skaters total 0 (2021:51700 HPK, the ten 2025
+  PLAYOUT/QUALIFICATIONS games) or that is on a `lineups.GAP_DATES` day
+  (all ten team-games of 2016-01-05: four at 0, six at 2–17% of a game)
+  has `toi_s` NULL in `game_skater_toi` and is skipped by windows.
+  2015:45873, 2021:480 and 51 games of 2016 have no stats rows at all.
+- **`game_rosters` is the squad list, not the lineup.** Who played is the
+  players with a `game_player_period_stats` row (`game_skater_toi`); the
+  roster gives only the position: `role`, else `role_code`'s letter when
+  `role` is NULL (H/KH → F, P → D). A snapshot's `roleCode` is never used.
+- **`starter_source` and `lineup_source` are audit columns, never model
+  inputs.** Both resolvers take the snapshot from
+  `pregame.latest_pregame_snapshot`: pre-game snapshot, else the actual
+  starter / lineup (ended games, training only), else a fallback (expected
+  goalie; last known lineup), whose value is stored on every row.
 - **`benchmark_odds` takes Pinnacle's last row before the start even when
   it's old**: filter on `minutes_before_start` ≤ 60.
 - **`docs/ELO_RESULTS.md` is generated below its marker line**; the summary

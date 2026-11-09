@@ -17,6 +17,7 @@ import sqlite3
 # Never a hockey.* or snapshots.* table: those are read by the builders.
 PER_GAME_TABLES = (
     "game_goalies", "game_team_shots", "penalty_events_resolved", "game_team_special_teams",
+    "game_skater_toi",
 )
 
 

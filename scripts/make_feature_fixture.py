@@ -27,12 +27,25 @@ what phase F1 reads; later phases add their tables to SLICES.
   for the same games, but only the rows of players a penalty names (the
   penalised player or the sufferer): that is all the penalty-team rule
   reads. Text and id columns nothing reads are left out.
+- F3c: hockey.game_player_period_stats (keys and ice time only) for the
+  ended competitive games of 2027 and the 2025 games from 2025-02-01 of
+  Pelicans, Jukurit and Jokerit (SKATER_GAMES: their regular-season run-in,
+  then the ice-time gap of the PLAYOUT and QUALIFICATIONS series), with
+  the game_rosters rows of those skaters (role kept: it gives pos), and the
+  2027 lineup snapshots' roster_json cut to each player's id, role and line.
+
+`--append-f3c` appends only the F3c slices to the existing file, as INSERT
+OR REPLACE where rows are already there (the roster rows of penalty-named
+players without role, the 2027 snapshots without roster_json), cut to what
+the file already holds (FIXTURE_FROZEN). The full regeneration before step
+6 writes everything from SLICES; APPEND_F3C can go then.
 
 Season 2027 is live, so regenerating this changes the file. The tests pin
 individual games, not totals.
 """
 
 import sqlite3
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -84,6 +97,41 @@ ROSTER_COLUMNS_DROPPED = (
 GOAL_COLUMNS_DROPPED = (
     "id", "scorer_first_name", "scorer_last_name", "log_time_utc", "assistant_player_ids",
 )
+# F3c. Pelicans, Jukurit, Jokerit: the 2025 ice-time gap games.
+GAP_TEAMS = ("875886777:pelicans", "292293444:jukurit", "238306801:jokerit")
+SKATER_GAMES = (
+    "(game_id, season) IN (SELECT game_id, season FROM games "
+    f"WHERE ended = 1 AND phase IN {COMPETITIVE} AND (season = 2027 OR "
+    "(season = 2025 AND start_utc >= '2025-02-01' AND "
+    f"(home_team_id IN {GAP_TEAMS} OR away_team_id IN {GAP_TEAMS}))))"
+)
+SKATER_COLUMNS_DROPPED = (
+    "id", "jersey_id", "goals", "assists", "points", "plusminus", "shots", "penalty_minutes",
+    "powerplay_goals", "shorthanded_goals", "blocked_shots", "faceoffs_total", "faceoffs_won",
+    "corsi_for", "corsi_against", "distance", "expected_goals_player", "expected_goals_against",
+)
+SKATER_ROSTER = (
+    f"{SKATER_GAMES} AND EXISTS (SELECT 1 FROM game_player_period_stats p "
+    "WHERE p.season = game_rosters.season AND p.game_id = game_rosters.game_id "
+    "AND p.team_id = game_rosters.team_id AND p.player_id = game_rosters.player_id)"
+)
+# role gives a skater's pos (lineups.py); the rest still goes.
+ROSTER_COLUMNS_DROPPED_F3C = tuple(c for c in ROSTER_COLUMNS_DROPPED if c != "role")
+
+
+class Expr(str):
+    """A column override that is an SQL expression, not a literal."""
+
+
+# Each player's id, role and line: all lineups.py reads.
+COMPACT_ROSTER = Expr(
+    "(SELECT json_group_array(json_object('id', json_extract(value, '$.id'), "
+    "'role', json_extract(value, '$.role'), 'line', json_extract(value, '$.line'))) "
+    "FROM json_each(roster_json))"
+)
+# What the file held before F3c: games up to the 2026-11-01 slate and the
+# snapshots captured until then (ids 1-772).
+FIXTURE_FROZEN = "2026-11-02"
 BATCH_ROWS = 500
 
 # (schema, table, source db, column overrides, WHERE, ORDER BY). An override of
@@ -96,20 +144,44 @@ SLICES = (
     ("hockey", "game_goalie_period_stats", "hockey.db", {"jersey_id": "NULL", "save_percentage": "NULL"},
      COMPETITIVE_GAMES, "id"),
     ("hockey", "game_goalkeeper_events", "hockey.db", {}, COMPETITIVE_GAMES, "id"),
-    ("snapshots", "lineup_snapshots", "snapshots.db", {"raw_payload": "''", "roster_json": "''"},
+    ("snapshots", "lineup_snapshots", "snapshots.db", {"raw_payload": "''", "roster_json": COMPACT_ROSTER},
      "season = 2027", "id"),
     ("hockey", "shot_events", "hockey.db", dict.fromkeys(SHOT_COLUMNS_DROPPED),
      SHOT_GAMES, "id"),
     ("hockey", "game_penalty_events", "hockey.db", dict.fromkeys(("id", "fault_name")),
      PENALTY_SLICE, "season, game_id, event_id"),
-    ("hockey", "game_rosters", "hockey.db", dict.fromkeys(ROSTER_COLUMNS_DROPPED),
-     ROSTER_SLICE, "season, game_id, team_id, player_id"),
+    ("hockey", "game_rosters", "hockey.db", dict.fromkeys(ROSTER_COLUMNS_DROPPED_F3C),
+     f"({ROSTER_SLICE}) OR ({SKATER_ROSTER})", "season, game_id, team_id, player_id"),
     ("hockey", "game_goal_events", "hockey.db", dict.fromkeys(GOAL_COLUMNS_DROPPED),
      PENALTY_SLICE, "season, game_id, event_id"),
+    ("hockey", "game_player_period_stats", "hockey.db", dict.fromkeys(SKATER_COLUMNS_DROPPED),
+     SKATER_GAMES, "id"),
+)
+
+# `--append-f3c`: (verb, slice), cut to what the file already holds.
+_FROZEN_GAMES = (
+    f"(game_id, season) IN (SELECT game_id, season FROM games WHERE start_utc < '{FIXTURE_FROZEN}')"
+)
+APPEND_F3C = (
+    ("INSERT", ("hockey", "game_player_period_stats", "hockey.db", dict.fromkeys(SKATER_COLUMNS_DROPPED),
+                f"{SKATER_GAMES} AND {_FROZEN_GAMES}", "id")),
+    ("INSERT OR REPLACE", ("hockey", "game_rosters", "hockey.db", dict.fromkeys(ROSTER_COLUMNS_DROPPED_F3C),
+                           f"{SKATER_ROSTER} AND {_FROZEN_GAMES}", "season, game_id, team_id, player_id")),
+    ("INSERT OR REPLACE", ("snapshots", "lineup_snapshots", "snapshots.db",
+                           {"raw_payload": "''", "roster_json": COMPACT_ROSTER},
+                           f"season = 2027 AND captured_at < '{FIXTURE_FROZEN}'", "id")),
 )
 
 
-def dump(schema, table, db_name, overrides, where, order_by) -> list[str]:
+def _value(column: str, overrides: dict) -> str:
+    if column not in overrides:
+        return f"quote({column})"
+    if isinstance(overrides[column], Expr):
+        return f"quote({overrides[column]})"
+    return "'" + overrides[column].replace("'", "''") + "'"
+
+
+def dump(schema, table, db_name, overrides, where, order_by, verb="INSERT") -> list[str]:
     """INSERT statements for one slice."""
     conn = sqlite3.connect((ROOT / "data" / db_name).as_uri() + "?mode=ro", uri=True)
     try:
@@ -117,10 +189,7 @@ def dump(schema, table, db_name, overrides, where, order_by) -> list[str]:
             row[1] for row in conn.execute(f"PRAGMA table_info({table})")
             if not (row[1] in overrides and overrides[row[1]] is None)
         ]
-        values = " || ', ' || ".join(
-            "'" + overrides[c].replace("'", "''") + "'" if c in overrides else f"quote({c})"
-            for c in columns
-        )
+        values = " || ', ' || ".join(_value(c, overrides) for c in columns)
         rows = [
             f"({row[0]})"
             for row in conn.execute(f"SELECT {values} FROM {table} WHERE {where} ORDER BY {order_by}")
@@ -128,19 +197,31 @@ def dump(schema, table, db_name, overrides, where, order_by) -> list[str]:
     finally:
         conn.close()
     # One row per line, in batches: a single statement is capped at 1 MB.
-    header = f"INSERT INTO {schema}.{table} ({', '.join(columns)}) VALUES"
+    header = f"{verb} INTO {schema}.{table} ({', '.join(columns)}) VALUES"
     return [
         header + "\n" + ",\n".join(rows[i:i + BATCH_ROWS]) + ";"
         for i in range(0, len(rows), BATCH_ROWS)
     ]
 
 
+def _statements(spec: tuple, verb: str = "INSERT") -> list[str]:
+    statements = dump(*spec, verb=verb)
+    print(f"{spec[0]}.{spec[1]} ({verb}): {sum(s.count(chr(10)) for s in statements)} rows")
+    return statements
+
+
 def main() -> None:
+    if sys.argv[1:] == ["--append-f3c"]:
+        lines = ["-- F3c slices, appended by scripts/make_feature_fixture.py --append-f3c."]
+        for verb, spec in APPEND_F3C:
+            lines.extend(_statements(spec, verb))
+        with OUT_PATH.open("a", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join(lines) + "\n")
+        print(f"appended to {OUT_PATH} ({OUT_PATH.stat().st_size / 1024:.0f} KB)")
+        return
     lines = ["-- Generated by scripts/make_feature_fixture.py from real rows. Do not edit."]
     for spec in SLICES:
-        statements = dump(*spec)
-        print(f"{spec[0]}.{spec[1]}: {sum(s.count(chr(10)) for s in statements)} rows")
-        lines.extend(statements)
+        lines.extend(_statements(spec))
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUT_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {OUT_PATH} ({OUT_PATH.stat().st_size / 1024:.0f} KB)")

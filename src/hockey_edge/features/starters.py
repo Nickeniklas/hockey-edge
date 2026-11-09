@@ -18,7 +18,8 @@ where hockey.db is attached.
 """
 
 import sqlite3
-from datetime import datetime
+
+from hockey_edge.features import pregame
 
 EARLY_CHANGE_THRESHOLD_SECONDS = 300  # 5 minutes into period 1
 
@@ -68,21 +69,10 @@ def derive_actual_starter(
 
 def _snapshot_starter(conn: sqlite3.Connection, g: sqlite3.Row, role: str) -> tuple[int, str] | None:
     """The latest parsed snapshot with a starter, captured before the start."""
-    start = datetime.fromisoformat(g["start_utc"].replace("Z", "+00:00"))
-    captured = [
-        (datetime.fromisoformat(r["captured_at"]), r["captured_at"], r["starter_player_id"])
-        for r in conn.execute(
-            "SELECT captured_at, starter_player_id FROM snapshots.lineup_snapshots "
-            "WHERE league = 'liiga' AND season = ? AND game_id = ? AND team_role = ? "
-            "AND parsed = 1 AND starter_player_id IS NOT NULL",
-            (g["season"], g["game_id"], role),
-        )
-    ]
-    before = [c for c in captured if c[0] < start]
-    if not before:
+    snapshot = pregame.latest_pregame_snapshot(conn, g, role)
+    if snapshot is None:
         return None
-    _, captured_at, player_id = max(before)
-    return player_id, captured_at
+    return snapshot["starter_player_id"], snapshot["captured_at"]
 
 
 def resolve_starter(
