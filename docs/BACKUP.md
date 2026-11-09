@@ -100,6 +100,7 @@ prompt (no elevation needed, since no principal is set):
 $repo = "C:\Users\Nikla_000\Documents\local-repo\hockey-edge"
 $action = New-ScheduledTaskAction -Execute "$repo\.venv\Scripts\pythonw.exe" -Argument "`"$repo\scripts\backup_data.py`"" -WorkingDirectory $repo
 $trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 11:05
+$trigger.StartBoundary = "2026-11-15T11:05:00"  # local time, no UTC offset, or the run shifts an hour at each DST change
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -WakeToRun -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 Register-ScheduledTask -TaskName "hockey-edge backup" -Action $action -Trigger $trigger -Settings $settings
 ```
