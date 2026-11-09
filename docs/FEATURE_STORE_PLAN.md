@@ -301,32 +301,52 @@ checked per season first (goalie ice time is 0 for all of 2026).
 One row per competitive penalty event, built from `game_penalty_events` +
 `game_rosters`:
 - **Player penalties:** team = the penalised player's roster team in that game.
-- **Team/bench penalties (`player_id = 0`):** take the game's direction. If that
-  game's player penalties are stored on the opposite team, swap; if they are stored
-  on the right team, keep.
-- **Player on both rosters of the game** (3 competitive penalties: 2016:7661,
-  2016:7665, 2025:399): the roster cannot decide, so take the game's direction, as
-  for a bench penalty. Accepted 2026-11-07.
-- **`team_source`** column: `roster`, `game_direction` or `unresolved` (player not in
-  the roster, or a game with only bench penalties).
+- **Team/bench penalties (`player_id = 0`):** take the roster team of
+  `sufferer_player_id`, the player who served the penalty (`sufferer_roster`).
+  **Changed 2026-11-09** from "take the game's direction": found in the F3b check,
+  bench penalties do not follow the game's player penalties. In 2016, 2023, 2025
+  and much of 2026 liiga.fi stores most of them under the other team (about 650
+  rows). A two-minute penalty that ends early at the second of a regulation goal
+  was taken by the team that did not score; on those, the sufferer rule is right
+  for all 335 bench penalties, the game's direction for 224.
+- **Game direction is the fallback:** a bench penalty without a sufferer on exactly
+  one roster, and a **player on both rosters of the game** (3 competitive
+  penalties: 2016:7661, 2016:7665, 2025:399, accepted 2026-11-07), take the game's
+  direction: if that game's roster-resolved player penalties are mostly stored on
+  the opposite team, swap; if mostly on the right team, keep.
+- **`team_source`** column: `roster`, `sufferer_roster`, `game_direction` or
+  `unresolved` (player not in the roster, or a fallback in a game with no
+  direction).
 - Also keep the stored `team_id` and a `was_swapped` flag, for auditing.
 - **Build report:** swapped share per season (should reproduce FEATURE_AUDIT item 7's
   table), the number of `unresolved` rows, and games with mixed direction (the audit
   saw eleven competitive games with one stray row).
+- **Goal-shortened check** (`penalty_report.goal_shortened`, also a test): every
+  two-minute penalty ended early by a regulation goal resolves to the team that did
+  not score. Overtime goals are left out: they end the game and every penalty.
 - Tests on real fixtures: the five penalty-direction games listed under "Fixtures"
   (2022:152 swapped, 2027:2701274 right, 2025:231 mixed, each with a bench penalty;
-  2025:399 a player on both rosters; 2022:35 bench-only, unresolved). 2018 game 1
-  and 2023 game 1 have no bench penalty; the swapped share on the real build covers
-  their seasons.
+  2025:399 a player on both rosters; 2022:35 bench-only), plus the goal-shortened
+  check on the fixture's 2025 and 2027 games. 2018 game 1 and 2023 game 1 have no
+  bench penalty; the swapped share on the real build covers their seasons.
 
 **F3a done 2026-11-07.** 46,687 rows. The swapped share reproduces FEATURE_AUDIT
 item 7 except 2016 (3,221 / 97 vs 3,223 / 99) and 2025 (3,464 / 4 vs 3,465 / 5):
 the audit's roster join counted each both-rosters penalty once kept and once
-swapped. 5 unresolved rows (2 by a player in neither roster, 2016:7943 and
-2016:7968; 3 bench penalties in games with no player penalty, 2016:37752 and
-2022:35). 9 games with mixed direction, each with one stray row; the audit's
+swapped. 9 games with mixed direction, each with one stray row; the audit's
 method finds 12 today, the three both-rosters games included. Report:
 `python -m hockey_edge.features.penalty_report`.
+
+**F3a bench fix 2026-11-09** (`FEATURE_VERSION` `f3a.1`): bench penalties by
+sufferer roster, as above. Unresolved rows 5 → 2 (both by one player in neither
+roster, 2016:7943 and 2016:7968; the three bench penalties of 2016:37752 and
+2022:35 now resolve by sufferer). By source: 46,685 resolved, of which 1,962 by
+sufferer roster and 85 by game direction. The per-season bench "wrong team" counts
+in the first F3a report (e.g. 6 of 194 in 2016, 0 of 159 in 2025) came from the old
+rule; under this one they are 180 of 194 in 2016, 161 of 164 in 2023, 157 of 159 in
+2025, 139 of 198 in 2026, and near all in the seasons whose player penalties are
+swapped. Goal-shortened check on the full data: 6,947 / 6,947 player, 326 / 326
+sufferer, 9 / 9 game direction.
 
 **STOP after F3a.** Report the build report above, row counts, test count.
 
@@ -388,13 +408,17 @@ building.
   games, one PLAYOFFS series, 2022:49294, one foreign friendly, the 2025 Jokerit
   qualification series and the 2025 PLAYOUT series, one 2025/2026 game with stripped
   team stats, one game from the 2025 `shot_events` gap, the 2027 games with
-  snapshots, and penalty events plus rosters for five penalty-direction games (F3a):
+  snapshots, penalty events and goal events for the ended competitive games of 2027
+  and of 2025 from 2025-01-22 to 2025-02-23 (the `shot_events` stretch) and for five
+  penalty-direction games (F3a), with the roster rows of every player a penalty
+  names (penalised player or sufferer; all the penalty-team rule reads):
   - 2022:152: stored swapped, with a bench penalty;
   - 2027:2701274: stored right, with a bench penalty;
   - 2025:231: mixed (one stray row among seven player penalties), with a bench
     penalty;
   - 2025:399: a penalised player listed on both rosters;
-  - 2022:35: a single bench penalty and nothing else, so unresolved.
+  - 2022:35: a single bench penalty and nothing else (resolves by sufferer since the
+    2026-11-09 fix).
 
   2018 game 1 and 2023 game 1 are not in the fixture: neither has a bench penalty,
   and the build accepts only whole seasons. The per-season swapped share on the

@@ -20,8 +20,13 @@ what phase F1 reads; later phases add their tables to SLICES.
   2025-01-22 to 2025-02-23, which runs into the start of the 2025 shot_events
   gap (game 393 on). Only the columns Corsi reads are kept; the rest are left
   out of the INSERT and load as NULL (about 6 MB otherwise).
-- F3a: hockey.game_penalty_events and hockey.game_rosters for five games
-  (PENALTY_GAMES), one per case of the penalty-team correction.
+- F3a/F3b: hockey.game_penalty_events and hockey.game_goal_events for five
+  games picked per case of the penalty-team correction (PENALTY_GAMES) and
+  for the ended competitive games of 2027 and of 2025 from 2025-01-22 to
+  2025-02-23 (EVENT_GAMES, the same 2025 stretch as shot_events). Rosters
+  for the same games, but only the rows of players a penalty names (the
+  penalised player or the sufferer): that is all the penalty-team rule
+  reads. Text and id columns nothing reads are left out.
 
 Season 2027 is live, so regenerating this changes the file. The tests pin
 individual games, not totals.
@@ -61,6 +66,24 @@ PENALTY_GAMES = ((2022, 152), (2027, 2701274), (2025, 231), (2025, 399), (2022, 
 PENALTY_WHERE = (
     "(season, game_id) IN (VALUES " + ", ".join(f"({s}, {g})" for s, g in PENALTY_GAMES) + ")"
 )
+EVENT_GAMES = (
+    "(game_id, season) IN (SELECT game_id, season FROM games "
+    f"WHERE ended = 1 AND phase IN {COMPETITIVE} AND (season = 2027 OR "
+    "(season = 2025 AND start_utc >= '2025-01-22' AND start_utc < '2025-02-24')))"
+)
+PENALTY_SLICE = f"({PENALTY_WHERE} OR {EVENT_GAMES})"
+ROSTER_SLICE = (
+    f"{PENALTY_SLICE} AND EXISTS (SELECT 1 FROM game_penalty_events p "
+    "WHERE p.season = game_rosters.season AND p.game_id = game_rosters.game_id "
+    "AND game_rosters.player_id IN (p.player_id, p.sufferer_player_id))"
+)
+ROSTER_COLUMNS_DROPPED = (
+    "id", "role", "role_code", "jersey", "captain", "alternate_captain", "rookie", "injured",
+    "suspended", "removed",
+)
+GOAL_COLUMNS_DROPPED = (
+    "id", "scorer_first_name", "scorer_last_name", "log_time_utc", "assistant_player_ids",
+)
 BATCH_ROWS = 500
 
 # (schema, table, source db, column overrides, WHERE, ORDER BY). An override of
@@ -77,8 +100,12 @@ SLICES = (
      "season = 2027", "id"),
     ("hockey", "shot_events", "hockey.db", dict.fromkeys(SHOT_COLUMNS_DROPPED),
      SHOT_GAMES, "id"),
-    ("hockey", "game_penalty_events", "hockey.db", {}, PENALTY_WHERE, "id"),
-    ("hockey", "game_rosters", "hockey.db", {}, PENALTY_WHERE, "id"),
+    ("hockey", "game_penalty_events", "hockey.db", dict.fromkeys(("id", "fault_name")),
+     PENALTY_SLICE, "season, game_id, event_id"),
+    ("hockey", "game_rosters", "hockey.db", dict.fromkeys(ROSTER_COLUMNS_DROPPED),
+     ROSTER_SLICE, "season, game_id, team_id, player_id"),
+    ("hockey", "game_goal_events", "hockey.db", dict.fromkeys(GOAL_COLUMNS_DROPPED),
+     PENALTY_SLICE, "season, game_id, event_id"),
 )
 
 

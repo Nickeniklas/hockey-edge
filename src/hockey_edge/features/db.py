@@ -258,11 +258,14 @@ CREATE TABLE features_shots (
 -- Derived per-game table (penalties.py, D1), read by features only through
 -- history.history_before. One row per penalty event of a competitive game.
 -- team_id is the penalised team, corrected: the penalised player's roster
--- team ('roster'), else the game's direction ('game_direction': the stored
--- team, or the other one when most of the game's roster-resolved penalties
--- are stored on the wrong team), used for team/bench penalties (player_id
--- 0) and players on both rosters. 'unresolved' (team_id NULL): a player in
--- neither roster, or a game whose direction is unknown. stored_team_id is
+-- team ('roster'). A team/bench penalty (player_id 0) takes the roster team
+-- of its sufferer_player_id, the player who served it ('sufferer_roster').
+-- Otherwise the game's direction ('game_direction': the stored team, or the
+-- other one when most of the game's roster-resolved player penalties are
+-- stored on the wrong team), for a bench penalty without a sufferer on
+-- exactly one roster and for players on both rosters. 'unresolved'
+-- (team_id NULL): a player in neither roster, or a game whose direction is
+-- unknown. stored_team_id is
 -- the team liiga.fi listed it under; was_swapped = team_id <> stored_team_id,
 -- NULL when unresolved. The other columns are copied from
 -- hockey.game_penalty_events.
@@ -272,7 +275,7 @@ CREATE TABLE penalty_events_resolved (
     event_id INTEGER NOT NULL,
     player_id INTEGER,
     team_id TEXT,
-    team_source TEXT NOT NULL CHECK (team_source IN ('roster', 'game_direction', 'unresolved')),
+    team_source TEXT NOT NULL CHECK (team_source IN ('roster', 'sufferer_roster', 'game_direction', 'unresolved')),
     stored_team_id TEXT NOT NULL,
     was_swapped INTEGER,
     sufferer_player_id INTEGER,
