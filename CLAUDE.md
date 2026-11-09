@@ -108,9 +108,9 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
   recovery finished 2026-09-25 (`docs/RECOVERY_BACKLOG.md`). The scheduled
   task "hockey-edge nightly sync" runs `scripts/nightly_sync.py` daily
   (backfill of the season-level endpoints, forced, with `--only-ended`, then
-  guarded `resync --days 7`). Its trigger is stored as 22:00+02:00, so it
-  fires at **22:00 local in winter time** (23:00 in summer time); the docs
-  and the healthchecks.io check say 23:00.
+  guarded `resync --days 7`) at **23:00 local**. Its trigger had a fixed
+  +02:00 offset, so it ran at 22:00 after DST ended; re-registered
+  2026-11-09 without an offset.
 - **Step 2, snapshot capture: live.** Task "hockey-edge snapshot job", every
   15 min 11:00–23:00 local, `WakeToRun` + `StartWhenAvailable`, runs
   `python -m hockey_edge.snapshot.job --once`. Lineups (`lineup_snapshots`)
@@ -323,9 +323,10 @@ Full gap lists: `docs/DATA_PIPELINE.md` "Known data gaps" and
   one. The job's own due/missed logic (`get_due_windows`,
   `mark_missed_windows`) makes a late wake-up correct; never replace it with
   an "is now ≈ the window time" check.
-- **The nightly-sync and backup triggers carry a fixed UTC offset** (22:00 and
-  10:05 at +02:00), so they move by an hour against local time at the DST
-  change; the snapshot job's trigger has no offset and stays at local time.
+- **A trigger `StartBoundary` with a UTC offset moves an hour against local
+  time at each DST change.** Write it without one (`2026-11-09T23:00:00`).
+  The snapshot job and nightly sync have none; the backup trigger still
+  carries one (10:05+02:00).
 - **Task registration is fiddly.** `Register-ScheduledTask -Xml` from
   PowerShell 7 needs the XML declaration stripped
   (`$xml -replace '<\?xml[^>]*\?>', ''`); the file must stay UTF-8 for
