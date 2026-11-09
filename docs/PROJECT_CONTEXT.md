@@ -1,8 +1,8 @@
 # PROJECT_CONTEXT — hockey-edge (Liiga + NHL prediction & edge tool)
 
 Paste-ready summary for Claude project memory. Crystallized 2026-07-06; rewritten
-2026-09-03, 2026-09-20, 2026-09-25, 2026-10-12, 2026-10-14, 2026-11-06; rewritten
-2026-11-07 after F2.
+2026-09-03, 2026-09-20, 2026-09-25, 2026-10-12, 2026-10-14, 2026-11-06, 2026-11-07;
+rewritten 2026-11-09 after F3a/F3b.
 
 Owned by the design chat. Emitted whole and replaced wholesale at session close. Not
 edited by Human or by Claude Code sessions.
@@ -47,8 +47,8 @@ Elo turns its rating gap into 1X2 probabilities with an **ordered-logit link** f
 per fold (decided 2026-10-12).
 
 Tests: `tests/`, stdlib `unittest`, no pytest — `python -m unittest discover -s tests`
-(232 as of 2026-11-07, after F2b). They assert against real saved data and make zero
-HTTP requests. The feature tests run on `fixtures/features/mini.sql` (2.7 MB),
+(256 as of 2026-11-09, after F3b; a full run takes ~3 min). They assert against real saved data and make zero
+HTTP requests. The feature tests run on `fixtures/features/mini.sql` (3.0 MB),
 regenerated from the live databases by `scripts/make_feature_fixture.py`; a nightly
 resync can renumber row ids in it with values unchanged, so tests never pin ids.
 
@@ -64,7 +64,7 @@ no autonomous git commits; no affiliate integrations.
 Composite `(season, game_id)` is the primary key everywhere. `game_id` is a per-season
 counter on liiga.fi's side and gets reused.
 
-## Where things stand (2026-11-07)
+## Where things stand (2026-11-09)
 
 Build order: 1 Liiga ingest → 2 snapshot capture → 3 NHL ingest (deferred) → 4 feature
 store → 5 Elo + walk-forward harness → 6 LightGBM + blend → 7 prediction log + local
@@ -83,23 +83,23 @@ dashboard.
   Nothing alerted then; since 2026-10-16 a shutdown or a missed window sends an
   email (see Pipeline safety). Any later shutdown on a game day is a gap of the same
   kind.
-- **Step 4 (feature store): F0, F1 and F2 done; F3 next.** Plan:
+- **Step 4 (feature store): F0, F1, F2, F3a and F3b done; F3c next, then F3d.** Plan:
   `docs/FEATURE_STORE_PLAN.md`. Audit: `docs/FEATURE_AUDIT.md`.
-  `python -m hockey_edge.features.build` rebuilds `data/features.db` in ~45 s (full
+  `python -m hockey_edge.features.build` rebuilds `data/features.db` in ~45–56 s (full
   rebuild every time; the build's own connection uses a 256 MB page cache).
-  `FEATURE_VERSION` is `f2b`. F1: game spine with the regulation 1X2 target and phase
+  `FEATURE_VERSION` is `f3b`. F1: game spine with the regulation 1X2 target and phase
   flags, `season_format`, `team_season`, home advantage, rest days, `benchmark_odds`
   (2022:49298 dropped from `feeds_ratings`). F2: starters, goalie quality, shot
-  attempts and team xG (summary below). F3 (penalty-team correction, special teams,
-  roster availability, motivation) is the last phase before step 6.
+  attempts and team xG. F3a: penalty team corrected; F3b: special teams (summaries
+  below). F3c (roster availability) and F3d (motivation) are left before step 6.
 - **Step 5 (Elo + walk-forward harness): done 2026-10-13.** Plan
   `docs/ELO_HARNESS_PLAN.md` (E0–E3), results `docs/ELO_RESULTS.md`. Summary below.
 - **Pipeline safety: done 2026-10-16** (`docs/PIPELINE_SAFETY_PLAN.md`). Weekly
   verified backup and healthchecks.io alerts, both live and confirmed working.
   Summary below.
 
-Repo: `origin/main` at `9390aab` (2026-11-07): F2a `d42a76f`, F2b `9390aab`. GitHub
-knowledge sync run 2026-11-07. The GitHub account is fine; the earlier suspension is
+Repo: F2a `d42a76f`, F2b `9390aab`, F3a `a41770b`, F3a bench fix `dbc70cf`, then the
+F3b commit (2026-11-09). The GitHub account is fine; the earlier suspension is
 long over.
 
 ## F2 in short
@@ -129,6 +129,28 @@ long over.
   windows hold only 2027 games while the others reach into 2026. Fades as 2027 fills.
 - `history_before(..., per_game=...)` serves derived per-game tables in `features.db`
   through the same date cut; only listed tables are allowed.
+
+## F3a/F3b in short
+
+- **`penalty_events_resolved`:** player penalties take the player's roster team;
+  **bench penalties (`player_id = 0`) take the roster team of the player who served
+  them (`sufferer_roster`)**; game direction only as a fallback (85 rows); a player
+  on both rosters takes the game's direction. 2 rows unresolved (one 2016 player in
+  neither roster). Proof: on penalties cut short by a non-overtime goal, every rule
+  is right in every case (player 6,947/6,947, sufferer 326/326, fallback 9/9). The
+  first F3a rule (bench = game direction) got 224 of 335 bench cases right and was
+  replaced in `dbc70cf`.
+- **Real goals** exclude `VT0`/`RL0` events and shootout attempts; then goal events
+  match the final score in every game except 2021:480.
+- **PP goals from liiga.fi's goal label (`YV`/`YV2`).** It matches stored
+  `powerplay_goals` exactly wherever one exists and agrees with penalty timing on
+  99.2–99.6% of goals per season.
+- **PP opportunities: coincident-adjusted, derived for every season.** Runs ~0.2 per
+  team-game below liiga.fi's stored count in every season (by design). League PP%
+  18.7–22.2%; 2025/2026 have no stored value to check against.
+- `game_team_special_teams` (per team-game counts) and `features_special_teams`
+  (10/25/40-game windows, raw counts plus PP%/PK% shrunk with k = 150 opportunities).
+  Seven games are NULL: the six zero-penalty games and the 2022:49298 tiebreak.
 
 ## Pipeline safety in short
 
@@ -241,15 +263,21 @@ The ones that shape design:
 
 ## Immediate next steps, in order
 
-1. Commit this file and `docs/FEATURE_STORE_PLAN.md`; push; sync.
-2. **F3** per `docs/FEATURE_STORE_PLAN.md`, in a fresh Claude Code session: F3a
-   (`penalty_events_resolved`), F3b (special teams), F3c (roster availability, after a
-   player ice-time pre-check), F3d (motivation, needs the 2026 relegation format).
-   Each has a STOP. Feature code only; no scheduled task runs it, so it can be built
-   in the live checkout.
-3. **Plan step 6 in the design chat** (LightGBM + blend), scored by the step 5 harness.
+1. **`CLAUDE.md` cleanup** (2026-11-09): it had grown to 1,067 lines, ~720 of them
+   dated Status logs, several contradicting the current sections (odds provider,
+   nightly sync scheduling, step 2 status). Old entries move verbatim to
+   `docs/STATUS_LOG.md`; `CLAUDE.md` keeps one current Status section, replaced each
+   session, not appended. Done before F3c, in its own Claude Code session.
+2. **F3c** (roster availability) in a fresh session: player ice-time pre-check first,
+   STOP. Then **F3d** (motivation; needs the 2025–26 relegation rule from Niklas).
+   Feature code only; safe to build during capture hours.
+3. **Clean-up before step 6:** a full regeneration of `fixtures/features/mini.sql`
+   (it has been appended to since F2 to avoid breaking pinned values), with the tests
+   re-pinned in one go.
+4. **Plan step 6 in the design chat** (LightGBM + blend), scored by the step 5 harness.
    Carried into it: pivoting the per-team F2/F3 tables, shrinkage for the shot
-   windows, and whether the build (~45 s and growing) needs to become incremental.
+   windows (none yet) and tuning `k` for goalie and special teams, and whether the
+   build (~45–56 s and growing) needs to become incremental.
 
 ## Deferred (explicitly, with reasons)
 
@@ -308,11 +336,12 @@ The ones that shape design:
   Niklas to confirm what the 2025–26 relegation rule actually was (the data has no
   PLAYOUT or QUALIFICATIONS games that season).
 - `homePreviousGames`/`awayPreviousGames` absent from `game_preview` — unresolved.
-- Goal-event surplus variance across seasons — unexplained; doesn't block anything.
-- Why the power-play derivation fits 2016 and 2023 less well — not investigated.
 - Review liiga.fi (and, if used, Veikkaus) ToS before anything public.
 
-Closed since the last version: F2 (starters, goalie quality, Corsi, team xG); the
+Closed 2026-11-09: the bench-penalty team (sufferer roster, proven against
+goal-shortened penalties); why 2016 and 2023 fit the PP derivation worse (the bench
+bug); the goal-event surplus (`VT0`/`RL0` are not goals); F3a and F3b.
+Closed 2026-11-07: F2 (starters, goalie quality, Corsi, team xG); the
 Corsi/Fenwick decision (D4: Corsi only); the early-change bug in the actual-starter
 logic; `CLAUDE.md` status entries for S1/S2, F2a and F2b. Earlier on 2026-11-06:
 off-machine backup and failure alerting, both confirmed in normal use.
