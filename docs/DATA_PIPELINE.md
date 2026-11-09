@@ -254,6 +254,18 @@ Details and per-game lists are in `docs/RECOVERY_BACKLOG.md`.
   power-play instances despite 3–14 penalties each.
 - A penalty `player_id` of 0 means no individual player, mostly the team
   penalty. It is not a player.
+- **Not every `game_goal_events` row is a goal** (found in F3b,
+  2026-11-09). A row whose `goal_types` holds `VT0` or `RL0` does not
+  change the score (`RL0` is a missed penalty shot), and rows in period 5+
+  of a shootout game (`end_type` SO) are shootout attempts. Leaving those
+  out, goal events match the final score in every game except 2021:480.
+  `features/team_penalties.REAL_GOAL` is the rule.
+- **2025/2026 power-play counts are derived only.** With the team-level
+  power-play columns stripped, F3b's opportunities and PP goals for those
+  seasons (3.13 and 2.90 opportunities per team-game, league PP% 22.2% and
+  21.3%) have no stored value to check against. The same rule matches the
+  stored values in 2015–2024 and 2027 (opportunities about 0.2 below
+  stored, PP goals exact).
 - **Goalie gaps in `game_goalie_period_stats`** (found in F2a, 2026-11-06):
   - **Goalie time on ice is 0 for every goalie in 2026 and only partly
     present in 2025** (958 of 1,090 competitive team-games have any). Shots, saves and

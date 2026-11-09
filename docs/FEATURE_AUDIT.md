@@ -273,6 +273,14 @@ WHERE g.phase = 'RUNKOSARJA' AND p.player_id > 0 GROUP BY 1;
 - Team penalties (`player_id = 0`, 2,031 rows in competitive games) have no
   roster to check against. They can take the orientation of the other
   penalties in the same game.
+  **[Corrected 2026-11-09, commit `dbc70cf`: wrong. Bench penalties do not
+  follow the game's other penalties. liiga.fi stores most of them under the
+  other team in 2016, 2023, 2025 and much of 2026, whatever the game's
+  player penalties do. They take the roster team of `sufferer_player_id`,
+  the player who served them; the game's direction is only a fallback (85
+  rows). Evidence: every two-minute penalty ended early by a regulation goal
+  was taken by the team that did not score; the sufferer rule is right for
+  all 335 such bench penalties, the game-direction rule for 224.]**
 
 Nothing built so far reads penalty teams, so no existing result is wrong.
 Special-teams features would have been inverted for about seven seasons.
@@ -301,6 +309,10 @@ team's own. It is the best of five variants tried and runs about 0.2 below the
 stored count on average. Counting advantage intervals from timing was worse
 (about −0.45). 2027 is pulled down by the seven opening-night games with a
 stored count of 0. Why 2016 and 2023 fit less well was not investigated.
+**[Resolved 2026-11-09: it was the bench penalties' team (see the correction
+above). With bench penalties on the sufferer's roster team, F3b's build fits
+2016 at 76% / 97% / 0.95 and 2023 at 77% / 98% / 0.96, like the other
+seasons.]**
 
 Applied to the stripped seasons it gives 3.14 opportunities per team-game in
 2025 and 2.92 in 2026, in line with 3.13 stored for 2024 and 2.98 for 2027.

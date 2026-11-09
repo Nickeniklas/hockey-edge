@@ -13,9 +13,10 @@ Build step 5 (Elo + walk-forward harness) is done 2026-10-13: plan
 `docs/ELO_HARNESS_PLAN.md`, results `docs/ELO_RESULTS.md`. Pipeline safety (backup,
 alerts) done 2026-10-16. F2 pre-check done 2026-11-06 (D4). F2 done 2026-11-07: F2a
 (starters, goalie) and F2b (shot quality). F3a (`penalty_events_resolved`) done
-2026-11-07. F3b is next, then F3c and F3d, for step 6.**
+2026-11-07 (bench fix 2026-11-09). F3b (special teams) done 2026-11-09. F3c is
+next, then F3d, for step 6.**
 
-Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3a (done) → F3b → F3c → F3d.** NHL stays
+Order: **F0 (done) → F1 (done) → step 5 (done) → F2a (done) → F2b (done) → F3a (done) → F3b (done) → F3c → F3d.** NHL stays
 deferred.
 
 ---
@@ -364,9 +365,19 @@ sufferer, 9 / 9 game direction.
   opportunities, raw counts stored.
 - The six zero-penalty competitive games listed in PROJECT_CONTEXT are skipped as
   missing (2022:49298 is not one of them; it is a short tiebreak).
-- Report: opportunities per team-game per season (should match FEATURE_AUDIT item 7:
-  ~3.1 in 2024–2025, ~2.9–3.0 in 2026–2027), league PP% per season, and any season
-  that breaks the pattern.
+- Report: opportunities per team-game per season, league PP% per season, and any
+  season that breaks the pattern. Compare derived with derived: the coincident-
+  adjusted count runs about 0.2 below stored in every season (FEATURE_AUDIT item 7),
+  so the expectation is about 2.9–3.1 derived for 2024–2027 (built: 2024 2.91,
+  2025 3.13, 2026 2.90, 2027 2.85), not the stored 3.13 (2024) and 2.96 (2027).
+  **[Corrected 2026-11-09: this line first said "~3.1 in 2024–2025, ~2.9–3.0 in
+  2026–2027", mixing stored figures for 2024/2027 with derived ones for 2025/2026.]**
+- **Built 2026-11-09:** PP goals use liiga.fi's own `YV`/`YV2` label. It matches the
+  stored `powerplay_goals` wherever one exists and agrees with the advantage derived
+  from penalty timing on 99.2–99.6% of goals per season. Goals exclude `VT0`/`RL0`
+  events and shootout attempts. k = 150 opportunities. Tables
+  `game_team_special_teams` and `features_special_teams`; report
+  `python -m hockey_edge.features.special_teams_report`.
 - Same test pattern (truncation, poison, a gap game treated as missing).
 
 **STOP after F3b.**

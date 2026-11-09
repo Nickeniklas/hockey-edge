@@ -77,13 +77,66 @@ packaging only. Any doc/docstring still showing `PYTHONPATH=src python -m
    store come first
 4. Feature store (see feature families in `docs/DATA_PIPELINE.md`)
    — **F0 and F1 done** (2026-10-12), **F2 done** (F2a and F2b,
-   2026-11-07), **F3a done** (2026-11-07, bench fix 2026-11-09); **F3b is
-   next**, per
+   2026-11-07), **F3a done** (2026-11-07, bench fix 2026-11-09), **F3b
+   done** (2026-11-09); **F3c is next**, per
    `docs/FEATURE_STORE_PLAN.md`
 5. Elo baseline + validation harness (benchmark: odds-implied log loss)
    — **done 2026-10-13**; `docs/ELO_RESULTS.md`, tagged `elo-1`
 6. LightGBM + blend
 7. Prediction log + local dashboard
+
+## Status (as of 2026-11-09, F3b)
+
+**Feature store phase F3b is done: special teams (Family 3), on
+`penalty_events_resolved`.** Plan `docs/FEATURE_STORE_PLAN.md`. F3c
+(roster availability) is next.
+
+- **Rebuild:** `python -m hockey_edge.features.build`, 56 s on 2026-11-09.
+  The new steps take about 9 s (windows 8.7 s, per-game table 0.4 s); the
+  rest is the existing steps running slower that day (goalie 22 s vs about
+  13 s on 11-07). `FEATURE_VERSION` is `f3b`.
+- **New tables:** `game_team_special_teams` (12,172: one row per team per
+  ended competitive game: PP and PK opportunities, PP goals for and
+  against, penalties taken and drawn) and `features_special_teams`
+  (12,938: one row per team per game, same shape as F2). Columns in
+  `features/db.py`; code in `features/team_penalties.py` (per-game table)
+  and `features/special_teams.py` (windows). `history_before`'s
+  `per_game=` allowlist has `game_team_special_teams`.
+- **Opportunities:** the coincident-adjusted count (FEATURE_AUDIT item 7)
+  for every season, never liiga.fi's stored `powerplay_instances`. A
+  counted penalty has a resolved team, 2 or 5 minutes and a non-zero
+  duration; unresolved rows are left out. **Derived runs about 0.2 below
+  stored in every season** (2024 2.91 vs 3.13 stored, 2027 2.85 vs 2.96),
+  so compare derived with derived: 2025 3.13, 2026 2.90.
+- **PP goals come from liiga.fi's own strength label (`YV`/`YV2`),
+  checked three ways:** it matches the stored `powerplay_goals` in 100% of
+  team-games where one is stored (2015–2024, 2027), and agrees with the
+  man advantage derived from resolved penalty timing on 99.2–99.6% of
+  goals per season. Before the bench fix that agreement was 97.7% at
+  worst.
+- **Real-goal rule:** a goal event with `VT0` or `RL0` in `goal_types` is
+  not a goal (the score does not change; `RL0` is a missed penalty shot),
+  and neither is a shootout attempt (`end_type` SO, period ≥ 5). With
+  that rule the goals match the final score in every game except 2021:480
+  (damaged at source).
+- **Missing, not zero:** the seven games with no penalty events (the six
+  RUNKOSARJA ones plus the 2022:49298 tiebreak) have NULL counts and are
+  skipped in the windows.
+- **Windows:** 10/25/40 games over the team's rating-feeding games this
+  season and last. PP% and PK% are shrunk toward the league PP% (from
+  earlier dates, same two seasons) with **k = 150 opportunities**, which
+  pulls a 40-game window about halfway. Raw counts are stored, so k can be
+  tuned in step 6. Penalties taken and drawn are per game, not shrunk.
+- **League PP% 18.7–22.2%**; 2025 is the highest (22.2%), with no stored
+  value to check it against. 2015 and 2021 run high on opportunities
+  (3.72) but stored is high too (4.04, 3.96). 2027's correlation with
+  stored is 0.80 (0.95–0.96 elsewhere): the opening-night games stored as
+  0. **2016 and 2023 now fit as well as the rest (76–77% exact):** their
+  worse fit in FEATURE_AUDIT item 7 was the bench-penalty team.
+- **Report:** `python -m hockey_edge.features.special_teams_report`.
+- Tests: 256. `tests/features/test_special_teams.py` pins two games by
+  hand (coincident penalties, a missed penalty shot), plus truncation,
+  poison and a gap game skipped rather than counted as zero.
 
 ## Status (as of 2026-11-07, F3a)
 

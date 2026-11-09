@@ -290,6 +290,81 @@ CREATE TABLE penalty_events_resolved (
     CHECK ((team_id IS NULL) = (team_source = 'unresolved'))
 );
 
+-- Derived per-game table (team_penalties.py), read by features only through
+-- history.history_before. One row per team per ended competitive game.
+-- Counted penalties: penalty_events_resolved rows with a team, 2 or 5
+-- minutes and a non-zero duration. penalties_taken / _drawn: the team's /
+-- the opponent's counted penalties. pp_opportunities: the opponent's counted
+-- penalties minus those starting at the same second as one of the team's
+-- own (coincident-adjusted); pk_opportunities: the same for the opponent.
+-- pp_goals / pp_goals_against: real goals (no VT0/RL0, no shootout) of the
+-- team / the opponent labelled YV or YV2 by liiga.fi. Every count is NULL
+-- when the game has no penalty event at all (missing, not 0).
+CREATE TABLE game_team_special_teams (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_id TEXT NOT NULL,
+    opponent_id TEXT NOT NULL,
+    pp_opportunities INTEGER,
+    pk_opportunities INTEGER,
+    pp_goals INTEGER,
+    pp_goals_against INTEGER,
+    penalties_taken INTEGER,
+    penalties_drawn INTEGER,
+    PRIMARY KEY (game_id, season, team_id)
+);
+CREATE INDEX idx_game_team_special_teams_team ON game_team_special_teams (team_id, season);
+
+-- Family 3, one row per team per competitive game. History is the team's
+-- earlier games that feed ratings and have penalty data, this season and
+-- last (games with NULL counts are skipped). league_pp_pct: power-play goals
+-- / opportunities over the league's such games, this season and last (NULL
+-- with none). Windows _10, _25, _40 take the team's most recent N such
+-- games; st_n_N is how many there were. pp_opp_N / pp_goals_N and pk_opp_N
+-- / pk_ga_N are the raw sums (times shorthanded, power-play goals against).
+-- pp_pct_N = (pp_goals + k * league_pp_pct) / (pp_opp + k), k =
+-- special_teams.PP_K; pk_pct_N = 1 - (pk_ga + k * league_pp_pct) / (pk_opp
+-- + k). Without a league rate both are the raw rates (NULL with no
+-- opportunities). penalties_taken_N / _drawn_N are counted penalties per
+-- game, NULL when the window is empty. st_n_season counts the window games
+-- from this season.
+CREATE TABLE features_special_teams (
+    game_id INTEGER NOT NULL,
+    season INTEGER NOT NULL,
+    team_role TEXT NOT NULL CHECK (team_role IN ('home', 'away')),
+    team_id TEXT NOT NULL,
+    league_pp_pct REAL,
+    st_n_season INTEGER NOT NULL,
+    st_n_10 INTEGER NOT NULL,
+    pp_opp_10 INTEGER NOT NULL,
+    pp_goals_10 INTEGER NOT NULL,
+    pp_pct_10 REAL,
+    pk_opp_10 INTEGER NOT NULL,
+    pk_ga_10 INTEGER NOT NULL,
+    pk_pct_10 REAL,
+    penalties_taken_10 REAL,
+    penalties_drawn_10 REAL,
+    st_n_25 INTEGER NOT NULL,
+    pp_opp_25 INTEGER NOT NULL,
+    pp_goals_25 INTEGER NOT NULL,
+    pp_pct_25 REAL,
+    pk_opp_25 INTEGER NOT NULL,
+    pk_ga_25 INTEGER NOT NULL,
+    pk_pct_25 REAL,
+    penalties_taken_25 REAL,
+    penalties_drawn_25 REAL,
+    st_n_40 INTEGER NOT NULL,
+    pp_opp_40 INTEGER NOT NULL,
+    pp_goals_40 INTEGER NOT NULL,
+    pp_pct_40 REAL,
+    pk_opp_40 INTEGER NOT NULL,
+    pk_ga_40 INTEGER NOT NULL,
+    pk_pct_40 REAL,
+    penalties_taken_40 REAL,
+    penalties_drawn_40 REAL,
+    PRIMARY KEY (game_id, season, team_role)
+);
+
 -- NOT a feature table. Evaluation benchmark only: the last parsed 1X2 row
 -- captured before start_utc, Pinnacle if it has one, else bet365.
 CREATE TABLE benchmark_odds (
@@ -332,6 +407,8 @@ TABLES = (
     "game_team_shots",
     "features_shots",
     "penalty_events_resolved",
+    "game_team_special_teams",
+    "features_special_teams",
     "benchmark_odds",
 )
 
