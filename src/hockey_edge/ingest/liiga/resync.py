@@ -86,6 +86,11 @@ GUARDED_TABLES = {
 # while the largest real drop seen across 44 live 2027 refetches was corsi
 # -12%. Backtest: refuses 3,767 of the 3,953 stripped reparses (the other
 # 186 had no stored values to lose) and none of the 44 live refetches.
+# The same floor also applies per team (added 2026-11-11): a game total
+# summed over both teams keeps about half its value when one team alone is
+# stripped to 0, so it could pass. Teams are matched on each table's stored
+# `team_id` (all three come from the response's team-period `teamId`); a
+# team whose old total is 0 is not checked, so grow-from-zero still passes.
 VALUE_FLOOR = 0.5
 VALUE_TOTALS = {
     "player_toi": ("game_player_period_stats", "time_on_ice_seconds"),
@@ -248,6 +253,19 @@ def game_stats_totals(conn: sqlite3.Connection, game_id: int, season: int) -> di
     }
 
 
+def game_stats_team_totals(conn: sqlite3.Connection, game_id: int, season: int) -> dict[str, dict[str, float]]:
+    """{total: {team_id: sum}} for VALUE_TOTALS, one entry per team_id stored
+    in that table for this game. A NULL sum counts as 0, as in
+    game_stats_totals."""
+    return {
+        name: dict(conn.execute(
+            f"SELECT team_id, COALESCE(SUM({column}), 0) FROM {table} WHERE game_id = ? AND season = ? GROUP BY team_id",
+            (game_id, season),
+        ).fetchall())
+        for name, (table, column) in VALUE_TOTALS.items()
+    }
+
+
 def _final_goals(conn: sqlite3.Connection, game_id: int, season: int) -> int | None:
     row = conn.execute(
         "SELECT home_goals + away_goals FROM games WHERE game_id = ? AND season = ?", (game_id, season)
@@ -271,6 +289,18 @@ def value_guard_violations(before: dict, after: dict, final_goals: int | None) -
     return violations
 
 
+def team_value_guard_violations(before: dict, after: dict) -> dict[str, tuple]:
+    """{'total[team_id]': (before, after)} for every team whose total was
+    above zero and fell below VALUE_FLOOR of it (a team missing after counts
+    as 0); empty if the reparse may stand. Takes game_stats_team_totals."""
+    return {
+        f"{name}[{team}]": (old, after[name].get(team, 0))
+        for name in VALUE_TOTALS
+        for team, old in before[name].items()
+        if old > 0 and after[name].get(team, 0) < VALUE_FLOOR * old
+    }
+
+
 def reparse_with_shrink_guard(conn: sqlite3.Connection, *, game_id: int, season: int, endpoint_name: str, do_upsert) -> str:
     """Runs do_upsert() (a zero-arg callable performing the real parse+upsert,
     which commits internally same as backfill.py's flow), then compares
@@ -283,12 +313,14 @@ def reparse_with_shrink_guard(conn: sqlite3.Connection, *, game_id: int, season:
     legitimate correction and must not trip this guard.
 
     For game_stats, a reparse that passes the row counts must also pass the
-    value guard (value_guard_violations); a refusal restores the same way.
+    value guard, per game (value_guard_violations) and per team
+    (team_value_guard_violations); a refusal restores the same way.
     Returns 'reparsed', 'shrink_guarded' or 'value_guarded'."""
     tables = GUARDED_TABLES[endpoint_name]
     before = {t: _count(conn, t, game_id, season) for t in tables}
     backups = {t: _snapshot_table(conn, t, game_id, season) for t in tables}
     totals_before = game_stats_totals(conn, game_id, season) if endpoint_name == "game_stats" else None
+    team_totals_before = game_stats_team_totals(conn, game_id, season) if endpoint_name == "game_stats" else None
 
     do_upsert()
 
@@ -310,6 +342,7 @@ def reparse_with_shrink_guard(conn: sqlite3.Connection, *, game_id: int, season:
         dropped = value_guard_violations(
             totals_before, game_stats_totals(conn, game_id, season), _final_goals(conn, game_id, season),
         )
+        dropped |= team_value_guard_violations(team_totals_before, game_stats_team_totals(conn, game_id, season))
         if dropped:
             for t in tables:
                 _restore_table(conn, t, game_id, season, backups[t])

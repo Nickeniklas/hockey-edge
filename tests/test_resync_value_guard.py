@@ -11,6 +11,9 @@ Fixtures are real game_stats responses:
 - season 2027 game 2701301: the first post-game fetch (2026-09-16) and the
   live correction liiga.fi served a day later (player time on ice -5.3%,
   corsi -8%), which must still be accepted.
+
+The per-team tests strip one team of the 2027 correction the way liiga.fi
+strips history (values zeroed, rows kept): see strip_team.
 """
 
 import json
@@ -34,6 +37,22 @@ ORIGINAL_2024 = load("2024_game2_original.json")
 STRIPPED_2024 = load("2024_game2_refetch_stripped.json")
 FIRST_2027 = load("2027_game2701301_first.json")
 CORRECTED_2027 = load("2027_game2701301_corrected.json")
+
+
+def strip_team(data: dict, side: str, player_fields=(), goalie_fields=()) -> dict:
+    """A copy of a real game_stats response with the named period-stat
+    fields of one side ('homeTeam' / 'awayTeam') set to 0, rows kept."""
+    data = json.loads(json.dumps(data))
+    for team_period in data[side]:
+        for key, fields in (("periodPlayerStats", player_fields), ("goaliePeriodStats", goalie_fields)):
+            for row in team_period.get(key) or []:
+                for field in fields:
+                    row["period"][field] = 0
+    return data
+
+
+JUKURIT = "292293444:jukurit"  # away in 2027:2701301
+SKATER_FIELDS = ("timeofice", "corsiFor", "faceoffsTotal")
 
 # Real games rows, copied from data/hockey.db.
 GAMES = {
@@ -115,6 +134,75 @@ class ValueGuardTest(unittest.TestCase):
         with mock.patch.object(resync.raw_cache, "fetch", return_value=fetched), self.assertLogs("hockey_edge.ingest.resync", "WARNING"):
             outcome = resync.resync_game_endpoint(self.conn, 2024, 2, "game_stats", min_hours_since_fetch=12)
         self.assertEqual(outcome, "value_guarded")
+
+    def test_one_team_stripped_is_refused_per_team_only(self):
+        # Jukurit's skater time on ice, corsi and faceoffs zeroed: the game
+        # totals keep 50.1%, 77% and 50%, so the per-game rule alone passes.
+        self._store(CORRECTED_2027, 2701301, 2027)
+        before = self._rows(2701301, 2027)
+        totals_before = resync.game_stats_totals(self.conn, 2701301, 2027)
+        stripped = strip_team(CORRECTED_2027, "awayTeam", player_fields=SKATER_FIELDS)
+
+        self._store(stripped, 2701301, 2027)
+        totals_after = resync.game_stats_totals(self.conn, 2701301, 2027)
+        self.assertEqual(totals_after["player_toi"], 17776)  # of 35479
+        self.assertEqual(resync.value_guard_violations(totals_before, totals_after, 5), {})
+        self._store(CORRECTED_2027, 2701301, 2027)
+
+        with self.assertLogs("hockey_edge.ingest.resync", "WARNING") as logs:
+            outcome = self._reparse(stripped, 2701301, 2027)
+        self.assertEqual(outcome, "value_guarded")
+        self.assertEqual(self._rows(2701301, 2027), before)  # row-for-row, ids included
+        for name in ("player_toi", "player_corsi_for", "player_faceoffs"):
+            self.assertIn(f"{name}[{JUKURIT}]", logs.output[0])
+        self.assertNotIn("651304385:tps", logs.output[0])
+
+    def test_real_live_correction_passes_per_team(self):
+        # TPS's skater time on ice fell 10% (19768 -> 17776) and its corsi
+        # 10% in the real correction; both stay above the per-team floor.
+        self._store(FIRST_2027, 2701301, 2027)
+        before = resync.game_stats_team_totals(self.conn, 2701301, 2027)
+        self.assertEqual(self._reparse(CORRECTED_2027, 2701301, 2027), "reparsed")
+        after = resync.game_stats_team_totals(self.conn, 2701301, 2027)
+        self.assertEqual(resync.team_value_guard_violations(before, after), {})
+        self.assertEqual((before["player_toi"]["651304385:tps"], after["player_toi"]["651304385:tps"]), (19768, 17776))
+        self.assertEqual((before["player_corsi_for"]["651304385:tps"], after["player_corsi_for"]["651304385:tps"]), (243, 218))
+
+    def test_team_growing_from_zero_is_applied(self):
+        # Stored with Jukurit's goalie time on ice at 0 (as all of 2026 is
+        # served), then the full values arrive: grow-from-zero must pass.
+        self._store(strip_team(CORRECTED_2027, "awayTeam", goalie_fields=("timeofice",)), 2701301, 2027)
+        before = resync.game_stats_team_totals(self.conn, 2701301, 2027)
+        self.assertEqual(before["goalie_toi"][JUKURIT], 0)
+        self.assertEqual(self._reparse(CORRECTED_2027, 2701301, 2027), "reparsed")
+        self.assertEqual(resync.game_stats_team_totals(self.conn, 2701301, 2027)["goalie_toi"][JUKURIT], 3600)
+
+
+class TeamViolationsTest(unittest.TestCase):
+    def _totals(self, **overrides) -> dict:
+        totals = {name: {"a": 100, "b": 100} for name in resync.VALUE_TOTALS}
+        totals.update(overrides)
+        return totals
+
+    def test_floor_is_half_per_team(self):
+        self.assertEqual(resync.team_value_guard_violations(self._totals(), self._totals(player_toi={"a": 50, "b": 100})), {})
+        self.assertEqual(
+            resync.team_value_guard_violations(self._totals(), self._totals(player_toi={"a": 49, "b": 100})),
+            {"player_toi[a]": (100, 49)},
+        )
+
+    def test_team_missing_after_counts_as_zero(self):
+        self.assertEqual(
+            resync.team_value_guard_violations(self._totals(), self._totals(goalie_toi={"b": 100})),
+            {"goalie_toi[a]": (100, 0)},
+        )
+
+    def test_zero_before_is_not_checked(self):
+        before = self._totals(goalie_toi={"a": 0, "b": 0})
+        self.assertEqual(resync.team_value_guard_violations(before, self._totals(goalie_toi={})), {})
+
+    def test_new_team_is_not_checked(self):
+        self.assertEqual(resync.team_value_guard_violations(self._totals(), self._totals(player_toi={"a": 100, "b": 100, "c": 0})), {})
 
 
 class ViolationsTest(unittest.TestCase):

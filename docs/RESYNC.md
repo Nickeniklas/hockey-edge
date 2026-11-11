@@ -187,6 +187,21 @@ guard refuses 3,767 of the 3,953 stripped reparses from 2026-09-25 (the
 other 186 had no stored values to lose), none of the 44 live refetches, and
 the 2024:2 pair. Tests: `tests/test_resync_value_guard.py`.
 
+**Per-team value floor (added 2026-11-11).** The totals above are summed over
+both teams, so one team stripped to 0 leaves about half the game total and
+could pass. The same 50% floor now also applies to each team's total
+(`game_stats_team_totals`, `team_value_guard_violations`), matched on the
+`team_id` each of the three tables stores (all from the response's
+team-period `teamId`). A team whose old total is 0 is not checked, so
+grow-from-zero (2026 goalie time on ice) still passes. Same outcome
+(`value_guarded`), same exact restore; the log names the team as
+`total[team_id]`. Backtest (every stored `game_stats` response pair replayed
+through a temp DB, zero HTTP): refuses none of the 106 live 2027
+corrections the per-game guard accepts (largest per-team drop: power-play
+instances 4 → 3), exactly the same 5,307 of 5,347 historical 2015–2024
+pairs the per-game guard refuses, and none of 6,724 stored games compared
+with themselves.
+
 **The guard is all-or-nothing per game** (noted 2026-09-24). One shrinking
 table reverts *every* guarded table for that game. So a refetch that
 recovers `game_penalty_events` 0→9 while carrying one fewer `game_rosters`

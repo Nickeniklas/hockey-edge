@@ -1,5 +1,80 @@
 # STATUS_LOG — dated status entries moved out of CLAUDE.md on 2026-11-09, verbatim, newest first; history only, CLAUDE.md "Current status" is the live one.
 
+## Current status (2026-11-09, CLAUDE.md before the per-team value guard)
+
+Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
+`docs/STATUS_LOG.md`.
+
+- **Step 1, Liiga ingest: done**, 2015–2027 in `data/hockey.db`. Historical
+  recovery finished 2026-09-25 (`docs/RECOVERY_BACKLOG.md`). The scheduled
+  task "hockey-edge nightly sync" runs `scripts/nightly_sync.py` daily
+  (backfill of the season-level endpoints, forced, with `--only-ended`, then
+  guarded `resync --days 7`) at 23:00 local.
+- **Step 2, snapshot capture: live.** Task "hockey-edge snapshot job", every
+  15 min 11:00–23:00 local, `WakeToRun` + `StartWhenAvailable`, runs
+  `python -m hockey_edge.snapshot.job --once`. Lineups (`lineup_snapshots`)
+  since 2026-09-02, odds (`odds_snapshots`, OddsPapi pinnacle + bet365) since
+  2026-09-17. Starter inference (`line == 1`) is about 98% right. **No
+  capture 2026-10-08 to 10-10 (PC shut down): those 13 games have no
+  confirmed lineup and no usable closing line, permanently.** **On
+  2026-10-17 the mid and closing windows were missed for all 7 games
+  (lineups and odds alike): no confirmed lineup and no closing line for
+  them either, permanently.**
+- **Step 3, NHL ingest: deferred.**
+- **Step 4, feature store: done 2026-11-09 (F0–F3d), `FEATURE_VERSION` is
+  `f3d`.** Plan `docs/FEATURE_STORE_PLAN.md`, audit `docs/FEATURE_AUDIT.md`.
+  Rebuild about 45 s (up to 74 s under machine load). Table meanings are in
+  the DDL comments in `features/db.py`.
+  - F1: `game_spine` (regulation 1X2 target, phase flags), `season_format`,
+    `team_season`, `features_home`, `features_schedule`, `benchmark_odds`,
+    `build_meta`.
+  - F2a: `game_goalies`, `game_starters`, `features_goalie` (save% over
+    500/1,500 shots shrunk with k = 1,000; GSAx-style mean over 20 games).
+  - F2b: `game_team_shots`, `features_shots` (Corsi and team xG, 10/25/40-game
+    windows, no shrinkage by design; window game counts stored).
+  - F3a: `penalty_events_resolved` (penalised team from rosters, bench fix
+    `f3a.1`).
+  - F3b: `game_team_special_teams`, `features_special_teams` (PP%/PK% shrunk
+    with k = 150 opportunities; raw counts stored).
+  - F3c: `game_skater_toi` (who dressed, with ice time and F/D; 228,790
+    rows), `features_availability` (share of the last 5/10 games' ice
+    time missing from the resolved lineup, this season only; lineup from
+    `lineups.resolve_lineup`: snapshot, else actual, else the last known
+    lineup). Report `python -m hockey_edge.features.availability_report`.
+    In 2027 the confirmed lineup equals who played in all 254 team-games
+    with both.
+    2016-01-05 is a named ice-time gap day (`lineups.GAP_DATES`); a NULL
+    roster `role` takes `pos` from `role_code`'s letter (H/KH → F, P → D).
+  - F3d: `features_motivation` (RUNKOSARJA only, NULL otherwise): table
+    before the game (3/2/1/0 points, then goal difference), games
+    remaining on the nominal schedule, signed gaps to the playoff and
+    relegation lines, conservative clinched / eliminated / safe / doomed
+    flags. Lines in `season_format.playoff_spots` / `relegation_spots`
+    (hand-curated): 10 spots 2015–2024 (2020's planned 10 although
+    cancelled), 12 from 2025; relegation zone 2025 bottom 2 (playout),
+    2026 none, 2027 bottom 3 direct (2027 format confirmed from MTV
+    Uutiset's season preview, 2026-08-31). Report
+    `python -m hockey_edge.features.motivation_report`.
+  - F2/F3 feature tables are **one row per team per game**; F1's are
+    home/away columns. Step 6 pivots them.
+  - Before step 6: one full regeneration of `fixtures/features/mini.sql`
+    with the tests re-pinned (it has F3c slices appended by
+    `scripts/make_feature_fixture.py --append-f3c`).
+- **Step 5, Elo + harness: done 2026-10-13.** Plan `docs/ELO_HARNESS_PLAN.md`,
+  results `docs/ELO_RESULTS.md`. Elo beats base rates by 0.0316 ± 0.0039 log
+  loss on pooled 2018–2026 (4,075 games), a goal-difference rating by only
+  0.0028 ± 0.0014; Pinnacle's closing line beats Elo by 0.049 ± 0.020 on 49
+  games. `elo-1` in `models/versions.py` (K 10, HFA 0, r 0.5, margin
+  multiplier on, `s_ot` 0.15).
+- **Steps 6–7: not started.** Step 6 is planned in the design chat first.
+- **Pipeline safety: done 2026-10-16** (`docs/PIPELINE_SAFETY_PLAN.md`).
+  Task "hockey-edge backup" runs `scripts/backup_data.py` weekly on Sunday
+  at 11:05 local, `StartWhenAvailable` + `WakeToRun`; keeps 4 verified zips in
+  `D:\Users\Nikla_000\DATA\hockey-edge-backups`. Restore: `docs/BACKUP.md`.
+  healthchecks.io alerts via `src/hockey_edge/ops/heartbeat.py`: checks
+  `snapshot-job`, `missed-windows`, `nightly-sync`, `backup`.
+- **Tests: 292** (5–8 min; F3d added 14), `python -m unittest discover -s tests`.
+
 ## Current status (2026-11-09, CLAUDE.md before F3d)
 
 Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:

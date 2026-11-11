@@ -98,9 +98,10 @@ runs; **not the prediction log**, which is step 7).
 6. LightGBM + blend
 7. Prediction log + local dashboard
 
-## Current status (2026-11-09)
+## Current status (2026-11-11)
 
-Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
+Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand", except that its
+"known hole in the `game_stats` value guard" is now closed (below). History:
 `docs/STATUS_LOG.md`.
 
 - **Step 1, Liiga ingest: done**, 2015–2027 in `data/hockey.db`. Historical
@@ -108,6 +109,18 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
   task "hockey-edge nightly sync" runs `scripts/nightly_sync.py` daily
   (backfill of the season-level endpoints, forced, with `--only-ended`, then
   guarded `resync --days 7`) at 23:00 local.
+- **Per-team `game_stats` value guard: done 2026-11-11.** `resync.py` now
+  also refuses a reparse (`value_guarded`, rows restored exactly) when any
+  team's total falls below 50% of that team's old value, on the stored
+  `team_id`; a team with old total 0 is not checked. The per-game and goal
+  checks are unchanged. Backtest, replaying every stored `game_stats`
+  response pair (zero HTTP): of 106 live 2027 corrections the per-game guard
+  accepted (49 of them by 2026-09-25, the era of the original 44), the
+  per-team check refuses **none**; the largest per-team drop was power-play
+  instances 4 → 3 (TPS, 2027:2701339). On the 5,347 historical 2015–2024
+  pairs it refuses exactly the 5,307 the per-game guard already refuses.
+  History against itself (6,724 games): zero refusals. Backup taken first
+  (`hockey-edge-data-2026-11-11.zip`, verified). Details `docs/RESYNC.md` 4c.
 - **Step 2, snapshot capture: live.** Task "hockey-edge snapshot job", every
   15 min 11:00–23:00 local, `WakeToRun` + `StartWhenAvailable`, runs
   `python -m hockey_edge.snapshot.job --once`. Lineups (`lineup_snapshots`)
@@ -171,7 +184,7 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand". History:
   `D:\Users\Nikla_000\DATA\hockey-edge-backups`. Restore: `docs/BACKUP.md`.
   healthchecks.io alerts via `src/hockey_edge/ops/heartbeat.py`: checks
   `snapshot-job`, `missed-windows`, `nightly-sync`, `backup`.
-- **Tests: 292** (5–8 min; F3d added 14), `python -m unittest discover -s tests`.
+- **Tests: 299** (5–8 min; the per-team guard added 7), `python -m unittest discover -s tests`.
 
 Commands (repo root, venv active):
 
@@ -217,7 +230,11 @@ scheduled tasks; check one with
 - **Refetch only through `resync.py`.** Its no-shrink guard refuses a reparse
   that would leave any per-game table with fewer rows (per table, not per
   team), and its value guard refuses a `game_stats` reparse whose totals
-  collapse (`value_guarded`). The raw response is saved either way. **The
+  collapse (`value_guarded`): any total below 50% of its old value, for the
+  game **and for each team** (on the stored `team_id`; a team whose old
+  total is 0 is not checked, so grow-from-zero passes). The per-team check
+  closes the hole where one team stripped to 0 left about half the game
+  total. The raw response is saved either way. **The
   row-count guard cannot see stripped values**, and the value guard covers
   `game_stats` only, so don't bulk-refetch `shotmap` or `game_detail`
   history. **`backfill.py --force` has no guard at all.**
