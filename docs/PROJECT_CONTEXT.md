@@ -2,7 +2,8 @@
 
 Paste-ready summary for Claude project memory. Crystallized 2026-07-06; rewritten
 2026-09-03, 2026-09-20, 2026-09-25, 2026-10-12, 2026-10-14, 2026-11-06, 2026-11-07,
-2026-11-09 after F3a/F3b; rewritten 2026-11-09 after F3c/F3d (build step 4 done).
+2026-11-09 after F3a/F3b, 2026-11-09 after F3c/F3d (build step 4 done); rewritten
+2026-11-12 after the per-team resync guard and the fixture clean-up.
 
 Owned by the design chat. Emitted whole and replaced wholesale at session close. Not
 edited by Human or by Claude Code sessions.
@@ -47,13 +48,13 @@ Elo turns its rating gap into 1X2 probabilities with an **ordered-logit link** f
 per fold (decided 2026-10-12).
 
 Tests: `tests/`, stdlib `unittest`, no pytest — `python -m unittest discover -s tests`
-(292 as of 2026-11-09, after F3d; a full run takes 5–8 min, up from ~3 min before
-F3c). They assert against real saved data and make zero HTTP requests. The feature
-tests run on `fixtures/features/mini.sql` (5.5 MB since F3c), regenerated from the
-live databases by `scripts/make_feature_fixture.py`; a nightly resync can renumber row
-ids in it with values unchanged, so tests never pin ids. The full suite is
-memory-hungry: on 2026-11-09 a run hit `MemoryError` while the machine was loaded with
-other apps, then passed cleanly on a rerun.
+(299 as of 2026-11-12; a full run takes about 3 min). They assert against real saved
+data and make zero HTTP requests. The feature tests run on
+`fixtures/features/mini.sql` (5.0 MB), written in one pass from the live databases by
+`scripts/make_feature_fixture.py`; a nightly resync can renumber row ids in it with
+values unchanged, so tests never pin ids. The feature tests load and build the fixture
+once per run (read-only, shared), and the test packages set `OPENBLAS_NUM_THREADS=1`.
+Because 2027 is live, each regeneration moves the 2027 counts the tests pin.
 
 ## Hard invariants
 
@@ -68,7 +69,7 @@ affiliate integrations.
 Composite `(season, game_id)` is the primary key everywhere. `game_id` is a per-season
 counter on liiga.fi's side and gets reused.
 
-## Where things stand (2026-11-09)
+## Where things stand (2026-11-12)
 
 Build order: 1 Liiga ingest → 2 snapshot capture → 3 NHL ingest (deferred) → 4 feature
 store → 5 Elo + walk-forward harness → 6 LightGBM + blend → 7 prediction log + local
@@ -77,7 +78,8 @@ dashboard.
 - **Step 1 (Liiga ingest): done** for 2015–2027. `data/hockey.db` is kept current by
   `scripts/nightly_sync.py` (daily 23:00: forced season-level endpoints with
   `--only-ended`, then guarded `resync --days 7`). Historical recovery done
-  2026-09-25.
+  2026-09-25. **The `game_stats` value guard checks per team as well as per game
+  since 2026-11-11** (`ba15eaa`; summary under the liiga.fi finding below).
 - **Step 2 (snapshot capture): live.** `data/snapshots.db`, Windows scheduled task
   every 15 min 11:00–23:00 with `WakeToRun`. Lineups since 2026-09-02, odds since
   2026-09-17. Closing windows land ~T-15. Starter inference (`line == 1`) is about
@@ -101,11 +103,15 @@ dashboard.
 - **Pipeline safety: done 2026-10-16** (`docs/PIPELINE_SAFETY_PLAN.md`). Weekly
   verified backup and healthchecks.io alerts, both live and confirmed working.
   Summary below. Task triggers fixed for DST on 2026-11-09 (`b17329e`).
-- **Steps 6–7: not started.** Step 6 is planned in the design chat first.
+- **Fixture clean-up: done 2026-11-12** (`05f8c68`). One-pass `mini.sql`, tests
+  re-pinned, suite 340 → ~170 s. `features.db` on real data is row-for-row identical
+  before and after.
+- **Steps 6–7: not started.** Step 6 is planned in a new design chat first.
 
 Repo: F2a `d42a76f`, F2b `9390aab`, F3a `a41770b`, F3a bench fix `dbc70cf`, F3b
 `c17f3f7`, `CLAUDE.md` cleanup `7a5eb7b`, DST trigger fix `b17329e`, F3c `477b761`,
-F3d `e5b9aa6`. The GitHub account is fine; the earlier suspension is long over.
+F3d `e5b9aa6`, per-team guard `ba15eaa`, fixture clean-up `05f8c68`. The GitHub
+account is fine; the earlier suspension is long over.
 
 ## F2 in short
 
@@ -118,7 +124,7 @@ F3d `e5b9aa6`. The GitHub account is fine; the earlier suspension is long over.
   training only), else `unknown` → the team's expected-goalie fallback (start-weighted
   mix of its last 10 known starters, this season or last). The fallback is stored on
   every row so it can be scored. `starter_source` is audit only, never a model input.
-  2027 skew: 1 mismatch in 250 team-games.
+  2027 skew: 1 mismatch in 263 team-games (to 2026-11-11).
 - **Goalie quality:** save% over 500- and 1,500-shot windows, shrunk toward the league
   rate (k = 1,000 shots); GSAx-style mean over the last 20 whole games with opponent
   xG (from 2021). "Whole game" = the only goalie of his team who faced a shot.
@@ -174,8 +180,8 @@ F3d `e5b9aa6`. The GitHub account is fine; the earlier suspension is long over.
   (`features/pregame.py`; `game_starters` came out row-for-row identical): pre-game
   snapshot, else actual (stats rows; training only), else the last known lineup this
   season. `lineup_source` is audit only. **2027: the confirmed lineup equals who played
-  in all 254 team-games with both.** A missed lineup window costs a mean 0.029 in
-  `missing_share_10` (max 0.166).
+  in all 268 team-games with both (to 2026-11-11).** A missed lineup window costs a
+  mean 0.029 in `missing_share_10` (max 0.166).
 - **`features_availability`:** share of the team's ice time over its last 5/10 games
   (with ice time, **this season only**, NULL at a team's first game) held by skaters
   absent from the resolved lineup; also forward and defence splits, window game counts,
@@ -259,11 +265,18 @@ archive. Consequences:
   (`scripts/recovery_report.py --diff` section 8). A row count proves nothing.
 - The value guard covers `game_stats` only. `game_detail` and `shotmap` still rely on
   the row-count guard, so don't bulk-refetch `shotmap` history.
-- **Known hole in the `game_stats` value guard:** its totals (including `player_toi`)
-  are summed over both teams of a game, refused below 50% of the old value. If one
-  team's values are stripped to 0, about half the total remains, right at the floor,
-  so the reparse can pass. The nightly `resync --days 7` refetches live 2027 games
-  through this guard. Fix is next step 1.
+- **The `game_stats` value guard is per game and per team (since 2026-11-11).** The
+  per-game totals alone let one stripped team through (about half the total remains,
+  right at the 50% floor). Now a reparse is also refused when any team's total falls
+  below 50% of that team's old value; a team whose old total is 0 is not checked, so
+  grow-from-zero still passes. Backtest on every stored response pair: none of the 106
+  accepted live 2027 corrections is refused (largest per-team drop: power-play
+  instances 4 → 3, then Corsi −17%); on 2015–2024 it refuses exactly the 5,307 pairs
+  the per-game guard already refuses; history against itself, zero. Details
+  `docs/RESYNC.md` 4c.
+- The name part of `team_id` is not fully stable across endpoints (`växjö lakers` vs
+  `växjö lakers, swe`). A spelling change on refetch would be refused by the per-team
+  guard, which is the safe direction.
 
 ## Data rules the feature store must respect
 
@@ -323,21 +336,15 @@ The ones that shape design:
 
 ## Immediate next steps, in order
 
-1. **Per-team `game_stats` value guard** (short Claude Code session; ingest code, so
-   backup first and a backtest against real corrections, as the original guard had).
-   Check each guarded total per team as well as per game, so one team stripped to 0 is
-   refused. Matters now because the nightly resync refetches live games and ice time
-   is a model input.
-2. **Clean-up before step 6:** a full regeneration of `fixtures/features/mini.sql`
-   (appended to since F2, 5.5 MB, with F3c slices cut at 2026-11-01), with the tests
-   re-pinned in one go. Aim to bring the suite back toward ~3 min and lower its memory
-   use.
-3. **Plan step 6 in the design chat** (LightGBM + blend), scored by the step 5 harness.
-   Carried into it: pivoting the per-team F2/F3 tables; shrinkage for the shot windows
-   (none yet); tuning `k` for goalie and special teams; how to use window game counts
-   early in a season (availability is NULL at a team's first game, and short after);
+1. **Plan step 6 in a new design chat** (LightGBM + blend), scored by the step 5
+   harness. Everything before it is done. Carried into it: pivoting the per-team
+   F2/F3 tables; shrinkage for the shot windows (none yet); tuning `k` for goalie and
+   special teams; how to use window game counts early in a season (availability is
+   NULL at a team's first game, and short after);
    whether motivation features earn their place beyond the last weeks of a season;
-   whether the build (~45 s) needs to become incremental.
+   whether the build (~45 s) needs to become incremental; `lightgbm` as a new
+   dependency. Outside the tests, numpy and scipy still reserve about 1 GB of
+   committed memory at import (one BLAS buffer per thread, 16 threads).
 
 ## Deferred (explicitly, with reasons)
 
@@ -357,7 +364,7 @@ The ones that shape design:
 ## Gotchas that cost real time
 
 - **The no-shrink guard counts rows; it cannot see stripped values.** Backed by the
-  value guard for `game_stats` only (with the per-team hole above). All-or-nothing per
+  value guard for `game_stats` only (per game and per team). All-or-nothing per
   game. `--salvage-from-raw` is the one approved exception.
 - **A plain "no total may drop" rule is wrong.** Real live corrections drop TOI by up to
   5.3%, corsi by up to 12%, player goals by 1 toward the final score.
@@ -404,6 +411,9 @@ The ones that shape design:
 - 2027 playoff spots are confirmed by the source but not yet by the data; the build
   check covers it once the 2027 playoffs are listed.
 
+Closed 2026-11-12: the per-team hole in the `game_stats` value guard; the fixture
+clean-up (one-pass generator, shared test build); the suite's memory use (BLAS
+buffers, not the fixture).
 Closed 2026-11-09 (after F3b): F3c and F3d, so build step 4 is done; the 2026
 relegation rule (none); the 2027 format (12 playoff spots, bottom 3 relegated
 directly); the 2026-10-17 capture gap (PC off, alerts fired); the Espoo Blues /
@@ -428,10 +438,12 @@ building each season's team list from games already played made predictions depe
 on future games, and the truncation test caught it. F3c added one more caught in
 time: a table called `game_rosters` that sounds like "who played" but is the whole
 squad, found only because the pre-check compared it with the stats rows and the
-snapshots.
+snapshots. And the fixture clean-up showed the same thing from the other side: the
+`MemoryError` was assumed to come from the 5.5 MB fixture, and measuring showed the
+fixture peaks at 45 MB while numpy and scipy reserve about 1 GB at import.
 
 Habits worth keeping: check a value against a second source before trusting it;
 backtest a guard against real corrections before relying on it; when something looks
 like bad data, test it before excluding it; give every point-in-time computation a
-truncation and a poison test; and run a read-only pre-check before building on a
-table nobody has measured yet.
+truncation and a poison test; run a read-only pre-check before building on a
+table nobody has measured yet; and measure before fixing.
