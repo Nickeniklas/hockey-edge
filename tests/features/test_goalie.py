@@ -7,7 +7,6 @@ Run: python -m unittest discover -s tests
 """
 
 import importlib.util
-import shutil
 import sqlite3
 import unittest
 from datetime import datetime, timedelta
@@ -34,8 +33,9 @@ GOALIE_POISON = (
 SNAPSHOT_MISS = (2027, 2701312, "away", 29857823, 30117507)
 # 2027:2701274 was played 2026-09-01, before the job captured lineups.
 NO_SNAPSHOT_ENDED = (2027, 2701274)
-# 2027:2701477 is unplayed in the fixture and has no snapshot.
-UNPLAYED_NO_SNAPSHOT = (2027, 2701477)
+# 2027:2701589 (HIFK-Tappara, 2027-01-02) is unplayed in the fixture and
+# has no snapshot.
+UNPLAYED_NO_SNAPSHOT = (2027, 2701589)
 
 
 def _game(conn, season, game_id):
@@ -158,15 +158,10 @@ class ResolverTest(FeatureTest):
     def test_snapshot_captured_after_the_start_is_ignored(self):
         season, game_id, role, _, actual = SNAPSHOT_MISS
         start = datetime.fromisoformat(_game(self.full, season, game_id)["start_utc"].replace("Z", "+00:00"))
-        snapshots = self.dir / "late.snapshots.db"
-        shutil.copy(self.snapshots, snapshots)
-        conn = sqlite3.connect(snapshots)
-        conn.execute(
+        snapshots = self.edited_snapshots("late", (
             "UPDATE lineup_snapshots SET captured_at = ? WHERE season = ? AND game_id = ?",
             ((start + timedelta(seconds=1)).isoformat(), season, game_id),
-        )
-        conn.commit()
-        conn.close()
+        ))
         late = self.build_features("late", snapshots=snapshots)
         self.assertEqual(starters.resolve_starter(late, season, game_id, role), (actual, starters.ACTUAL_POSTGAME))
 
@@ -252,7 +247,9 @@ class GoalieFeatureTest(FeatureTest):
 class StarterLogicTest(FeatureTest):
     def test_verify_starters_output_is_unchanged(self):
         # Pinned from `python scripts/verify_starters.py` on the real
-        # databases, 2026-11-06, before the logic moved to starters.py.
+        # databases, 2026-11-06, before the logic moved to starters.py;
+        # re-pinned 2026-11-12 with the 2027 games to 2026-11-11 (14 more
+        # team-games: 13 agree, 2701441 home has two period-1 goalies).
         spec = importlib.util.spec_from_file_location("verify_starters", REPO / "scripts" / "verify_starters.py")
         script = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(script)
@@ -270,14 +267,15 @@ class StarterLogicTest(FeatureTest):
                 agree += 1
             else:
                 disagree.append((row["game_id"], row["team_role"], actual))
-        self.assertEqual(len(captured), 254)
-        self.assertEqual(agree, 249)
+        self.assertEqual(len(captured), 268)
+        self.assertEqual(agree, 262)
         self.assertEqual(disagree, [(2701312, "away", 30117507)])
         self.assertEqual(sorted(undetermined), [
             (2701322, "home", "ambiguous_period1_stats (2 candidates)"),
             (2701331, "home", "ambiguous_period1_stats (0 candidates)"),
             (2701341, "away", "ambiguous_period1_stats (2 candidates)"),
             (2701432, "home", "ambiguous_period1_stats (2 candidates)"),
+            (2701441, "home", "ambiguous_period1_stats (2 candidates)"),
         ])
 
     def derive_with_event(self, name, player_id, begin_time):
@@ -301,9 +299,9 @@ class StarterLogicTest(FeatureTest):
 
     def test_skew_report_on_2027(self):
         skew = goalie_report.skew_report(self.full)
-        self.assertEqual(skew["with_snapshot"], 254)
-        self.assertEqual(skew["both"], 250)
-        self.assertEqual(skew["snapshot_but_actual_undetermined"], 4)
+        self.assertEqual(skew["with_snapshot"], 268)
+        self.assertEqual(skew["both"], 263)
+        self.assertEqual(skew["snapshot_but_actual_undetermined"], 5)
         season, game_id, role, inferred, actual = SNAPSHOT_MISS
         self.assertEqual(
             [(m["game_id"], m["team_role"], m["inferred"], m["actual"]) for m in skew["mismatches"]],

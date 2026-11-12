@@ -4,14 +4,13 @@ Run: python -m unittest discover -s tests
 """
 
 import math
-import shutil
 import sqlite3
 import unittest
 from pathlib import Path
 
 import numpy as np
 
-from features.support import FeatureTest
+from features.support import FeatureTest, copy_source
 from hockey_edge.models import versions
 from hockey_edge.validation import harness, market, report
 
@@ -30,7 +29,7 @@ class MarketTest(FeatureTest):
     def edited_features(self, name, *statements):
         """A copy of the built features.db with SQL statements applied."""
         path = self.dir / f"{name}.features.db"
-        shutil.copy(self.dir / "full.features.db", path)
+        copy_source(self.full_path, path)
         conn = sqlite3.connect(path)
         self.addCleanup(conn.close)
         for sql, params in statements:

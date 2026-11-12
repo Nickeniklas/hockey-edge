@@ -38,7 +38,7 @@ request per book**. `snapshot/job.py` runs `OddsPapiProvider` over
 zero-request stub. See `docs/ODDS_PLAN.md`.
 
 Tests: `tests/`, **stdlib `unittest`, no pytest** — run
-`python -m unittest discover -s tests` (292 tests, 5–8 min). New tests go in
+`python -m unittest discover -s tests` (299 tests, about 3 min). New tests go in
 `tests/test_*.py` or the matching subpackage (`tests/features/`,
 `tests/models/`, `tests/validation/`). They assert against **real saved data**
 (`fixtures/oddspapi/`, `fixtures/liiga/`, `fixtures/features/mini.sql`), never
@@ -46,7 +46,11 @@ invented payloads, and make zero HTTP requests. A test needing a snapshot DB
 builds a temp one via `storage.get_connection(tmp_path)`; nothing touches
 `data/*.db`. `mini.sql` is regenerated from the live databases by
 `scripts/make_feature_fixture.py`, and a nightly resync can renumber row ids in
-it, so tests never pin ids. Every point-in-time feature gets a truncation test
+it, so tests never pin ids. Feature tests subclass `FeatureTest`
+(`tests/features/support.py`), which builds the fixture once per process
+into read-only files: edit copies (`edited_hockey`, `edited_snapshots`,
+`copy_source`), never the shared ones; `shutil.copy` would carry the
+read-only flag over. Every point-in-time feature gets a truncation test
 and a poison test.
 
 Tooling: plain venv + `requirements.txt` (no uv/poetry; `numpy`, `scipy` are in
@@ -98,11 +102,11 @@ runs; **not the prediction log**, which is step 7).
 6. LightGBM + blend
 7. Prediction log + local dashboard
 
-## Current status (2026-11-11)
+## Current status (2026-11-12)
 
 Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand", except that its
-"known hole in the `game_stats` value guard" is now closed (below). History:
-`docs/STATUS_LOG.md`.
+"known hole in the `game_stats` value guard" is now closed and its fixture
+clean-up before step 6 is done (both below). History: `docs/STATUS_LOG.md`.
 
 - **Step 1, Liiga ingest: done**, 2015–2027 in `data/hockey.db`. Historical
   recovery finished 2026-09-25 (`docs/RECOVERY_BACKLOG.md`). The scheduled
@@ -147,13 +151,13 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand", except that its
     `f3a.1`).
   - F3b: `game_team_special_teams`, `features_special_teams` (PP%/PK% shrunk
     with k = 150 opportunities; raw counts stored).
-  - F3c: `game_skater_toi` (who dressed, with ice time and F/D; 228,790
-    rows), `features_availability` (share of the last 5/10 games' ice
-    time missing from the resolved lineup, this season only; lineup from
-    `lineups.resolve_lineup`: snapshot, else actual, else the last known
-    lineup). Report `python -m hockey_edge.features.availability_report`.
-    In 2027 the confirmed lineup equals who played in all 254 team-games
-    with both.
+  - F3c: `game_skater_toi` (who dressed, with ice time and F/D; 229,070
+    rows on 2026-11-12), `features_availability` (share of the last 5/10
+    games' ice time missing from the resolved lineup, this season only;
+    lineup from `lineups.resolve_lineup`: snapshot, else actual, else the
+    last known lineup). Report `python -m hockey_edge.features.availability_report`.
+    In 2027 the confirmed lineup equals who played in all 268 team-games
+    with both (to 2026-11-11).
     2016-01-05 is a named ice-time gap day (`lineups.GAP_DATES`); a NULL
     roster `role` takes `pos` from `role_code`'s letter (H/KH → F, P → D).
   - F3d: `features_motivation` (RUNKOSARJA only, NULL otherwise): table
@@ -168,9 +172,23 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand", except that its
     `python -m hockey_edge.features.motivation_report`.
   - F2/F3 feature tables are **one row per team per game**; F1's are
     home/away columns. Step 6 pivots them.
-  - Before step 6: one full regeneration of `fixtures/features/mini.sql`
-    with the tests re-pinned (it has F3c slices appended by
-    `scripts/make_feature_fixture.py --append-f3c`).
+- **Test fixture clean-up: done 2026-11-12** (plan "Fixtures" section).
+  `scripts/make_feature_fixture.py` writes the whole
+  `fixtures/features/mini.sql` in one pass (the `--append-f3c` mode is
+  gone), keeping only the rows and columns that the build, its reports and
+  `verify_starters.py` read; 2027 is in it to 2026-11-11. 5,481 → 4,951 KB.
+  Re-pinned only 2027 counts that grew with the seven games played since
+  (snapshot team-games 254 → 268, availability rows 322 → 336, starters
+  agreeing 249 → 262, 2701441 a new undetermined starter), the newest
+  snapshot in `build_meta`, and the "unplayed, no snapshot" game (2701477,
+  played 2026-11-09, now 2701589). The feature tests load and build the
+  fixture once per process (`tests/features/support.shared`: read-only
+  files, query-only connections), not once per class: loads 31 → 1, builds
+  81 → 51. The test packages set `OPENBLAS_NUM_THREADS=1`: numpy's and
+  scipy's OpenBLAS committed about 1 GB on import (16 threads), almost all
+  of the suite's committed memory. Suite 340 → about 170 s, peak committed
+  memory 1,101 → 128 MB. `features.db` rebuilt before and after: row-for-row
+  identical.
 - **Step 5, Elo + harness: done 2026-10-13.** Plan `docs/ELO_HARNESS_PLAN.md`,
   results `docs/ELO_RESULTS.md`. Elo beats base rates by 0.0316 ± 0.0039 log
   loss on pooled 2018–2026 (4,075 games), a goal-difference rating by only
@@ -184,7 +202,7 @@ Agrees with `docs/PROJECT_CONTEXT.md` "Where things stand", except that its
   `D:\Users\Nikla_000\DATA\hockey-edge-backups`. Restore: `docs/BACKUP.md`.
   healthchecks.io alerts via `src/hockey_edge/ops/heartbeat.py`: checks
   `snapshot-job`, `missed-windows`, `nightly-sync`, `backup`.
-- **Tests: 299** (5–8 min; the per-team guard added 7), `python -m unittest discover -s tests`.
+- **Tests: 299** (about 3 min), `python -m unittest discover -s tests`.
 
 Commands (repo root, venv active):
 

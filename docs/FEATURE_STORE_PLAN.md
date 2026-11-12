@@ -545,33 +545,53 @@ still `f3c`):**
 
 ## Fixtures
 
-- `scripts/make_feature_fixture.py` copies a slice of real rows from `hockey.db` and
-  `snapshots.db` into `fixtures/features/mini.sql` (text dump, git-diffable). Tests
-  load it into an in-memory DB. Include: two seasons, all teams, a few known OT/SO
-  games, one PLAYOFFS series, 2022:49294, one foreign friendly, the 2025 Jokerit
-  qualification series and the 2025 PLAYOUT series, one 2025/2026 game with stripped
-  team stats, one game from the 2025 `shot_events` gap, the 2027 games with
-  snapshots, penalty events and goal events for the ended competitive games of 2027
-  and of 2025 from 2025-01-22 to 2025-02-23 (the `shot_events` stretch) and for five
-  penalty-direction games (F3a), with the roster rows of every player a penalty
-  names (penalised player or sufferer; all the penalty-team rule reads):
-  - 2022:152: stored swapped, with a bench penalty;
-  - 2027:2701274: stored right, with a bench penalty;
-  - 2025:231: mixed (one stray row among seven player penalties), with a bench
-    penalty;
-  - 2025:399: a penalised player listed on both rosters;
-  - 2022:35: a single bench penalty and nothing else (resolves by sufferer since the
-    2026-11-09 fix).
+Regenerated whole on 2026-11-12 (before step 6); 2027 is in it to 2026-11-11.
 
-  2018 game 1 and 2023 game 1 are not in the fixture: neither has a bench penalty,
-  and the build accepts only whole seasons. The per-season swapped share on the
-  real build checks 2018 and 2023 against FEATURE_AUDIT item 7.
-- F3c (appended 2026-11-09 with `--append-f3c`, cut to the file's 2026-11-01
-  state): skater period stats (keys and ice time) for the ended competitive
-  games of 2027 and for Pelicans', Jukurit's and Jokerit's 2025 games from
-  2025-02-01 (run-in, then the ice-time gap of the PLAYOUT and QUALIFICATIONS
-  series), the roster rows of those skaters with `role`, and the 2027 lineup
-  snapshots' `roster_json` cut to id, role and line.
+- `scripts/make_feature_fixture.py` writes `fixtures/features/mini.sql` (text dump,
+  git-diffable) in one pass from `hockey.db` and `snapshots.db`, both opened
+  read-only. Each slice keeps only the rows and the columns that the feature build,
+  its reports and `scripts/verify_starters.py` read, plus NOT NULL columns; no
+  hockey.db row id is written (SQLite numbers rows on load; resync renumbers them
+  anyway). snapshots.db ids are kept: append-only, and they break ties. Season 2027
+  is live, so a regeneration re-pins the tests that count 2027 games or snapshots.
+- Rows: seasons 2022, 2025 and 2027 of `games` in full (the build accepts only
+  whole seasons): all teams, known OT/SO games, PLAYOFFS series, 2022:49294 and the
+  49298 tiebreak, foreign friendlies, the 2025 Jokerit qualification series and the
+  2025 PLAYOUT series, K-Espoo's and Jokerit's first seasons, unplayed games.
+  - Odds: every `odds_snapshots` row of four 2027 games, `raw_payload` blanked.
+  - F2a: goalie period stats and goalkeeper events for the competitive games of
+    2025 and 2027; the parsed 2027 lineup snapshots that name a starter (the only
+    ones read), `raw_payload` blanked, `roster_json` cut to each player's id and
+    role.
+  - F2b: `shot_events` for the competitive games of 2027 and of 2025 from
+    2025-01-22 to 2025-02-23, which runs into the 2025 `shot_events` gap.
+  - F3a/F3b: penalty and goal events for the ended competitive games of 2027 and
+    of the same 2025 stretch, and for five penalty-direction games:
+    - 2022:152: stored swapped, with a bench penalty;
+    - 2027:2701274: stored right, with a bench penalty;
+    - 2025:231: mixed (one stray row among seven player penalties), with a bench
+      penalty;
+    - 2025:399: a penalised player listed on both rosters;
+    - 2022:35: a single bench penalty and nothing else (resolves by sufferer since
+      the 2026-11-09 fix).
+
+    2018 game 1 and 2023 game 1 are not in the fixture: neither has a bench
+    penalty, and the build accepts only whole seasons. The per-season swapped share
+    on the real build checks 2018 and 2023 against FEATURE_AUDIT item 7.
+  - F3c: skater period stats (keys and ice time) for the ended competitive games of
+    2027 and Pelicans', Jukurit's and Jokerit's 2025 games from 2025-02-01 (run-in,
+    then the ice-time gap of the PLAYOUT and QUALIFICATIONS series).
+  - `game_rosters`: the rows of every player a penalty names (penalised player or
+    sufferer; all the penalty-team rule reads) and of every skater with a stats
+    row, with `role` and `role_code` (they give `pos`).
+  - F3d reads `games` only.
+- Tests (`tests/features/support.py`): the fixture is loaded into temp source
+  databases and built once per test process (`shared()`); the two source files and
+  the full `features.db` are made read-only and every `FeatureTest` class opens its
+  own query-only connection, so no test can change what another reads. Tests that
+  edit sources work on writable copies in their class's temp directory
+  (`edited_hockey`, `edited_snapshots`). Before 2026-11-12 every class loaded and
+  built it again (31 loads, 81 builds per run; now 1 and 51).
 
 ## Decisions for Niklas (collected)
 

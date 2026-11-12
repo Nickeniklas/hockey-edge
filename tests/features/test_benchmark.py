@@ -3,8 +3,6 @@
 Run: python -m unittest discover -s tests
 """
 
-import shutil
-import sqlite3
 import unittest
 
 from hockey_edge.features.benchmark import remove_vig
@@ -57,12 +55,9 @@ class BenchmarkTest(FeatureTest):
             self.full.execute("SELECT DISTINCT book, is_fallback FROM benchmark_odds").fetchall()[0][:],
             ("pinnacle", 0),
         )
-        snapshots = self.dir / "no_pinnacle.snapshots.db"
-        shutil.copy(self.snapshots, snapshots)
-        conn = sqlite3.connect(snapshots)
-        conn.execute("DELETE FROM odds_snapshots WHERE book = 'pinnacle' AND game_id = 2701309")
-        conn.commit()
-        conn.close()
+        snapshots = self.edited_snapshots(
+            "no_pinnacle", ("DELETE FROM odds_snapshots WHERE book = 'pinnacle' AND game_id = 2701309", ())
+        )
         fallback = self.build_features("no_pinnacle", snapshots=snapshots)
         book, is_fallback, snapshot_id = self.one(fallback, 2701309, "book, is_fallback, odds_snapshot_id")
         self.assertEqual((book, is_fallback), ("bet365", 1))

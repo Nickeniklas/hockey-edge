@@ -11,8 +11,6 @@ resolve to 'unknown' with no fallback.
 Run: python -m unittest discover -s tests
 """
 
-import shutil
-import sqlite3
 import unittest
 from datetime import datetime, timedelta
 from unittest import mock
@@ -36,8 +34,8 @@ KRANNILA = 32194874
 LOANED, LOAN_GAME = 40032907, (2027, 2701361)
 # 2025 PLAYOUT, Pelicans-Jukurit: no skater ice time in any of the five games.
 GAP_GAMES = (51169, 51170, 51171, 51172, 51174)
-# Unplayed in the fixture, no snapshot.
-UNPLAYED_NO_SNAPSHOT = (2027, 2701477)
+# Unplayed in the fixture (HIFK-Tappara, 2027-01-02), no snapshot.
+UNPLAYED_NO_SNAPSHOT = (2027, 2701589)
 
 # Snapshot, actual (the 2026-10-09 capture gap), actual in a gap series.
 TARGETS = ((2027, 2701306), (2027, 2701368), (2025, 51170))
@@ -196,7 +194,7 @@ class ResolverTest(FeatureTest):
 
     def test_snapshot_lineups_match_actual_in_2027(self):
         skew = availability_report.skew_report(self.full)
-        self.assertEqual(skew["both"], 254)
+        self.assertEqual(skew["both"], 268)
         self.assertEqual(skew["mismatches"], [])
         self.assertTrue(all(d["differ"] == 0 for d in skew["value_diffs"].values()))
 
@@ -229,20 +227,15 @@ class ResolverTest(FeatureTest):
                 (st["snapshot_player_id"], st["snapshot_captured_at"]),
             )
             checked += 1
-        self.assertEqual(checked, 254)
+        self.assertEqual(checked, 268)
 
     def test_snapshot_captured_after_the_start_is_ignored(self):
         season, game_id, team_id = ABSENCE
         start = datetime.fromisoformat(_game(self.full, season, game_id)["start_utc"].replace("Z", "+00:00"))
-        snapshots = self.dir / "avlate.snapshots.db"
-        shutil.copy(self.snapshots, snapshots)
-        conn = sqlite3.connect(snapshots)
-        conn.execute(
+        snapshots = self.edited_snapshots("avlate", (
             "UPDATE lineup_snapshots SET captured_at = ? WHERE season = ? AND game_id = ?",
             ((start + timedelta(minutes=1)).isoformat(), season, game_id),
-        )
-        conn.commit()
-        conn.close()
+        ))
         late = self.build_features("avlate", snapshots=snapshots)
         lineup, source = lineups.resolve_lineup(late, season, game_id, team_id)
         self.assertEqual(source, lineups.ACTUAL)
@@ -277,7 +270,7 @@ class AvailabilityTest(FeatureTest):
                     else:
                         self.assertAlmostEqual(a, b)
             checked += 1
-        self.assertEqual(checked, 322)
+        self.assertEqual(checked, 336)
 
     def test_first_game_of_the_season_is_null(self):
         # 2701277 is Lukko's 2027 opener.
